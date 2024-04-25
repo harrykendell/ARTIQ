@@ -1,102 +1,51 @@
 from artiq.experiment import *
 
 
-class SUServo(EnvExperiment):
-
+class SUServoMinimal(EnvExperiment):
     def build(self):
         self.setattr_device("core")
-        self.setattr_device("led0")
+        self.setattr_device("urukul0_cpld")
         self.setattr_device("suservo0")
-        for i in range(8):
-            self.setattr_device("suservo0_ch{}".format(i))
+        self.setattr_device("suservo0_ch0")
 
-    def run(self):
-        self.init()
-
-    def p(self, d):
-        mask = 1 << 18 - 1
-        for name, val in zip("ftw1 b1 pow cfg offset a1 ftw0 b0".split(), d):
-            val = -(val & mask) + (val & ~mask)
-            print("{}: {:#x} = {}".format(name, val, val))
-
-    @rpc(flags={"async"})
-    def p1(self, adc, asf, st):
-        print("ADC: {:10s}, ASF: {:10s}, clipped: {}".format(
-            "#" * int(adc), "#" * int(asf * 10), (st >> 8) & 1),
-              end="\r")
+        self.setattr_argument("en_irr", BooleanValue(True))
 
     @kernel
-    def init(self):
-        self.core.break_realtime()
+    def run(self):
+        # Prepare core
         self.core.reset()
-        self.led()
 
+        # Initialize and activate SUServo
         self.suservo0.init()
-        delay(1 * us)
-        # ADC PGIA gain
-        for i in range(8):
-            self.suservo0.set_pgia_mu(i, 0)
-            delay(10 * us)
-        # DDS attenuator
-        self.suservo0.cplds[0].set_att(0,10.0)
-        delay(1 * us)
-        # Servo is done and disabled
-        assert self.suservo0.get_status() & 0xff == 2
-
-        # set up profile 0 on channel 0:
-        delay(120 * us)
-        self.suservo0_ch0.set_y(
-            profile=0,
-            y=0.  # clear integrator
-        )
-        
-        self.suservo0_ch0.set_iir(
-            profile=0,
-            adc=7,  # take data from Sampler channel 7
-            kp=-.1,  # -0.1 P gain
-            ki=-300. / s,  # low integrator gain
-            g=0.,  # no integrator gain limit
-            delay=0.  # no IIR update delay after enabling
-        )
-        # setpoint 0.5 (5 V with above PGIA gain setting)
-        # 71 MHz
-        # 0 phase
-        self.suservo0_ch0.set_dds(
-            profile=0,
-            offset=-.5,  # 5 V with above PGIA settings
-            frequency=71 * MHz,
-            phase=0.)
-        # enable RF, IIR updates and profile 0
-        self.suservo0_ch0.set(en_out=1, en_iir=1, profile=0)
-        # enable global servo iterations
         self.suservo0.set_config(enable=1)
 
-        # check servo enabled
-        assert self.suservo0.get_status() & 0x01 == 1
-        delay(10 * us)
+        # Set Sampler gain and Urukul attenuation
+        gain = 0
+        attenuation = 0.0
+        # set gain on Sampler channel 0 to 10^gain
+        self.suservo0.set_pgia_mu(0, gain)
+        # set attenuation on Urukul channel 0 to A
+        self.suservo0.cpld0.set_att(0, attenuation)
 
-        # read back profile data
-        data = [0] * 8
-        self.suservo0_ch0.get_profile_mu(0, data)
-        self.p(data)
-        delay(10 * ms)
+        # Set physical parameters
+        targetV = 1.0  # target input voltage (V) for Sampler channel
+        freq = 100e6  # frequency (Hz) of Urukul output
+        # offset to assign to servo to reach target voltage
+        offset = -targetV * (10.0 ** (gain - 1))
 
-        while True:
-            self.suservo0.set_config(0)
-            delay(10 * us)
-            v = self.suservo0.get_adc(7)
-            delay(30 * us)
-            w = self.suservo0_ch0.get_y(0)
-            delay(20 * us)
-            x = self.suservo0.get_status()
-            delay(10 * us)
-            self.suservo0.set_config(1)
-            self.p1(v, w, x)
-            delay(20 * ms)
+        self.suservo0_ch0.set_dds(profile=0, frequency=freq, offset=offset)
 
-    @kernel
-    def led(self):
-        self.core.break_realtime()
-        for i in range(3):
-            self.led0.pulse(.1 * s)
-            delay(.1 * s)
+        # Input parameters, activate Urukul output (en_out=1), activate PI loop (en_iir=1)
+
+        if self.en_irr:
+            # Set PI loop parameters
+            P = 0.005  # proportional gain in loop
+            I = -10.0  # integrator gain
+            gl = 0.0  # integrator gain limit
+            adc_ch = 0  # Sampler channel to read from
+
+            self.suservo0_ch0.set(en_out=1, en_iir=1, profile=0)
+            self.suservo0_ch0.set_iir(profile=0, adc=adc_ch, kp=P, ki=I, g=gl)
+        else:
+            self.suservo0_ch0.set_y(0, 1.0)
+            self.suservo0_ch0.set(en_out=1, en_iir=0, profile=0)
