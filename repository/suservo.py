@@ -5,8 +5,8 @@ class SUServoMinimal(EnvExperiment):
     def build(self):
         self.setattr_device("core")
         self.setattr_device("urukul0_cpld")
-        self.setattr_device("suservo0")
-        self.setattr_device("suservo0_ch0")
+        self.setattr_device("suservo")
+        self.setattr_device("suservo_ch0")
 
         self.setattr_argument("en_irr", BooleanValue(True))
 
@@ -16,16 +16,16 @@ class SUServoMinimal(EnvExperiment):
         self.core.reset()
 
         # Initialize and activate SUServo
-        self.suservo0.init()
-        self.suservo0.set_config(enable=1)
+        self.suservo.init()
+        self.suservo.set_config(enable=1)
 
         # Set Sampler gain and Urukul attenuation
         gain = 0
         attenuation = 0.0
         # set gain on Sampler channel 0 to 10^gain
-        self.suservo0.set_pgia_mu(0, gain)
+        self.suservo.set_pgia_mu(0, gain)
         # set attenuation on Urukul channel 0 to A
-        self.suservo0.cpld0.set_att(0, attenuation)
+        self.suservo.cpld0.set_att(0, attenuation)
 
         # Set physical parameters
         targetV = 1.0  # target input voltage (V) for Sampler channel
@@ -33,7 +33,7 @@ class SUServoMinimal(EnvExperiment):
         # offset to assign to servo to reach target voltage
         offset = -targetV * (10.0 ** (gain - 1))
 
-        self.suservo0_ch0.set_dds(profile=0, frequency=freq, offset=offset)
+        self.suservo_ch0.set_dds(profile=0, frequency=freq, offset=offset)
 
         # Input parameters, activate Urukul output (en_out=1), activate PI loop (en_iir=1)
 
@@ -44,8 +44,8 @@ class SUServoMinimal(EnvExperiment):
             gl = 0.0  # integrator gain limit
             adc_ch = 0  # Sampler channel to read from
 
-            self.suservo0_ch0.set(en_out=1, en_iir=1, profile=0)
-            self.suservo0_ch0.set_iir(profile=0, adc=adc_ch, kp=P, ki=I, g=gl)
+            self.suservo_ch0.set(en_out=1, en_iir=1, profile=0)
+            self.suservo_ch0.set_iir(profile=0, adc=adc_ch, kp=P, ki=I, g=gl)
         else:
-            self.suservo0_ch0.set_y(0, 1.0)
-            self.suservo0_ch0.set(en_out=1, en_iir=0, profile=0)
+            self.suservo_ch0.set_y(0, 1.0)
+            self.suservo_ch0.set(en_out=1, en_iir=0, profile=0)

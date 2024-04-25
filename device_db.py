@@ -47,7 +47,7 @@ device_db = {
 
 # DAC = Digital to Analog Converter
 # 32 channels 16bit DAC
-device_db["fastino0"] = {
+device_db["fastino"] = {
     "type": "local",
     "module": "artiq.coredevice.fastino",
     "class": "Fastino",
@@ -57,49 +57,49 @@ device_db["fastino0"] = {
 # freq synthesiser 50MHz - 4GHz
 # boosted to 5GHz - 12GHz by the almazny
 # SPI = Serial Peripheral Interface
-device_db["spi_mirny0"] = {
+device_db["spi_mirny"] = {
     "type": "local",
     "module": "artiq.coredevice.spi2",
     "class": "SPIMaster",
     "arguments": {"channel": 1},
 }
-device_db["mirny0_cpld"] = {
+device_db["mirny_cpld"] = {
     "type": "local",
     "module": "artiq.coredevice.mirny",
     "class": "Mirny",
-    "arguments": {"spi_device": "spi_mirny0", "refclk": 100000000.0, "clk_sel": "mmcx"},
+    "arguments": {"spi_device": "spi_mirny", "refclk": 100000000.0, "clk_sel": "mmcx"},
 }
 
 for i in range(4):
     device_db.update(
         {
-            "ttl_mirny0_sw"
+            "ttl_mirny_sw"
             + str(i): {
                 "type": "local",
                 "module": "artiq.coredevice.ttl",
                 "class": "TTLOut",
                 "arguments": {"channel": 2 + i},
             },
-            "mirny0_ch"
+            "mirny_ch"
             + str(i): {
                 "type": "local",
                 "module": "artiq.coredevice.adf5356",
                 "class": "ADF5356",
                 "arguments": {
                     "channel": i,
-                    "sw_device": "ttl_mirny0_sw" + str(i),
-                    "cpld_device": "mirny0_cpld",
+                    "sw_device": "ttl_mirny_sw" + str(i),
+                    "cpld_device": "mirny_cpld",
                 },
             },
         }
     )
 
-device_db["mirny0_almazny"] = {
+device_db["almazny"] = {
     "type": "local",
     "module": "artiq.coredevice.mirny",
     "class": "Almazny",
     "arguments": {
-        "host_mirny": "mirny0_cpld",
+        "host_mirny": "mirny_cpld",
     },
 }
 
@@ -162,20 +162,19 @@ for i in range(8):
 
 # SU Servo is an 8-channel ADC (Sampler) and two 4-channel DDS (Urukuls) with a DSP engine
 # connecting the ADC data and the DDS output amplitudes to enable feedback.
-
-# SU Servo can for example be used to implement intensity stabilization of laser beams
+# It can be used to implement intensity stabilization of laser beams
 # with an amplifier and AOM driven by Urukul and a photodetector connected to Sampler.
 
 # PGIA = Programmable Gain Instrumentation Amplifier
 # CPLD = Complex Programmable Logic Device
 # DDS = Direct Digital Synthesis
-device_db["suservo0"] = {
+device_db["suservo"] = {
     "type": "local",
     "module": "artiq.coredevice.suservo",
     "class": "SUServo",
     "arguments": {
         "channel": 42,
-        "pgia_device": "spi_sampler0_pgia",
+        "pgia_device": "spi_sampler_pgia",
         "cpld_devices": ["urukul0_cpld", "urukul1_cpld"],
         "dds_devices": ["urukul0_dds", "urukul1_dds"],
     },
@@ -183,18 +182,18 @@ device_db["suservo0"] = {
 for i in range(8):
     device_db.update(
         {
-            "suservo0_ch"
+            "suservo_ch"
             + str(i): {
                 "type": "local",
                 "module": "artiq.coredevice.suservo",
                 "class": "Channel",
-                "arguments": {"channel": 34 + i, "servo_device": "suservo0"},
+                "arguments": {"channel": 34 + i, "servo_device": "suservo"},
             }
         }
     )
 
 # Sampler
-device_db["spi_sampler0_pgia"] = {
+device_db["spi_sampler_pgia"] = {
     "type": "local",
     "module": "artiq.coredevice.spi2",
     "class": "SPIMaster",
