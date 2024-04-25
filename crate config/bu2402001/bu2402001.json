@@ -1,0 +1,40 @@
+{
+    "target": "kasli",
+    "variant": "BU2402001",
+    "hw_rev": "v2.0",
+    "base": "standalone",
+    "peripherals": [
+        {
+            "type": "fastino",
+            "ports": [7]
+        },
+        {
+            "type": "mirny",
+            "ports": [4],
+            "clk_sel": "mmcx",
+            "almazny": true
+        },
+        {
+            "type": "dio",
+            "ports": [9],
+            "bank_direction_low": "output",
+            "bank_direction_high": "input",
+            "edge_counter": true
+        },
+        {
+            "type": "dio",
+            "ports": [10],
+            "bank_direction_low": "input",
+            "bank_direction_high": "input",
+            "edge_counter": true
+        },
+        {
+            "type": "suservo",
+            "sampler_ports": [5, 6],
+            "sampler_hw_rev": "v2.3",
+            "urukul0_ports": [0, 1],
+            "urukul1_ports": [2, 3],
+            "clk_sel": 2
+        }
+    ]
+}
