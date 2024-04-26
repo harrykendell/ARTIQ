@@ -31,6 +31,7 @@ device_db = {
     },
     # allows for direct memory access of RTIO events
     "core_dma": {"type": "local", "module": "artiq.coredevice.dma", "class": "CoreDMA"},
+    #     I2C switches
     "i2c_switch0": {
         "type": "local",
         "module": "artiq.coredevice.i2c",

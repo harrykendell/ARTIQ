@@ -11,27 +11,40 @@ class TTL_Pulse_All(EnvExperiment):
     def build(self):
         self.setattr_device("core")
 
+        self.ttlOut=[None]*4
+        self.ttl=[None]*12
+        for i in range(4):
+            self.setattr_device(f"ttl{i}")
+            self.ttlOut[i]=self.__dict__[f"ttl{i}"]
         for i in range(4,16):
             self.setattr_device(f"ttl{i}")
-
-        self.ttls=[self.__dict__[f"ttl{i}"] for i in range(4,16)]
+            self.ttl[i-4]=self.__dict__[f"ttl{i}"]
 
     @kernel  # this code runs on the FPGA
     def run(self):
 
         self.core.reset()  # resets core device
-        # for ttl in self.ttls:
-        #     ttl.output()
+        self.core.break_realtime()
 
-        delay(500 * ms)
+        for ttlout in self.ttlOut:
+            ttlout.output()
+            delay(1 * us)
+        for ttl in self.ttl:
+            ttl.output()
+            delay(1 * us)
 
-        # sets TTL output high for 5ms then sets it to low
-        for ttl in self.ttls:
-                ttl.on()
-                delay(1 * us)
-
-        delay(10*s)
-
-        for ttl in self.ttls:
-             ttl.off()
-             delay(1 * us)
+        self.core.break_realtime()
+        for _ in range(50000):
+                i = 0
+                for ttlout in self.ttlOut:
+                        i += 1
+                        for _ in range(i):
+                                ttlout.pulse(1*us)
+                                delay(1*us)
+                        delay(10*us)
+                for ttl in self.ttl:
+                        i += 1
+                        for _ in range(i):
+                                ttl.pulse(1*us)
+                                delay(1*us)
+                        delay(10*us)

@@ -17,13 +17,16 @@ class TTL_Output_On_Off_Pulse(EnvExperiment):
     def run(self):
 
         self.core.reset()  # resets core device
+        self.core.break_realtime()
         self.ttl0.output()  # sets TTL as an output
-        self.ttl0.off()
+
         # moves timestamp forward to prevent collision between ttl.output and ttl.on although appears not to be neccessary in this case.
         delay(1 * us)
 
         # sets TTL output high for 5ms then sets it to low
-        self.ttl0.pulse(5 * ms)
-        delay(1 * ms)
+        for i in range(1_000_000):
+                self.ttl0.pulse(5 * ms)
+                delay(5 * ms)
+
         self.ttl0.off()
 
