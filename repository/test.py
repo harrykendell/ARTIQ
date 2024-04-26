@@ -2,79 +2,105 @@ from artiq.experiment import *
 
 
 class Test(EnvExperiment):
-    '''Test all devices in the device_db.'''
+    """TEST - all devices"""
+
+    # printing must be off the kernel
+    @rpc(flags={"async"})
+    def prnt(self, channel, adc):
+        print(
+            "{} ADC: {}".format(channel, adc),
+            end="\r",
+        )
+
     def build(self):
         self.setattr_device("core")
+
+        # LED
         self.setattr_device("led0")
         self.setattr_device("led1")
 
-        for i in range(16):
-            self.setattr_device("ttl"+str(i))
-
-        self.setattr_device("fastino") # Fastino
-
-        self.setattr_device("mirny_cpld") # Mirny
+        # TTL
+        self.ttlOut = [None] * 4
+        self.ttl = [None] * 12
         for i in range(4):
-            self.setattr_device("mirny_ch"+i) # ADF5356
-            self.setattr_device("ttl_mirny_sw"+str(i)) # TTLOut
+            self.setattr_device("ttl" + str(i))
+            self.ttlOut[i] = self.__dict__["ttl" + str(i)]
+        for i in range(12):
+            self.setattr_device("ttl" + str(i + 4))
+            self.ttl[i] = self.__dict__["ttl" + str(i + 4)]
 
-        self.setattr_device("almazny") # Almazny
+        # Fastino
+        self.setattr_device("fastino")
 
-        self.setattr_device("suservo") # SUServo
+        # Mirny
+        self.setattr_device("mirny_cpld")
+        self.mirny_ch = [None] * 4
+        self.ttl_mirny_sw = [None] * 4
+        for i in range(4):
+            self.setattr_device(f"mirny_ch{i}")  # ADF5356
+            self.mirny_ch[i] = self.__dict__[f"mirny_ch{i}"]
+            self.setattr_device(f"ttl_mirny_sw{i}")  # TTLOut
+            self.ttl_mirny_sw[i] = self.__dict__[f"ttl_mirny_sw{i}"]
+
+        # Almazny
+        self.setattr_device("almazny")
+
+        # SUServo
+        self.setattr_device("suservo")
+        self.suservo_ch = [None] * 8
         for i in range(8):
-            self.setattr_device("suservo_ch"+i) # SUServo Channel
+            self.setattr_device(f"suservo_ch{i}")  # SUServo Channel
+            self.suservo_ch[i] = self.__dict__[f"suservo_ch{i}"]
 
+        self.urukul_cpld = [None] * 2
+        self.urukul_dds = [None] * 2
         for i in range(2):
-            self.setattr_device("urukul"+str(i)+"_cpld") # CPLD
-            self.setattr_device("urukul"+str(i)+"_dds") # AD9910
+            self.setattr_device("urukul" + str(i) + "_cpld")  # CPLD
+            self.urukul_cpld[i] = self.__dict__[f"urukul{i}_cpld"]
+            self.setattr_device(f"urukul{i}_dds")  # AD9910
+            self.urukul_dds[i] = self.__dict__[f"urukul{i}_dds"]
 
     @kernel
     def run(self):
         self.init()
-
         self.test()
 
     @kernel
     def init(self):
-        '''Call the init() method of each device in the device_db.'''
+        """Call the init() method of each device in the device_db."""
         self.core.break_realtime()
         self.core.reset()
 
         # Fastino
         self.fastino.init()
         print("fastino (Fastino) initialised")
-        delay(1*ms)
+        delay(100 * ms)
 
         # Mirny
         self.mirny_cpld.init()
         print("mirny (Mirny) initialised")
-        delay(1*ms)
-        for i in range(4):
-            self.__dict__["mirny_ch"+str(i)].init()
-            delay(1*ms)
+        delay(100 * ms)
+        for mirny_ch in self.mirny_ch:
+            mirny_ch.init()
+            delay(100 * ms)
         print("mirny (ADF5356) initialised")
         self.almazny.init()
         print("almazny (Almazny) initialised")
-        delay(1*ms)
+        delay(100 * ms)
 
         # SUServo
         self.suservo.init()
         print("suservo (SUServo) initialised")
-        delay(1*ms)
+        delay(100 * ms)
 
         # Urukul
         for i in range(2):
-            self.__dict__["urukul"+str(i)+"_cpld"].init()
-            delay(1*ms)
-            self.__dict__["urukul"+str(i)+"_dds"].init()
-            delay(1*ms)
+            self.urukul_cpld[i].init(blind=True)
+            delay(100 * ms)
+            self.urukul_dds[i].init(blind=True)
+            delay(100 * ms)
         print("urukuls initialised")
 
-    # printing must be off the kernel
-    @rpc(flags={"async"})
-    def prnt(self, channel, adc):
-        print("{} ADC: {:10s}".format(channel,"#" * int(adc)),end="\r",)
-    
     @kernel
     def test(self):
         self.core.break_realtime()
@@ -85,16 +111,19 @@ class Test(EnvExperiment):
 
         # Suservo
         for i in range(8):
-            self.__dict__["suservo_ch"+str(i)].set_dds(profile=0, frequency=10e6*(1+i), offset=0)
-            self.__dict__["suservo_ch" + str(i)].set(en_out=1, en_iir=0, profile=0)
-            delay(1*ms)
-            prnt(i,self.suservo.get_adc(i))
+            self.suservo_ch[i].set_dds(profile=0, frequency=10e6 * (1 + i), offset=0.0)
+            delay(100 * ms)
+            self.suservo_ch[i].set(en_out=1, en_iir=0, profile=0)
+            delay(100 * ms)
+            self.prnt(i, self.suservo.get_adc(i))
+            delay(100 * ms)
 
         # Mirny
         for i in range(4):
-            self.__dict__["ttl_mirny_sw"+str(i)].on()
-            self.__dict__["mirny_ch"+str(i)].set_frequency(100e6*(1+i))
-            delay(1*ms)
+            self.ttl_mirny_sw[i].on()
+            delay(100 * ms)
+            self.mirny_ch[i].set_frequency(100e6 * (1 + i))
+            delay(100 * ms)
         self.almazny.output_toggle(True)
 
         # Fastino
@@ -102,12 +131,14 @@ class Test(EnvExperiment):
 
         # TTL
         for i in range(4):
-            self.__dict__["ttl"+str(i)].on()
-            delay(1*ms)
-        for i in range(4,16):
-            self.__dict__["ttl"+str(i)].output()
-            self.__dict__["ttl"+str(i)].on()
-            delay(1*ms)
-
-
-
+            self.ttlOut[i].output()
+            delay(100 * ms)
+            self.ttlOut[i].on()
+            delay(100 * ms)
+        for i in range(12):
+            self.ttl[i].output()
+            delay(100 * ms)
+            self.ttl[i].on()
+            delay(100 * ms)
+        
+        print("Test completed")
