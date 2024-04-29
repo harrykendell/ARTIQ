@@ -11,7 +11,7 @@ class TTL_Output_On_Off_Pulse(EnvExperiment):
     def build(self):
         self.setattr_device("core")
 
-        # setup a variable which contrls which TTL to read
+        # setup a variable which controls which TTL to read
         self.setattr_argument(
             "ttl_number", NumberValue(type="int", ndecimals=0, step=1, min=0, max=15)
         )
