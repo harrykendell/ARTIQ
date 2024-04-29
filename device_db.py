@@ -29,7 +29,7 @@ device_db = {
         "module": "artiq.coredevice.cache",
         "class": "CoreCache",
     },
-    # allows for direct memory access of RTIO events
+    # allows for direct memory access of RTIO events to play back faster than the cpu can
     "core_dma": {"type": "local", "module": "artiq.coredevice.dma", "class": "CoreDMA"},
     #     I2C switches
     "i2c_switch0": {
