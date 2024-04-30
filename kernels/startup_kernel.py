@@ -1,11 +1,7 @@
+"""
+The startup sequence for the experiment.
+"""
 from artiq.experiment import *
-import sys, os
-sys.path.append(
-    os.path.join(os.path.dirname(__file__), "..")
-)  # link to repository root
-import sys, os
-import Utils.import_all_devices
-from Utils.surpress_missing_imports import *
 
 class LED(EnvExperiment):
     def build(self):
@@ -14,15 +10,15 @@ class LED(EnvExperiment):
         # LEDs
         self.setattr_device("led0")
         self.setattr_device("led1")
-        self.led = [self.__dict__["led" + str(i)] for i in range(2)] # TTLOut
+        self.led = [self.__dict__["led" + str(i)] for i in range(2)]  # TTLOut
 
         # TTLs
         for i in range(4):
             self.setattr_device("ttl" + str(i))
         for i in range(12):
             self.setattr_device("ttl" + str(i + 4))
-        self.ttlOut = [self.__dict__["ttl" + str(i)] for i in range(4)] # TTLOut
-        self.ttl = [self.__dict__["ttl" + str(i + 4)] for i in range(12)] # TTLInOut
+        self.ttlOut = [self.__dict__["ttl" + str(i)] for i in range(4)]  # TTLOut
+        self.ttl = [self.__dict__["ttl" + str(i + 4)] for i in range(12)]  # TTLInOut
 
         # Fastino
         self.setattr_device("fastino")
@@ -31,7 +27,7 @@ class LED(EnvExperiment):
         self.setattr_device("mirny_cpld")
         for i in range(4):
             self.setattr_device(f"mirny_ch{i}")
-        self.mirnies = [self.__dict__[f"mirny_ch{i}"] for i in range(4)] # ADF5356
+        self.mirnies = [self.__dict__[f"mirny_ch{i}"] for i in range(4)]  # ADF5356
 
         # Almazny
         self.setattr_device("almazny")
@@ -40,9 +36,9 @@ class LED(EnvExperiment):
         self.setattr_device("suservo")
         for i in range(8):
             self.setattr_device(f"suservo_ch{i}")  # SUServo Channel
-        self.suservo_ch = [self.__dict__[f"suservo_ch{i}"] for i in range(8)] # Channel
+        self.suservo_ch = [self.__dict__[f"suservo_ch{i}"] for i in range(8)]  # Channel
 
-        '''
+        """
         We are left with the following devices:
 
             self.led: [TTLOut]*2
@@ -58,19 +54,16 @@ class LED(EnvExperiment):
 
             self.suservo: SUServo
             self.suservo_ch: [Channel]*8
-        '''
-        
+        """
+
     @kernel
     def run(self):
         self.core.reset()
         print("Initialising all devices...")
 
-        self.core.break_realtime()
-
         # LEDs
         for led in self.led:
             led.off()
-        self.core.break_realtime()
 
         # TTLs
         for ttlo in self.ttlOut:
@@ -95,7 +88,6 @@ class LED(EnvExperiment):
         for dac in range(32):
             self.fastino.set_dac(dac, 0)
             delay(100 * us)
-        self.core.break_realtime()
 
         # Mirny
         self.mirny_cpld.init()
@@ -104,7 +96,7 @@ class LED(EnvExperiment):
             mirny.init()
             mirny.sw.off()
             delay(200 * ms)
-        
+
         self.almazny.init()
         delay(200 * ms)
         self.almazny.output_toggle(False)
@@ -112,9 +104,9 @@ class LED(EnvExperiment):
         # SUServo
         self.suservo.init()
         delay(200 * ms)
-        self.core.break_realtime()
 
-        '''
+        self.core.wait_until_mu(now_mu())
+        """
         We are left with the following devices:
 
             self.led: [TTLOut]*2
@@ -135,7 +127,4 @@ class LED(EnvExperiment):
             self.suservo: SUServo
             self.suservo_ch: [Channel]*8
                 disabled with profile configurations left as previously set
-        '''
-
-
-
+        """
