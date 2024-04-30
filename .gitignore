@@ -160,3 +160,4 @@ cython_debug/
 #.idea/
 *.pyon
 *.elf
+*.DS_Store
