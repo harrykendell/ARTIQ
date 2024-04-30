@@ -1,0 +1,30 @@
+[submodule "example/ox_aion"]
+	path = example/ox_aion
+	url = https://gitlab.com/aion-physics/code/artiq/device-packages/ox_aion.git
+[submodule "example/pyaion"]
+	path = example/pyaion
+	url = https://gitlab.com/aion-physics/code/artiq/pyaion.git
+[submodule "example/topticadlcpro"]
+	path = example/topticadlcpro
+	url = https://gitlab.com/aion-physics/code/artiq/drivers/topticadlcpro.git
+[submodule "example/laserloop"]
+	path = example/laserloop
+	url = https://gitlab.com/aion-physics/code/artiq/drivers/laserloop.git
+[submodule "example/high-finesse-wavemeter"]
+	path = example/high-finesse-wavemeter
+	url = https://gitlab.com/aion-physics/code/artiq/drivers/high-finesse-wavemeter.git
+[submodule "example/icl_experiments"]
+	path = example/icl_experiments
+	url = https://gitlab.com/aion-physics/code/artiq/experiment-repositories/icl_experiments.git
+[submodule "example/oitg"]
+	path = example/oitg
+	url = https://github.com/OxfordIonTrapGroup/oitg
+[submodule "example/oxart-devices"]
+	path = example/oxart-devices
+	url = https://github.com/OxfordIonTrapGroup/oxart-devices
+[submodule "example/ndscan"]
+	path = example/ndscan
+	url = https://github.com/OxfordIonTrapGroup/ndscan
+[submodule "example/dax"]
+	path = example/dax
+	url = https://gitlab.com/duke-artiq/dax.git
