@@ -1,34 +1,36 @@
-from artiq.experiment import *  # imports everything from experiment library
+import sys, os
+sys.path.append(
+    os.path.join(os.path.dirname(__file__), "..")
+)  # link to repository root
+from artiq.experiment import *
+
+from utils.surpress_missing_imports import *
+from utils.wait_for_enter import is_enter_pressed
 
 # This code outputs a ramp wave on a single channel of the fastino
 # The wave ramps from -10v to 10v with a frequency of 1.28kHz
 
-
 class Fastino_Ramp_Generator(EnvExperiment):
     """fastino: Ramp Generator"""
-
-    def build(self):  # this code runs from the host device
-
+    def build(self):
         self.setattr_device("core")
         self.setattr_device("fastino")
+
+        self.setattr_argument("voltage", NumberValue(ndecimals=2, min=-9.99, max=9.99))
 
     @kernel  # this code runs on the FPGA
     def run(self):
         self.core.reset()
-        n_steps = 100
-        voltages = [((10) // n_steps) * i for i in range(-n_steps, n_steps)]
-        self.core.break_realtime()  # moves timestamp forward to prevent underflow
+        self.core.break_realtime()
 
         self.fastino.init()
-        delay(200 * us)  # 200us delay, to prevent underflow
+        delay(200 * us)
+        self.fastino.set_leds(0b00000001)
+        delay(100 * us)
 
-        while (
-            True
-        ):  # loops until manually broken(from bash terminal, this requires closing terminal)
-            for voltage in voltages_mu:  # loops over all voltages in voltages_mu list
-
-                self.fastino.write_dac(0, voltage)
-                self.fastino.load()  # loads buffer to DAC channel
-
-                delay(7 * us)  # 7us delay
-                # for 1 channel, 800ns delay prevents underflow but for voltage to reach level, 7us delay is needed
+        voltages = [i/100. for i in range(-999,1000)]
+        # for dac in range(32):
+        while not is_enter_pressed():
+            for v in voltages:
+                self.fastino.set_dac(0, v)
+                delay(100 * us)
