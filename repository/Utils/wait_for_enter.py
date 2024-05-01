@@ -10,6 +10,9 @@ if os.name == "nt":
 def is_enter_pressed() -> TBool:
     if os.name == "nt":
         if msvcrt.kbhit() and msvcrt.getch() == b"\r":
+            while msvcrt.kbhit():
+                msvcrt.getch()
+            print("Enter pressed")
             return True
         else:
             return False
