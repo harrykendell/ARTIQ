@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
-import sys,os
-sys.path.append(os.path.join(os.path.dirname(__file__), "..")) # link to repository root 
+import sys, os
+
+sys.path.append(
+    os.path.join(os.path.dirname(__file__), "..")
+)  # link to repository root
 
 from artiq.experiment import *
 from artiq.master.databases import DeviceDB
 from artiq.master.worker_db import DeviceManager
 
-from Utils.surpress_missing_imports import *
-from Utils.wait_for_enter import is_enter_pressed
+from utils.surpress_missing_imports import *
+from utils.wait_for_enter import is_enter_pressed
 
 
 def chunker(seq, size):
@@ -41,9 +44,7 @@ class MirnyTester(EnvExperiment):
                     self.almaznys[name] = self.get_device(name)
 
         # Sort everything by RTIO channel number
-        self.mirnies = sorted(
-            self.mirnies.items(), key=lambda x: (x[1].cpld.bus.channel, x[1].channel)
-        )
+        self.mirnies = sorted(self.mirnies.items())
 
     @kernel
     def init_mirny(self, cpld):
@@ -185,6 +186,7 @@ class MirnyTester(EnvExperiment):
 
         self.test_almaznys()
 
+
 def main():
     device_mgr = DeviceManager(DeviceDB("device_db.py"))
     try:
@@ -194,6 +196,7 @@ def main():
         experiment.analyze()
     finally:
         device_mgr.close_devices()
+
 
 if __name__ == "__main__":
     main()

@@ -9,8 +9,8 @@ from artiq.experiment import *
 from artiq.master.databases import DeviceDB
 from artiq.master.worker_db import DeviceManager
 
-from Utils.surpress_missing_imports import *
-from Utils.wait_for_enter import is_enter_pressed
+from utils.surpress_missing_imports import *
+from utils.wait_for_enter import is_enter_pressed
 
 
 def chunker(seq, size):
@@ -46,9 +46,9 @@ class TTLTester(EnvExperiment):
                     self.ttl_ins[name] = self.get_device(name)
 
         # Sort everything by RTIO channel number
-        self.leds = sorted(self.leds.items(), key=lambda x: x[1].channel)
-        self.ttl_outs = sorted(self.ttl_outs.items(), key=lambda x: x[1].channel)
-        self.ttl_ins = sorted(self.ttl_ins.items(), key=lambda x: x[1].channel)
+        self.leds = sorted(self.leds.items())
+        self.ttl_outs = sorted(self.ttl_outs.items())
+        self.ttl_ins = sorted(self.ttl_ins.items())
 
     @kernel
     def test_led(self, led):

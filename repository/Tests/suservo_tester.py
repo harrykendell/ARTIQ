@@ -6,7 +6,7 @@ from artiq.experiment import *
 from artiq.master.databases import DeviceDB
 from artiq.master.worker_db import DeviceManager
 
-from Utils.surpress_missing_imports import *
+from utils.surpress_missing_imports import *
 
 
 def chunker(seq, size):
@@ -35,8 +35,8 @@ class SUServoTester(EnvExperiment):
                 elif (module, cls) == ("artiq.coredevice.suservo", "Channel"):
                     self.suschannels[name] = self.get_device(name)
 
-        self.suservos = sorted(self.suservos.items(), key=lambda x: x[1].channel)
-        self.suschannels = sorted(self.suschannels.items(), key=lambda x: x[1].channel)
+        self.suservos = sorted(self.suservos.items())
+        self.suschannels = sorted(self.suschannels.items())
 
     @kernel
     def setup_suservo(self, channel):

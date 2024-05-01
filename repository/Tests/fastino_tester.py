@@ -9,8 +9,8 @@ from artiq.experiment import *
 from artiq.master.databases import DeviceDB
 from artiq.master.worker_db import DeviceManager
 
-from Utils.surpress_missing_imports import *
-from Utils.wait_for_enter import is_enter_pressed
+from utils.surpress_missing_imports import *
+from utils.wait_for_enter import is_enter_pressed
 
 class FastinoTester(EnvExperiment):
     def build(self):
@@ -25,8 +25,7 @@ class FastinoTester(EnvExperiment):
                 if (module, cls) == ("artiq.coredevice.fastino", "Fastino"):
                     self.fastinos[name] = self.get_device(name)
 
-        # Sort everything by RTIO channel number
-        self.fastinos = sorted(self.fastinos.items(), key=lambda x: x[1].channel)
+        self.fastinos = sorted(self.fastinos.items())
 
     @kernel
     def set_fastino_voltages(self, fastino, voltages):
@@ -59,7 +58,7 @@ class FastinoTester(EnvExperiment):
         print("Voltages:")
         for card_n, (card_name, card_dev) in enumerate(self.fastinos):
             voltages = [
-                (-1) ** i * (2.0 * card_n + 0.1 * (i // 2 + 1)) for i in range(32)
+                (-1) ** i * (2.0 * card_n + 1.1 * (i // 4 + 1)) for i in range(32)
             ]
             print(card_name, " ".join(["{:.1f}".format(x) for x in voltages]))
             self.set_fastino_voltages(card_dev, voltages)
