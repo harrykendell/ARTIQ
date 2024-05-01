@@ -25,11 +25,12 @@ class Fastino_Ramp_Generator(EnvExperiment):
 
         self.fastino.init()
         delay(200 * us)
-        self.fastino.set_leds(0b00000001)
+        self.fastino.set_leds(0b01010101)
         delay(100 * us)
 
         voltages = [i/100. for i in range(-999,1000)]
-        # for dac in range(32):
+        
+        print("Press ENTER to cancel.")
         while not is_enter_pressed():
             for v in voltages:
                 self.fastino.set_dac(0, v)
