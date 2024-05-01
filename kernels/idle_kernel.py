@@ -13,12 +13,15 @@ class Idle(EnvExperiment):
 
     @kernel
     def run(self):
+        start_time = now_mu() + self.core.seconds_to_mu(500*ms)
+        while self.core.get_rtio_counter_mu() < start_time:
+            pass
         self.core.reset()
-
-        self.led0.on()
-        delay(0.5 * s)
-        self.led0.off()
-        delay(0.5 * s)
-
-        # Wait for idle to finish
-        self.core.wait_until_mu(now_mu())
+    
+        while True:
+            self.led0.pulse(250*ms)
+            delay(125*ms)
+            self.led0.pulse(125*ms)
+            delay(125*ms)
+            self.led0.pulse(125*ms)
+            delay(250*ms)
