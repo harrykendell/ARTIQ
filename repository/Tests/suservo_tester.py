@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
-import sys,os
-sys.path.append(os.path.join(os.path.dirname(__file__), "..")) # link to repository root 
+import sys
+
+sys.path.append(
+    __file__.split("repository")[0] + "repository"
+)  # link to repository root
 
 from artiq.experiment import *
 from artiq.master.databases import DeviceDB

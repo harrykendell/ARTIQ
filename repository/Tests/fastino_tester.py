@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
-import sys, os
-
+import sys
 sys.path.append(
-    os.path.join(os.path.dirname(__file__), "..")
+    __file__.split("repository")[0] + "repository"
 )  # link to repository root
 
 from artiq.experiment import *
