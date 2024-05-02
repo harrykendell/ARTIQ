@@ -159,6 +159,9 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
+# VSCode
+.vscode
+
 # Artiq specific:
 *.pyon
 *.elf
@@ -166,3 +169,4 @@ cython_debug/
 dataset_db.mdb
 dataset_db.mdb-lock
 results
+
