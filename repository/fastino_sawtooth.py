@@ -16,6 +16,10 @@ class Fastino_Ramp_Generator(EnvExperiment):
 
         self.setattr_argument("voltage", NumberValue(ndecimals=2, min=-9.99, max=9.99))
 
+        num = 1000
+        self.v = [10.0 * i / num for i in range(-num, num)]
+        self.v += self.v[::-1]
+
     @kernel  # this code runs on the FPGA
     def run(self):
         self.core.reset()
@@ -25,14 +29,11 @@ class Fastino_Ramp_Generator(EnvExperiment):
         self.fastino.set_leds(0b01010101)
         delay(100 * us)
 
-        voltages = [i / 10.0 for i in range(-100, 100)]
-        # voltages = voltages[::-1]
-        gap = self.core.seconds_to_mu(1 * ms)
-
         print("Press ENTER to cancel.")
         # keep this low to avoid long response times due to backed up FIFOs
         # but long enough to poll for enter on the host otherwise we underflow
-        time_to_poll = self.core.seconds_to_mu(100 * ms)
+        time_to_poll = self.core.seconds_to_mu(200 * ms)
+        gap = self.core.seconds_to_mu(0.1 * ms)
         self.core.break_realtime()
         delay_mu(time_to_poll)
 
@@ -41,9 +42,12 @@ class Fastino_Ramp_Generator(EnvExperiment):
             fill_to = self.core.get_rtio_counter_mu() + time_to_poll
             while now_mu() < fill_to:
                 # contribute more events to fill the timeline
-                for v in voltages:
-                    self.fastino.set_dac(0, v)
-                    delay_mu(gap)
+                for _ in range(10):
+                    for v in self.v:
+                        self.fastino.set_dac(0, v)
+                        delay_mu(gap)
 
         self.fastino.set_leds(0b00000000)
+        delay(100 * us)
         self.fastino.set_dac(0,0.0)
+        delay_mu(gap)
