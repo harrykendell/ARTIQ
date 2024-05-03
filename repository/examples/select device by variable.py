@@ -25,15 +25,13 @@ class TTL_Pulse_Train(EnvExperiment):
         # this just allows for easy access with self.ttl as we can't construct strings in kernels
         # if we dont do this we have to access the member through the classes __dict__ attribute :(
         self.ttl = self.__dict__[f"ttl{self.ttl_number}"]
-        
-        print("We are pulsing TTL number", self.ttl_number)
-
 
     @kernel  # this code runs on the FPGA
     def run(self):
 
         self.core.reset()  # resets core device
         self.ttl.output()
+        print("We are pulsing TTL number", self.ttl_number)
 
         self.core.break_realtime()
 
