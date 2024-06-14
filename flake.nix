@@ -15,9 +15,9 @@
             # List desired Python packages here.
             artiq.artiq
             #ps.paramiko  # needed if and only if flashing boards remotely (artiq_flash -H)
-            # artiq.flake8-artiq
-            # artiq.dax
-            # artiq.dax-applets
+            artiq.flake8-artiq
+            artiq.dax
+            artiq.dax-applets
 
             # The NixOS package collection contains many other packages that you may find
             # interesting. Here are some examples:
