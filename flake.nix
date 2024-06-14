@@ -1,9 +1,12 @@
 {
-  inputs.extrapkg.url = "git+https://git.m-labs.hk/M-Labs/artiq-extrapkg.git";
-  outputs = { self, extrapkg }:
+  inputs.artiq.url = "git+https://github.com/m-labs/artiq.git?ref=release-8";
+  inputs.extrapkg.url = "git+https://git.m-labs.hk/M-Labs/artiq-extrapkg.git?ref=release-8";
+  inputs.extrapkg.inputs.artiq.follows = "artiq";
+  outputs = { self, artiq, extrapkg }:
     let
-      pkgs = extrapkg.pkgs;
-      artiq = extrapkg.packages.x86_64-linux;
+      pkgs = artiq.inputs.nixpkgs.legacyPackages.x86_64-linux;
+      aqmain = artiq.packages.x86_64-linux;
+      aqextra = extrapkg.packages.x86_64-linux;
     in {
       defaultPackage.x86_64-linux = pkgs.buildEnv {
         name = "artiq-env";
@@ -13,11 +16,9 @@
           # ========================================
           (pkgs.python3.withPackages(ps: [
             # List desired Python packages here.
-            artiq.artiq
+            aqmain.artiq
             #ps.paramiko  # needed if and only if flashing boards remotely (artiq_flash -H)
-            artiq.flake8-artiq
-            artiq.dax
-            artiq.dax-applets
+            aqextra.flake8-artiq
 
             # The NixOS package collection contains many other packages that you may find
             # interesting. Here are some examples:
@@ -26,17 +27,18 @@
             ps.scipy
             #ps.numba
             ps.matplotlib
+            ps.qt6
             # or if you need Qt (will recompile):
             #(ps.matplotlib.override { enableQt = true; })
             #ps.bokeh
             #ps.cirq
             #ps.qiskit
           ]))
-          #artiq.korad_ka3005p
-          #artiq.novatech409b
+          #aqextra.korad_ka3005p
+          #aqextra.novatech409b
           # List desired non-Python packages here
-          #artiq.openocd-bscanspi  # needed if and only if flashing boards
-          # Other potentially interesting non-Python packages from the NixOS package collection:
+          #aqmain.openocd-bscanspi  # needed if and only if flashing boards
+          # Other potentially interesting packages from the NixOS package collection:
           #pkgs.gtkwave
           #pkgs.spyder
           #pkgs.R
