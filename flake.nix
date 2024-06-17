@@ -4,9 +4,22 @@
   inputs.extrapkg.inputs.artiq.follows = "artiq";
   outputs = { self, artiq, extrapkg }:
     let
-      pkgs = artiq.inputs.nixpkgs.legacyPackages.x86_64-linux;
-      aqmain = artiq.packages.x86_64-linux;
-      aqextra = extrapkg.packages.x86_64-linux;
+      pkgs = extrapkg.pkgs;
+      artiq = extrapkg.packages.x86_64-linux;
+
+      # BRING A PACKAGE IN FROM PIP
+      #  windfreak to control the RF synth
+      windfreak = pkgs.python3Packages.buildPythonPackage rec {
+        pname = "windfreak";
+        version = "0.3.0";
+        doCheck = false;
+        src = pkgs.python3Packages.fetchPypi {
+          inherit pname version;
+          sha256 = "d0ec652bc57aa630f38d34abd9eba938fb7aae8c4bd42ceb558eb38d170d8620";
+        };
+      };
+      # end of windfreak package (we then include it below inside 'in')
+
     in {
       defaultPackage.x86_64-linux = pkgs.buildEnv {
         name = "artiq-env";
@@ -33,6 +46,7 @@
             #ps.bokeh
             #ps.cirq
             #ps.qiskit
+            windfreak
           ]))
           #aqextra.korad_ka3005p
           #aqextra.novatech409b
