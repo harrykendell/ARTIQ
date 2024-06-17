@@ -1,66 +1,6 @@
 {
   "nodes": {
-    "artiq-comtools": {
-      "inputs": {
-        "flake-utils": "flake-utils",
-        "nixpkgs": [
-          "extrapkg",
-          "artiqpkgs",
-          "nixpkgs"
-        ],
-        "sipyco": [
-          "extrapkg",
-          "artiqpkgs",
-          "sipyco"
-        ]
-      },
-      "locked": {
-        "lastModified": 1717637438,
-        "narHash": "sha256-BXFidNm3Em8iChPGu1L0s2bY+f2yQ0VVid4MuOoTehw=",
-        "owner": "m-labs",
-        "repo": "artiq-comtools",
-        "rev": "78d27026efe76a13f7b4698a554f55811369ec4d",
-        "type": "github"
-      },
-      "original": {
-        "owner": "m-labs",
-        "repo": "artiq-comtools",
-        "type": "github"
-      }
-    },
-    "artiq-stubs": {
-      "inputs": {
-        "artiqpkgs": [
-          "extrapkg",
-          "daxpkgs",
-          "artiqpkgs"
-        ],
-        "flake8-artiq": [
-          "extrapkg",
-          "daxpkgs",
-          "flake8-artiq"
-        ],
-        "nixpkgs": [
-          "extrapkg",
-          "daxpkgs",
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "lastModified": 1706553333,
-        "narHash": "sha256-woCaWllU5vKn0aXxt2VajlK7hseQe7LrJY5LAKF9LZ8=",
-        "ref": "refs/heads/master",
-        "rev": "86df3ceb606a50708f812ce8c3c8a4e7cfc3db8f",
-        "revCount": 35,
-        "type": "git",
-        "url": "https://gitlab.com/duke-artiq/artiq-stubs.git"
-      },
-      "original": {
-        "type": "git",
-        "url": "https://gitlab.com/duke-artiq/artiq-stubs.git"
-      }
-    },
-    "artiqpkgs": {
+    "artiq": {
       "inputs": {
         "artiq-comtools": "artiq-comtools",
         "mozilla-overlay": "mozilla-overlay",
@@ -85,25 +25,17 @@
         "url": "https://github.com/m-labs/artiq.git"
       }
     },
-    "daxpkgs": {
+    "artiq-comtools": {
       "inputs": {
-        "artiq-stubs": "artiq-stubs",
-        "artiqpkgs": [
-          "extrapkg",
-          "artiqpkgs"
-        ],
-        "flake8-artiq": "flake8-artiq",
+        "flake-utils": "flake-utils",
         "nixpkgs": [
-          "extrapkg",
-          "artiqpkgs",
+          "artiq",
           "nixpkgs"
         ],
         "sipyco": [
-          "extrapkg",
-          "artiqpkgs",
+          "artiq",
           "sipyco"
-        ],
-        "trap-dac-utils": "trap-dac-utils"
+        ]
       },
       "locked": {
         "lastModified": 1717637438,
@@ -114,8 +46,9 @@
         "type": "github"
       },
       "original": {
-        "type": "git",
-        "url": "https://gitlab.com/duke-artiq/dax.git"
+        "owner": "m-labs",
+        "repo": "artiq-comtools",
+        "type": "github"
       }
     },
     "artiq-comtools_2": {
@@ -418,14 +351,14 @@
     },
     "root": {
       "inputs": {
+        "artiq": "artiq",
         "extrapkg": "extrapkg"
       }
     },
     "sipyco": {
       "inputs": {
         "nixpkgs": [
-          "extrapkg",
-          "artiqpkgs",
+          "artiq",
           "nixpkgs"
         ]
       },
