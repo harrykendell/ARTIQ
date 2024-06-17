@@ -4,8 +4,9 @@
   inputs.extrapkg.inputs.artiq.follows = "artiq";
   outputs = { self, artiq, extrapkg }:
     let
-      pkgs = extrapkg.pkgs;
-      artiq = extrapkg.packages.x86_64-linux;
+      pkgs = artiq.inputs.nixpkgs.legacyPackages.x86_64-linux;
+      aqmain = artiq.packages.x86_64-linux;
+      aqextra = extrapkg.packages.x86_64-linux;
 
       # BRING A PACKAGE IN FROM PIP
       #  windfreak to control the RF synth
