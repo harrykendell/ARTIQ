@@ -52,7 +52,7 @@
           #aqextra.korad_ka3005p
           #aqextra.novatech409b
           # List desired non-Python packages here
-          #aqmain.openocd-bscanspi  # needed if and only if flashing boards
+          aqmain.openocd-bscanspi  # needed if and only if flashing boards
           # Other potentially interesting packages from the NixOS package collection:
           #pkgs.gtkwave
           #pkgs.spyder
