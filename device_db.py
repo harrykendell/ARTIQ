@@ -262,6 +262,7 @@ for i in range(2):
 
 
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 # Aliases
 aliases = {
     "suservo_aom_780_locking": "suservo_ch0",
@@ -272,6 +273,8 @@ aliases = {
 
 device_db |= aliases
 =======
+=======
+>>>>>>> Stashed changes
 # Booster - 8 channel RF power amplifier
 device_db.update({
 "hello": {
@@ -280,5 +283,9 @@ device_db.update({
         "port": 3249,
         "command": "python /home/ae19663/artiq/examples/oxart-devices/oxart/frontend/aqctl_booster.py -p {port}"
 },
+<<<<<<< Updated upstream
+})
+>>>>>>> Stashed changes
+=======
 })
 >>>>>>> Stashed changes

@@ -135,7 +135,10 @@ class BoosterApi:
         # Indicate a response was received.
         request_id = int.from_bytes(properties['correlation_data'][0], 'big')
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 =======
+=======
+>>>>>>> Stashed changes
 
         payload = json.loads(payload)
         if payload['code'] != 0: print(f'Error code: {payload["code"]}')
