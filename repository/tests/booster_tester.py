@@ -10,6 +10,18 @@ import contextlib
 import sys
 import time
 
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+=======
+sys.path.append(
+    __file__.split("repository")[0] + "repository"
+)  # link to repository root
+>>>>>>> Stashed changes
+=======
+sys.path.append(
+    __file__.split("repository")[0] + "repository"
+)  # link to repository root
+>>>>>>> Stashed changes
 from utils.booster import BoosterApi, TelemetryReader
 
 # The default bias current to tune to.

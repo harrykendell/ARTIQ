@@ -132,13 +132,30 @@ class BoosterApi:
         """
         if topic != f'{self.prefix}/command/response':
             raise Exception(f'Unknown topic: {topic}')
-
         # Indicate a response was received.
         request_id = int.from_bytes(properties['correlation_data'][0], 'big')
-        assert len(properties['user_property']) == 1, 'Unexpected number of user properties'
-        response_prop = properties['user_property'][0]
-        assert response_prop[0] == 'code'
-        self.inflight[request_id].set_result((response_prop[1], json.loads(payload)))
+<<<<<<< Updated upstream
+=======
+
+        payload = json.loads(payload)
+        if payload['code'] != 0: print(f'Error code: {payload["code"]}')
+        self.inflight[request_id].set_result(('Ok', json.loads(payload['data'] if 'data' in payload else '{}')))
+
+        # assert len(properties['user_property']) == 1, 'Unexpected number of user properties'
+        # response_prop = properties['user_property'][0]
+        # assert response_prop[0] == 'code'
+        # self.inflight[request_id].set_result((response_prop[1], json.loads(payload)))
+        del self.inflight[request_id]
+>>>>>>> Stashed changes
+
+        payload = json.loads(payload)
+        if payload['code'] != 0: print(f'Error code: {payload["code"]}')
+        self.inflight[request_id].set_result(('Ok', json.loads(payload['data'] if 'data' in payload else '{}')))
+
+        # assert len(properties['user_property']) == 1, 'Unexpected number of user properties'
+        # response_prop = properties['user_property'][0]
+        # assert response_prop[0] == 'code'
+        # self.inflight[request_id].set_result((response_prop[1], json.loads(payload)))
         del self.inflight[request_id]
 
     async def perform_action(self, action: Action, channel: str):

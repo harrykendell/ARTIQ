@@ -23,22 +23,22 @@
       # mqtt client
       gmqtt = pkgs.python3Packages.buildPythonPackage rec {
         pname = "gmqtt";
-        version = "0.6.16";
+        version = "0.6.12";
         doCheck = false;
         src = pkgs.python3Packages.fetchPypi {
           inherit pname version;
-          sha256 = "ddd1fdc1c6ae604e74377cf70e99f067e579c03c1c71a6acd494e199e93b7fa4";
+          sha256 = "7df03792343089ae62dc7cd6f8be356861c4fc68768cefa22f3d8de5e7e5be48";
         };
       };
       # miniconf-mqtt
       miniconf_mqtt_repo = pkgs.fetchgit {
         url="https://github.com/quartiq/miniconf.git";
-        rev="581fda76533c37f789c47015a30e8f1226dc7de1";
-        sha256 = "Xp9syrtuDvF84HFaTyIwPW1YQ0OiGdttoiyOMsNzTfA=";
+        rev="d03726db064c61fdbaf55db4788fa56cc09ece10";
+        sha256 = "qP79+FNykNqyoaPrwYAvO2+Lvzdf7N+rNd6bKpp36gw=";
       };
       miniconf_mqtt = pkgs.python3Packages.buildPythonPackage rec {
         name = "miniconf_mqtt";
-        version = "0.1.0";
+        version = "0.8.0";
         src = "${miniconf_mqtt_repo}/py/miniconf-mqtt";
         format = "pyproject";
         dependencies = [pkgs.python3Packages.setuptools gmqtt];
@@ -46,12 +46,12 @@
       # Booster control
       booster_repo = pkgs.fetchgit {
         url="https://github.com/quartiq/booster.git";
-        rev="f84048a119f3a0294ebe8e530827ba2347d057a2";
-        sha256 = "7UOuGXYfJe2b8bA3jyeRNTyJjIaeK+MHdZ/TiwmkDNs=";
+        rev="a1f83b63180511ecd68f88a04621624941d17a41";
+        sha256 = "FS3tb6FFJxrYZQEJ4o+PNBiXmnh2T+qVRmueJmS5XL8=";
       };
       booster = pkgs.python3Packages.buildPythonPackage rec {
         name = "booster";
-        version = "0.1.0";
+        version = "0.5.0";
         src = "${booster_repo}/py";
         format = "pyproject";
         dependencies = [pkgs.python3Packages.setuptools miniconf_mqtt];
