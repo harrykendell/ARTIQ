@@ -3,7 +3,23 @@ from artiq.coredevice.core import Core
 from artiq.coredevice.urukul import CPLD as urukul_CPLD
 from artiq.coredevice.suservo import SUServo, Channel as SUServoChannel
 
-class SUServoMinimal(EnvExperiment):
+class Laser780(EnvExperiment):
+    '''
+        This sets up a GUI for the 780nm laser to control a number of AOMs and a single EOM.
+        It aims for the default frequencies with ramping and locking.
+
+        The GUI uses worker_db.py components to manage its own experiment submissions
+
+        Components:
+            1 EOM at 7.8GHz using a Mirny DDS with Almazny mezzanine
+                - Sidebands for repump
+            1 AOM at xMHz using a SUServo Urukul channel
+                - Laser locking offset
+            1 AOM at xMHz using a SUServo Urukul channel
+                - 2/3D MOT offset
+            2 Booster channels
+                - AOMs
+    '''
     def build(self):
         self.setattr_device("core")
         self.core: Core

@@ -8,12 +8,14 @@ from artiq.experiment import *
 from artiq.master.databases import DeviceDB
 from artiq.master.worker_db import DeviceManager
 
+from artiq.coredevice.core import Core
 from utils.surpress_missing_imports import *
 from utils.wait_for_enter import is_enter_pressed
 
 class FastinoTester(EnvExperiment):
     def build(self):
         self.setattr_device("core")
+        self.core: Core
 
         self.fastinos = dict()
 
