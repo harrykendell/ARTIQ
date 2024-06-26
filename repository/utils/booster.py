@@ -29,7 +29,6 @@ class Action(enum.Enum):
     ReadBiasCurrent = 'read-bias'
     Save = 'save'
 
-
 class TelemetryReader:
     """ Helper utility to read telemetry. """
 
@@ -106,7 +105,7 @@ class BoosterApi:
 
 
     def __init__(self, client, prefix, settings_interface):
-        """ Consructor.
+        """ Constructor.
 
         Args:
             client: A connected MQTT5 client.
@@ -141,7 +140,6 @@ class BoosterApi:
         assert response_prop[0] == 'code'
         self.inflight[request_id].set_result((response_prop[1], json.loads(payload)))
         del self.inflight[request_id]
-
 
     async def perform_action(self, action: Action, channel: str):
         """ Send a command to a booster control topic.

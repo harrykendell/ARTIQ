@@ -16,7 +16,7 @@ class TTL_Pulse_Train(EnvExperiment):
 
         # setup a variable which controls which TTL to read
         self.setattr_argument(
-            "ttl_number", NumberValue(type="int", ndecimals=0, step=1, min=0, max=15)
+            "ttl_number", NumberValue(type="int", precision=0, step=1, min=0, max=15)
         )
 
         # activate the ttl device we want

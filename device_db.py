@@ -55,7 +55,7 @@ device_db["fastino"] = {
     "arguments": {"channel": 0, "log2_width": 0},
 }
 
-# freq synthesiser 50MHz - 4GHz
+# freq synthesiser 50MHz - 4GHz (6.8GHz-ish if pushed)
 # boosted to 5GHz - 12GHz by the almazny
 # SPI = Serial Peripheral Interface
 device_db["spi_mirny"] = {
@@ -95,14 +95,21 @@ for i in range(4):
         }
     )
 
-device_db["almazny"] = {
-    "type": "local",
-    "module": "artiq.coredevice.mirny",
-    "class": "Almazny",
-    "arguments": {
-        "host_mirny": "mirny_cpld",
-    },
-}
+for i in range(4):
+    device_db.update(
+        {
+            "almazny_ch"
+            + str(i): {
+                "type": "local",
+                "module": "artiq.coredevice.almazny",
+                "class": "AlmaznyChannel",
+                "arguments": {
+                    "host_mirny": "mirny_cpld",
+                    "channel": i,
+                },
+            }
+        }
+    )
 
 # 4x4 TTL IOs - switched by sets of 4
 # NB ttl0-ttl3 are OUT only
@@ -252,3 +259,14 @@ for i in range(2):
             }
         }
     )
+
+
+# Aliases
+aliases = {
+    "suservo_aom_780_locking": "suservo_ch0",
+    "suservo_aom_780_MOT": "suservo_ch1",
+    "almazny_eom_780": "ttl8",
+}
+
+
+device_db |= aliases
