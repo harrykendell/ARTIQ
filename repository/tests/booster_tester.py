@@ -10,7 +10,9 @@ Set this up to
     - clear interlocks
     - set bias currents
     - reset?
-    
+    - basic gui to show in/out powers and interlocks
+
+    include into the windfreak one or artiq applets
 
 """
 
