@@ -29,6 +29,7 @@ class Action(enum.Enum):
     ReadBiasCurrent = 'read-bias'
     Save = 'save'
 
+
 class TelemetryReader:
     """ Helper utility to read telemetry. """
 
@@ -72,7 +73,7 @@ class TelemetryReader:
         return self.get_latest_telemetry()
 
 
-class BoosterApi:
+class BoosterAPI:
     """ An asynchronous API for controlling booster using the MQTT control interface. """
 
     @classmethod
@@ -105,7 +106,7 @@ class BoosterApi:
 
 
     def __init__(self, client, prefix, settings_interface):
-        """ Constructor.
+        """ Consructor.
 
         Args:
             client: A connected MQTT5 client.
@@ -134,35 +135,20 @@ class BoosterApi:
             raise Exception(f'Unknown topic: {topic}')
         # Indicate a response was received.
         request_id = int.from_bytes(properties['correlation_data'][0], 'big')
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-=======
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
 
         payload = json.loads(payload)
-        if payload['code'] != 0: print(f'Error code: {payload["code"]}')
-        self.inflight[request_id].set_result(('Ok', json.loads(payload['data'] if 'data' in payload else '{}')))
+        if payload['code'] != 0:
+            print(f'Error code: {payload["code"]}')
+        # check if payload['data'] is a json
+        try :
+            json.loads(payload['data'])
+            self.inflight[request_id].set_result(('Ok', json.loads(payload['data'])))
+        except:
+            self.inflight[request_id].set_result(('Ok', payload['data']))
+        
 
-        # assert len(properties['user_property']) == 1, 'Unexpected number of user properties'
-        # response_prop = properties['user_property'][0]
-        # assert response_prop[0] == 'code'
-        # self.inflight[request_id].set_result((response_prop[1], json.loads(payload)))
         del self.inflight[request_id]
->>>>>>> Stashed changes
 
-        payload = json.loads(payload)
-        if payload['code'] != 0: print(f'Error code: {payload["code"]}')
-        self.inflight[request_id].set_result(('Ok', json.loads(payload['data'] if 'data' in payload else '{}')))
-
-        # assert len(properties['user_property']) == 1, 'Unexpected number of user properties'
-        # response_prop = properties['user_property'][0]
-        # assert response_prop[0] == 'code'
-        # self.inflight[request_id].set_result((response_prop[1], json.loads(payload)))
-        del self.inflight[request_id]
 
     async def perform_action(self, action: Action, channel: str):
         """ Send a command to a booster control topic.
@@ -208,16 +194,16 @@ class BoosterApi:
             the measured RF amplifier drain current.
         """
         # Power up the channel. Wait for the channel to fully power-up before continuing.
-        await self.settings_interface.set(f'/channel/{channel}/state', "Powered")
+        await self.settings_interface.set(f'channel/{channel}/state', "Powered")
         await asyncio.sleep(0.4)
 
         async def set_bias(voltage):
-            await self.settings_interface.set(f'/channel/{channel}/bias_voltage', voltage)
+            await self.settings_interface.set(f'channel/{channel}/bias_voltage', voltage)
             # Sleep 100 ms for bias current to settle and for ADC to take current measurement.
             await asyncio.sleep(0.2)
             response = await self.perform_action(Action.ReadBiasCurrent, channel)
             vgs, ids = response['vgs'], response['ids']
-            print(f'Vgs = {vgs:.3f} V, Ids = {ids * 1000:.2f} mA')
+            # print(f'Vgs = {vgs:.3f} V, Ids = {ids * 1000:.2f} mA')
             return vgs, ids
 
         # v_gsq from datasheet
@@ -253,5 +239,13 @@ class BoosterApi:
                 raise ValueError(f'Ids out of range')
             if ids <= current:
                 break
+
+        # save the channel information
+        await self.settings_interface.set(f'channel/{channel}/state', "Powered")
+        await asyncio.sleep(0.4)
+        await self.settings_interface.set(f'channel/{channel}/state', "Enabled")
+        await asyncio.sleep(0.4)
+        _ = await self.perform_action(Action.Save, channel)
+        print(f'Saved channel {channel}')
 
         return vgs, ids

@@ -80,7 +80,7 @@
             ps.scipy
             #ps.numba
             ps.matplotlib
-            ps.qt6
+            ps.pyqt5
             # or if you need Qt (will recompile):
             #(ps.matplotlib.override { enableQt = true; })
             #ps.bokeh

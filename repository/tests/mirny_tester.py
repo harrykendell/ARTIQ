@@ -47,18 +47,13 @@ class MirnyTester(EnvExperiment):
                 elif (module, cls) == ("artiq.coredevice.mirny", "Almazny"):
                     self.almaznys[name] = self.get_device(name)
 
-        # Sort everything by RTIO channel number
-        self.mirny_cplds: list[Mirny] = sorted(self.mirny_cplds.items())
-        self.mirnies: list[ADF5356] = sorted(self.mirnies.items())
-        self.almaznys: list[AlmaznyChannel] = sorted(self.almaznys.items())
-
     @kernel
-    def init_mirny(self, cpld: Mirny):
+    def init_mirny(self, cpld):
         self.core.break_realtime()
         cpld.init()
 
     @kernel
-    def setup_mirny(self, channel: ADF5356, frequency: float):
+    def setup_mirny(self, channel, frequency):
         self.core.break_realtime()
         channel.init()
 
@@ -70,12 +65,12 @@ class MirnyTester(EnvExperiment):
         delay(5 * ms)
 
     @kernel
-    def sw_off_mirny(self, channel: ADF5356):
+    def sw_off_mirny(self, channel):
         self.core.break_realtime()
         channel.sw.off()
 
     @kernel
-    def mirny_rf_switch_wave(self, channels: list[ADF5356]):
+    def mirny_rf_switch_wave(self, channels):
         while not is_enter_pressed():
             self.core.break_realtime()
             # do not fill the FIFOs too much to avoid long response times
@@ -87,7 +82,7 @@ class MirnyTester(EnvExperiment):
                 delay(100 * ms)
 
     @kernel
-    def almazny_led_wave(self, almaznys: list[AlmaznyChannel]):
+    def almazny_led_wave(self, almaznys):
         while not is_enter_pressed():
             self.core.break_realtime()
             # do not fill the FIFOs too much to avoid long response times
@@ -100,7 +95,7 @@ class MirnyTester(EnvExperiment):
                 ch.set(31.5, False, False)
 
     @kernel
-    def almazny_att_test(self, almaznys: list[AlmaznyChannel]):
+    def almazny_att_test(self, almaznys):
         rf_en = 1
         led = 1
         att_mu = 0

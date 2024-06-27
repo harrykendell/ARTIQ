@@ -71,7 +71,7 @@ class SynthController(QWidget):
     # we hold state for the synth temperature and each channel's enable and frequency/power
     def __init__(self):
         super().__init__()
-        self.synth = SynthHD('/dev/ttyACM0')
+        self.synth = SynthHD('/dev/ttyACM1')
         self.initUI()
 
         self.timer = QTimer()
@@ -99,7 +99,7 @@ class SynthController(QWidget):
             enable_checkbox.stateChanged.connect(lambda state, ch=ch: setattr(self.synth[ch], 'enable', state==Qt.Checked))
 
             # Channel label - in bold
-            label = QLabel(f'<b>Channel {ch}</b>')
+            label = QLabel(f'<b>Channel {["a","b"][ch]}</b>')
 
             topline.addWidget(enable_checkbox)
             topline.addWidget(label)

@@ -14,7 +14,7 @@ class Fastino_Ramp_Generator(EnvExperiment):
         self.setattr_device("core")
         self.setattr_device("fastino")
 
-        self.setattr_argument("voltage", NumberValue(precision=2, min=-9.99, max=9.99))
+        self.setattr_argument("voltage", NumberValue(precision=2, min=-9.99, max=9.99, default=10, type='float'))
 
         num = 1000
         self.v = [10.0 * i / num for i in range(-num, num)]
