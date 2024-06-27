@@ -264,7 +264,8 @@ for i in range(2):
 aliases = {
     "suservo_aom_780_locking": "suservo_ch0",
     "suservo_aom_780_MOT": "suservo_ch1",
-    "almazny_eom_780": "ttl8",
+    "mirny_eom_780": "mirny_ch0",
+    "almazny_eom_780": "almazny_ch0",
 }
 
 

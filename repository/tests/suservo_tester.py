@@ -9,6 +9,9 @@ from artiq.experiment import *
 from artiq.master.databases import DeviceDB
 from artiq.master.worker_db import DeviceManager
 
+from artiq.coredevice.suservo import SUServo, Channel
+from artiq.coredevice.core import Core
+
 from utils.surpress_missing_imports import *
 
 
@@ -25,7 +28,7 @@ def chunker(seq, size):
 class SUServoTester(EnvExperiment):
     def build(self):
         self.setattr_device("core")
-
+        self.core: Core
         self.suservos = dict()
         self.suschannels = dict()
 
@@ -38,11 +41,11 @@ class SUServoTester(EnvExperiment):
                 elif (module, cls) == ("artiq.coredevice.suservo", "Channel"):
                     self.suschannels[name] = self.get_device(name)
 
-        self.suservos = sorted(self.suservos.items())
-        self.suschannels = sorted(self.suschannels.items())
+        self.suservos: list[SUServo] = sorted(self.suservos.items())
+        self.suschannels: list[Channel] = sorted(self.suschannels.items())
 
     @kernel
-    def setup_suservo(self, channel):
+    def setup_suservo(self, channel: SUServo):
         self.core.break_realtime()
         channel.init()
         delay(1 * us)
@@ -60,7 +63,7 @@ class SUServoTester(EnvExperiment):
         delay(10 * us)
 
     @kernel
-    def setup_suservo_loop(self, channel, loop_nr):
+    def setup_suservo_loop(self, channel: Channel, loop_nr):
         self.core.break_realtime()
         channel.set_y(profile=loop_nr, y=0.0)  # clear integrator
         channel.set_iir(
@@ -84,7 +87,7 @@ class SUServoTester(EnvExperiment):
         channel.set(en_out=1, en_iir=1, profile=loop_nr)
 
     @kernel
-    def setup_start_suservo(self, channel):
+    def setup_start_suservo(self, channel: SUServo):
         self.core.break_realtime()
         channel.set_config(enable=1)
         delay(10 * us)
@@ -93,7 +96,6 @@ class SUServoTester(EnvExperiment):
         delay(10 * us)
 
     def test_suservos(self):
-        print(sys.path[-1])
         print("*** Testing SUServos.")
         print("Initializing modules...")
         for card_name, card_dev in self.suservos:
