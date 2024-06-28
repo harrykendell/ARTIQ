@@ -107,6 +107,12 @@
           # ========================================
         ];
       };
+
+      pkgs.mkShell {
+        # environment variable declaration
+        ENV_VAR="lofa";
+      };
+      
     };
   nixConfig = {  # work around https://github.com/NixOS/nix/issues/6771
     extra-trusted-public-keys = "nixbld.m-labs.hk-1:5aSRVA5b320xbNvu30tqxVPXpld73bhtOeH6uAjRyHc=";
