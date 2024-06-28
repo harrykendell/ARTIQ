@@ -61,9 +61,9 @@
 
 
     in {
-      defaultPackage.x86_64-linux = pkgs.buildEnv {
+      defaultPackage.x86_64-linux = pkgs.mkShell {
         name = "artiq-env";
-        paths = [
+        buildInputs = [
           # ========================================
           # EDIT BELOW
           # ========================================
