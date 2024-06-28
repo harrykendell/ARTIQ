@@ -110,7 +110,7 @@
         '';
         env = {
           QT_PLUGIN_PATH="test";
-        }
+        };
       };
     };
   nixConfig = {  # work around https://github.com/NixOS/nix/issues/6771
