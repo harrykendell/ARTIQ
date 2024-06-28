@@ -107,7 +107,7 @@
         postBuild = ''
         export QT_PLUGIN_PATH=${pkgs.qt5.qtbase}/${pkgs.qt5.qtbase.dev.qtPluginPrefix}:${pkgs.qt5.qtsvg.bin}/${pkgs.qt5.qtbase.dev.qtPluginPrefix}
         export QML2_IMPORT_PATH=${pkgs.qt5.qtbase}/${pkgs.qt5.qtbase.dev.qtQmlPrefix}
-        ''
+        '';
       };
     };
   nixConfig = {  # work around https://github.com/NixOS/nix/issues/6771
