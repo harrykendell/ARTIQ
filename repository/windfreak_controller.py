@@ -2,6 +2,8 @@ from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLa
 from PyQt5.QtCore import Qt,QTimer
 from windfreak import SynthHD
 
+import argparse
+
 class TextSliderControl(QWidget):
     def __init__(self, label, unit, set,get, min=0, max=10000):
         super().__init__()
@@ -69,9 +71,9 @@ class TextSliderControl(QWidget):
 
 class SynthController(QWidget):
     # we hold state for the synth temperature and each channel's enable and frequency/power
-    def __init__(self):
+    def __init__(self, port='/dev/ttyACM0'):
         super().__init__()
-        self.synth = SynthHD('/dev/ttyACM1')
+        self.synth = SynthHD(port)
         self.initUI()
 
         self.timer = QTimer()
@@ -99,7 +101,7 @@ class SynthController(QWidget):
             enable_checkbox.stateChanged.connect(lambda state, ch=ch: setattr(self.synth[ch], 'enable', state==Qt.Checked))
 
             # Channel label - in bold
-            label = QLabel(f'<b>Channel {["a","b"][ch]}</b>')
+            label = QLabel(f'<b>Channel {["A","B"][ch]}</b>')
 
             topline.addWidget(enable_checkbox)
             topline.addWidget(label)
@@ -145,8 +147,20 @@ class SynthController(QWidget):
                 self.__dict__[f'ch{ch}_power_control'].text.setText(str(channel.power))
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Controller for the Windfreak RF device',)
+    parser.add_argument('--port', '-p', type=str, help='The port to open the Windfreak device on', default='/dev/ttyACM0')
+    args = parser.parse_args()
+
     app = QApplication([])
-    controller = SynthController()
+
+    try:
+        controller = SynthController(args.port)
+    except Exception as e:
+        print(f'Failed to open Windfreak device: {e}')
+        print('Permission denied errors  -> try running with sudo or adding user to dialout group')
+        print('Port not found errors -> check the port is correct and that the device is connected')
+        print('Formatting/terminator value errors -> check the port isn\'t a different device')
+        exit(1)
     controller.show()
 
     app.exec_()
