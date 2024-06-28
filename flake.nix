@@ -56,8 +56,8 @@
         format = "pyproject";
         dependencies = [pkgs.python3Packages.setuptools miniconf_mqtt];
 
-        QT_PLUGIN_PATH=${pkgs.qt5.qtbase}/${pkgs.qt5.qtbase.dev.qtPluginPrefix}:${pkgs.qt5.qtsvg.bin}/${pkgs.qt5.qtbase.dev.qtPluginPrefix};
-        QML2_IMPORT_PATH=${pkgs.qt5.qtbase}/${pkgs.qt5.qtbase.dev.qtQmlPrefix};
+        QT_PLUGIN_PATH="${pkgs.qt5.qtbase}/${pkgs.qt5.qtbase.dev.qtPluginPrefix}:${pkgs.qt5.qtsvg.bin}/${pkgs.qt5.qtbase.dev.qtPluginPrefix}";
+        QML2_IMPORT_PATH="${pkgs.qt5.qtbase}/${pkgs.qt5.qtbase.dev.qtQmlPrefix}";
       };
 
       # end of packages
