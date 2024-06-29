@@ -4,7 +4,8 @@ from artiq.coredevice.core import Core
 from artiq.coredevice.urukul import CPLD as urukul_CPLD
 from artiq.coredevice.suservo import SUServo, Channel as SUServoChannel
 
-class SUServoMinimal(EnvExperiment):
+class SUServoControl(EnvExperiment):
+    '''Control of all SUServo channels - records attenuations in a dataset due to the inability to restore them from the device.'''
     @host_only
     def cpld_num(self, channel):
         return f'urukul{channel//4}_cpld' if channel else 0
