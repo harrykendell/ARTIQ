@@ -26,7 +26,7 @@ from artiq.language import ms, MHz, dB, delay
 #   [ ] Refactor to remove the artiq/dds handle issue
 #   [ ] Add tabs to store different configurations
 
-JSON_DATAFILE = 'dds_states.json'
+JSON_DEFAULT = {'ch0': {'state':0,'freq':200e6,'amp':1.0,'att':0.6,}, 'ch1': {'state':0,'freq':100e6,'amp':1.0,'att':0.6,}}
 
 class SingleChannel(QWidget): #{{{
     """Class to control a single given Urukul channel"""
@@ -186,7 +186,7 @@ class DDSManager(QWidget): #{{{
         # Make a default initial parameter dictionary to pass to the channels
         # in case a real one is found, this gets stepped on with the real values
         initial_params = {'ch0': None, 'ch1': None}
-        loaded_params.update(self.load_state())
+        initial_params.update(self.load_state())
 
         self.setWindowTitle("DDS Manager GUI")
         layout = QGridLayout()
@@ -211,20 +211,14 @@ class DDSManager(QWidget): #{{{
 
     def load_state(self):
         """Load the JSON parameter dictionary if existent"""
-        if not os.path.isfile(JSON_DATAFILE):
-            return False
-
-        with open(JSON_DATAFILE, "r") as in_json:
-            return json.load(in_json)
-
+        return JSON_DEFAULT
 
     def save_state(self):
         """Store the parameter dictionary as a JSON file"""
         ch0_data = self.laser_1.get_state()
         ch1_data = self.laser_2.get_state()
         out_json = {'ch0':ch0_data, 'ch1':ch1_data}
-        with open(JSON_DATAFILE, 'w') as log:
-            json.dump(out_json, log, indent=1)
+        print('Saving state not implemented yet')
 
     def start(self):
         """TODO: Check scheduler to see if the process be re-started after finished"""
