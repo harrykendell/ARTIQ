@@ -1,33 +1,33 @@
-[submodule "example/ox_aion"]
-	path = examples/ox_aion
+[submodule "submodules/ox_aion"]
+	path = submodules/ox_aion
 	url = https://gitlab.com/aion-physics/code/artiq/device-packages/ox_aion.git
-[submodule "example/pyaion"]
-	path = examples/pyaion
+[submodule "submodules/pyaion"]
+	path = submodules/pyaion
 	url = https://gitlab.com/aion-physics/code/artiq/pyaion.git
-[submodule "example/topticadlcpro"]
-	path = examples/topticadlcpro
+[submodule "submodules/topticadlcpro"]
+	path = submodules/topticadlcpro
 	url = https://gitlab.com/aion-physics/code/artiq/drivers/topticadlcpro.git
-[submodule "example/laserloop"]
-	path = examples/laserloop
+[submodule "submodules/laserloop"]
+	path = submodules/laserloop
 	url = https://gitlab.com/aion-physics/code/artiq/drivers/laserloop.git
-[submodule "example/high-finesse-wavemeter"]
-	path = examples/high-finesse-wavemeter
+[submodule "submodules/high-finesse-wavemeter"]
+	path = submodules/high-finesse-wavemeter
 	url = https://gitlab.com/aion-physics/code/artiq/drivers/high-finesse-wavemeter.git
-[submodule "example/icl_experiments"]
-	path = examples/icl_experiments
+[submodule "submodules/icl_experiments"]
+	path = submodules/icl_experiments
 	url = https://gitlab.com/aion-physics/code/artiq/experiment-repositories/icl_experiments.git
-[submodule "example/oitg"]
-	path = examples/oitg
+[submodule "submodules/oitg"]
+	path = submodules/oitg
 	url = https://github.com/OxfordIonTrapGroup/oitg
-[submodule "example/oxart-devices"]
-	path = examples/oxart-devices
+[submodule "submodules/oxart-devices"]
+	path = submodules/oxart-devices
 	url = https://github.com/OxfordIonTrapGroup/oxart-devices
-[submodule "example/ndscan"]
-	path = examples/ndscan
+[submodule "submodules/ndscan"]
+	path = submodules/ndscan
 	url = https://github.com/OxfordIonTrapGroup/ndscan
-[submodule "example/dax"]
-	path = examples/dax
+[submodule "submodules/dax"]
+	path = submodules/dax
 	url = https://gitlab.com/duke-artiq/dax.git
-[submodule "examples/jax"]
-	path = examples/jax
+[submodule "submodules/jax"]
+	path = submodules/jax
 	url = https://github.com/Jayich-Lab/jax
