@@ -1,5 +1,5 @@
 from PyQt5 import QtWidgets, QtGui, QtCore
-from dialog_on_top import DialogOnTop
+from repository.utils.dialog_on_top import DialogOnTop
 
 
 class CustomListWidget(QtWidgets.QListWidget):

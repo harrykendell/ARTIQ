@@ -19,12 +19,8 @@ class TTL_Pulse_Train(EnvExperiment):
             "ttl_number", NumberValue(type="int", precision=0, step=1, min=0, max=15)
         )
 
-        # activate the ttl device we want
-        self.setattr_device(f"ttl{self.ttl_number}")
-
-        # this just allows for easy access with self.ttl as we can't construct strings in kernels
-        # if we dont do this we have to access the member through the classes __dict__ attribute :(
-        self.ttl = self.__dict__[f"ttl{self.ttl_number}"]
+        # activate the ttl device we want to use
+        self.ttl = self.get_device(f"ttl{self.ttl_number}")
 
     @kernel  # this code runs on the FPGA
     def run(self):
