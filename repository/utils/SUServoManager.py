@@ -21,7 +21,7 @@ class SUServoManager(): #{{{
         assert len(self.channels) == 8, "There must be 8 channels per SUServo"
 
         datasets = ["enabled", "gains", "atts",   "freqs",     "en_outs", "ys",     "en_iirs", "Vs",    "Ps",      "Is",      "Gls",   "sampler_ch"]
-        defaults = [[1],         [0]*8,   [31.5]*8, [200e6]*8,   [1]*8,     [1.0]*8,  [0]*8,     [0.0]*8, [-0.005]*8, [-10.0]*8, [0.0]*8, [i for i in range(8)]]
+        defaults = [1,         [0]*8,   [31.5]*8, [200e6]*8,   [1]*8,     [1.0]*8,  [0]*8,     [0.0]*8, [-0.005]*8, [-10.0]*8, [0.0]*8, [i for i in range(8)]]
         units =    [None,      "dB",    "dB",     "MHz",       None,      None,     None,      "V",     None,       None,       None,    None]
         for dataset,default,unit in zip(datasets,defaults,units):
             self.__dict__[dataset] = experiment.get_dataset(name+"."+dataset, default=default, archive=False)
@@ -58,7 +58,6 @@ class SUServoManager(): #{{{
         self._mutate_and_set("en_outs", self.en_outs, ch, 1)
         self.core.break_realtime()
         self.channels[ch].set(1,self.en_iirs[ch],ch)
-
 
     @kernel
     def disable(self, ch):
@@ -97,30 +96,16 @@ class SUServoManager(): #{{{
         self._mutate_and_set("Vs", ch, offset)
 
         self.core.break_realtime()
-        # Disable our profile to avoid collisions, 31 should be kept clean for this
-        self.channels[ch].set(en_out=self.en_outs[ch], en_iir=self.en_iirs[ch], profile=31)
-        delay(2*1.2*us)
 
         self.channels[ch].set_dds(profile=ch, frequency=freq*MHz, offset=offset)
-
-        # set back the one we want
-        self.channels[ch].set(en_out=self.en_outs[ch], en_iir=self.en_iirs[ch], profile=ch)
-        delay(2*1.2*us)
 
     @kernel
     def set_freq(self, ch, freq):
         self._mutate_and_set("freqs", self.freqs, ch, freq*MHz)
 
         self.core.break_realtime()
-        # Disable our profile to avoid collisions, 31 should be kept clean for this
-        # self.channels[ch].set(en_out=self.en_outs[ch], en_iir=self.en_iirs[ch], profile=31)
-        # delay(2*1.2*us)
 
         self.channels[ch].set_dds(profile=ch, frequency=freq*MHz, offset=self.Vs[ch])
-
-        # set back the one we want
-        # self.channels[ch].set(en_out=self.en_outs[ch], en_iir=self.en_iirs[ch], profile=ch)
-        # delay(2*1.2*us)
 
     @kernel
     def set_y(self, ch, y):
@@ -137,21 +122,33 @@ class SUServoManager(): #{{{
         self._mutate_and_set("Gls", ch, Gl)
 
         self.core.break_realtime()
-        # Disable our profile to avoid collisions, 31 should be kept clean for this
-        self.channels[ch].set(en_out=self.en_outs[ch], en_iir=self.en_iirs[ch], profile=31)
-        delay(2*1.2*us)
 
         self.channels[ch].set_iir(profile=ch, adc=adc, kp=P, ki=I, g=Gl)
 
-        # set back the one we want
-        self.channels[ch].set(en_out=self.en_outs[ch], en_iir=self.en_iirs[ch], profile=ch)
-        delay(2*1.2*us)
-
     @kernel
     def set_all(self):
-        '''
-            Ensures the SUServo is set to the current state of the manager
-        '''
+        """
+        Ensures the SUServo is set to the current state of the manager
+
+        we can retrieve
+        get_y: y
+            y - the output scaling amplitude
+        get_profile_mu: [ftw >> 16, b1, pow, adc | (delay << 8), offset, a1,ftw & 0xffff, b0]
+            ftw >> 16           - frequency tuning word
+            b1                  - feedforward gain
+            pow                 - phase offset word
+            adc | (delay << 8)  - adc channel | delay until implementation
+            offset              - negative setpoint offset
+            a1                  - feedback gain
+            ftw & 0xffff        - frequency tuning word
+            b0                  - feedforward gain
+        get_status: Bit 0: enabled, bit 1: done, bits 8-15: channel clip indicators.
+
+        so we should be able to retrieve the state up to gains and atts
+        ["enabled", "gains", "atts",   "freqs",     "en_outs", "ys",     "en_iirs", "Vs",    "Ps",      "Is",      "Gls",   "sampler_ch"]
+
+        """
+
         # Prepare core
         print("Resetting core")
         self.core.reset()
