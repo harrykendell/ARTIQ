@@ -28,11 +28,7 @@ from PyQt5.QtGui import QDoubleValidator, QIntValidator
 from repository.utils.SUServoManager import SUServoManager
 
 from artiq.experiment import *
-from artiq.language import us, ms, MHz, dB, delay
-
-from artiq.coredevice.core import Core
-from artiq.coredevice.suservo import SUServo, Channel as SUServoChannel
-
+from artiq.language import MHz
 
 class Switch(QWidget):
     def __init__(self, default: bool, turn_on, turn_off, on_text="ON", off_text="OFF"):
