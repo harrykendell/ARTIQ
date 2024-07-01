@@ -72,6 +72,19 @@ class SUServoManager:  # {{{
         self.set_all()
 
     @kernel
+    def get_adc(self, ch):
+        '''
+        Get the ADC value for a given channel
+        Delays by 20us to ensure the servo was disabled
+        '''
+        self.suservo.set_config(0)
+        delay(10*us)
+        v = self.channels[ch].get_adc(0)
+        self.suservo.set_config(self.enabled)
+        delay(10*us)
+        return v
+    
+    @kernel
     def _mutate_and_set_float(self, dataset, variable, index, value):
         """Mutate the dataset and change our internal store of the value
         We have to pass both the dataset reference and local variable as __dict__ access is illegal on kernel

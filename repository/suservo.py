@@ -82,9 +82,3 @@ class SUServoControl(EnvExperiment):
         delay(2*1.2*us)
 
         self.suservo.set_config(enable=self.En)
-
-        self.set_dataset("suservo.atts", self.Attenuations, broadcast=True)
-        self.mutate_dataset("suservo.atts", self.Channel, self.Attenuation)
-
-
-
