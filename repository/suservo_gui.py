@@ -149,16 +149,15 @@ class DDSControl(QWidget):
             return
 
         # guard against recursion
-        if val == self.freq or round(float(self.text.text())) == self.slider.value():
+        if val == self.manager.freqs[self.ch] / MHz or round(float(self.text.text())) == self.slider.value():
             return
 
         val = min(max(val, self.min), self.max)
 
-        self.manager.set_freq(self.ch, val * MHz)
-        self.freq = val
+        self.manager.set_freq(self.ch, val)
 
-        self.text.setText(str(round(self.freq, 3)))
-        self.slider.setValue(int(self.freq))
+        self.text.setText(str(round(self.manager.freqs[self.ch] / MHz, 3)))
+        self.slider.setValue(int(self.manager.freqs[self.ch] / MHz))
 
 
 class PIDControl(QWidget):
