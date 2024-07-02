@@ -28,7 +28,7 @@ from PyQt5.QtGui import QDoubleValidator, QIntValidator
 from repository.utils.SUServoManager import SUServoManager
 
 from artiq.experiment import *
-from artiq.language import MHz
+from artiq.language import MHz, ms
 
 class Switch(QWidget):
     def __init__(self, default: bool, turn_on, turn_off, on_text="ON", off_text="OFF"):
@@ -71,7 +71,6 @@ class Switch(QWidget):
             self.button.setText(self.text[1])  # Change text and color
             self.button.setStyleSheet("background-color: #b75d5d;")
         self.state = not self.state
-
 
 class DDSControl(QWidget):
     def __init__(self, manager, ch=0):
@@ -159,7 +158,6 @@ class DDSControl(QWidget):
         self.text.setText(str(round(self.manager.freqs[self.ch] / MHz, 3)))
         self.slider.setValue(int(self.manager.freqs[self.ch] / MHz))
 
-
 class PIDControl(QWidget):
     def __init__(self, manager, ch=0):
         super().__init__()
@@ -242,6 +240,21 @@ class PIDControl(QWidget):
             float(self.I.text()),
             float(self.Gl.text()),
         )
+
+
+class SamplerControl(QWidget):
+    def __init__(self, manager, ch=0):
+        super().__init__()
+        self.manager = manager
+        self.ch = ch
+
+        layout = QVBoxLayout()
+
+        self.setLayout(layout)
+
+    @kernel
+    def sample(self, gap = 1*ms, num = 100):
+        raise NotImplementedError
 
 
 class SingleChannel(QWidget):  # {{{
