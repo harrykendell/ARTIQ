@@ -273,7 +273,7 @@
         postShellHook = ''
           PYTHONPATH = ${nixpkgs.python3.sitePackages}:$PYTHONPATH
           echo "To use the ARTIQ master environment, run 'artiq-master' in this shell."
-        ''
+        '';
       };
     in {
       defaultPackage.x86_64-linux = artiq-master-dev;
