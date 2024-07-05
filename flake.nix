@@ -142,7 +142,7 @@
       flake = false;
       };
   };
-  outputs = { self, artiq}:
+  outputs = { self, artiq, src-ndscan, src-oitg, src-oxart-devices, src-miniconf-mqtt, src-booster}:
     let
       nixpkgs = artiq.nixpkgs;
       sipyco = artiq.inputs.sipyco;
