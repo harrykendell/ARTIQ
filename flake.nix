@@ -114,7 +114,7 @@
             # List desired Python packages here.
             aqmain.artiq
             #ps.paramiko  # needed if and only if flashing boards remotely (artiq_flash -H)
-            aqextra.flake8-artiq
+            #aqextra.flake8-artiq
 
             ps.pip
             ps.pandas
