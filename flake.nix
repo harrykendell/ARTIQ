@@ -147,20 +147,20 @@
       nixpkgs = artiq.nixpkgs;
       sipyco = artiq.inputs.sipyco;
       # PIP: sha256 comes from the .tar.gz url sha256 at https://pypi.org/pypi/$package/$version/json
-      windfreak = pkgs.python3Packages.buildPythonPackage rec {
+      windfreak = nixpkgs.python3Packages.buildPythonPackage rec {
         pname = "windfreak";
         version = "0.3.0";
         doCheck = false;
-        src = pkgs.python3Packages.fetchPypi {
+        src = nixpkgs.python3Packages.fetchPypi {
           inherit pname version;
           sha256 = "d0ec652bc57aa630f38d34abd9eba938fb7aae8c4bd42ceb558eb38d170d8620";
         };
         };
-      gmqtt = pkgs.python3Packages.buildPythonPackage rec {
+      gmqtt = nixpkgs.python3Packages.buildPythonPackage rec {
         pname = "gmqtt";
         version = "0.6.12";
         doCheck = false;
-        src = pkgs.python3Packages.fetchPypi {
+        src = nixpkgs.python3Packages.fetchPypi {
           inherit pname version;
           sha256 = "7df03792343089ae62dc7cd6f8be356861c4fc68768cefa22f3d8de5e7e5be48";
         };
