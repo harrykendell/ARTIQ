@@ -2,7 +2,7 @@
 # This script installs the modules as per flake.nix into the windows_src file which is gitignored
 # NB you may need to run this manually step by step
 
-cd windows_src
+cd src
 
 # Windfreak
 pip install windfreak==0.3.0

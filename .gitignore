@@ -171,4 +171,4 @@ dataset_db.mdb-lock
 results
 
 flake.lock
-windows_src/
+src/
