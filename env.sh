@@ -21,3 +21,6 @@ pip install -e "git+https://github.com/OxfordIonTrapGroup/oxart-devices.git#egg=
 
 # ndscan
 pip install -e "git+https://github.com/OxfordIonTrapGroup/ndscan.git#egg=ndscan"
+
+# pydantic
+pip install pydantic
