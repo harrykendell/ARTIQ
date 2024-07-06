@@ -122,6 +122,7 @@
             ps.scipy
             ps.matplotlib
             ps.pyqt5
+            ps.pydantic
 
             windfreak
             booster
