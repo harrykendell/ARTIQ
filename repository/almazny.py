@@ -9,7 +9,7 @@ class TestMirny(EnvExperiment):
         self.mirny: ADF5356 = self.get_device("mirny_ch0")
         self.almazny: AlmaznyChannel = self.get_device("almazny_ch0")
 
-        self.setattr_argument("frequency", NumberValue(unit="MHz", default=6800, ndecimals=0, step=1),tooltip="Frequency to set on the Almazny with frequency/2 on the Mirny.")
+        self.setattr_argument("frequency", NumberValue(unit="MHz", default=6800.0*MHz, precision=3, min=50, type="float"),tooltip="Frequency to set on the Almazny with frequency/2 on the Mirny.")
 
     @kernel
     def run(self):
