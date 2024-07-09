@@ -57,18 +57,19 @@ class SUServoManager:  # {{{
         ]
         units = [None, "dB", "dB", "MHz", None, None, None, "FullScale", None, None, None, None]
         for dataset, default, unit in zip(datasets, defaults, units):
-            self.__dict__[dataset] = experiment.get_dataset(
+            temp = experiment.get_dataset(
                 name + "." + dataset, default=default, archive=False
             )
             # we set the values back so we are allowed to mutate then later
             experiment.set_dataset(
                 name + "." + dataset,
-                self.__dict__[dataset],
+                temp,
                 persist=True,
                 archive=False,
                 unit=unit,
             )
-
+            self.__dict__[dataset] = temp
+        
         self.set_all()
 
     @kernel
@@ -177,7 +178,6 @@ class SUServoManager:  # {{{
 
     @kernel
     def set_iir(self, ch, adc, P, I, Gl):
-        print("Setting IIR", ch, adc, P, I, Gl)
         self._mutate_and_set_int("sampler_chs", self.sampler_chs, ch, adc)
         self._mutate_and_set_float("Ps", self.Ps, ch, P)
         self._mutate_and_set_float("Is", self.Is, ch, I)
@@ -188,6 +188,20 @@ class SUServoManager:  # {{{
         self.channels[ch].set_iir(profile=0, adc=adc, kp=P, ki=I, g=Gl)
 
     @kernel
+    def enable_iir(self, ch):
+        self._mutate_and_set_int("en_iirs", self.en_iirs, ch, 1)
+
+        self.core.break_realtime()
+        self.channels[ch].set(self.en_outs[ch], 1)
+
+    @kernel
+    def disable_iir(self, ch):
+        self._mutate_and_set_int("en_iirs", self.en_iirs, ch, 0)
+
+        self.core.break_realtime()
+        self.channels[ch].set(self.en_outs[ch], 0)
+
+    @kernel
     def set_all(self):
         """
         Ensures the SUServo is set to the current state of the manager
@@ -195,16 +209,15 @@ class SUServoManager:  # {{{
         """
 
         # Prepare core
-        print("Resetting core")
         self.core.reset()
         self.core.break_realtime()
 
         self.enabled = self.suservo.get_status() & 0b01
-        delay(200 * us)
+        delay(200 * ms)
         self.experiment.set_dataset(
             self.name + ".enabled", self.enabled, persist=True, archive=False
         )
-
+        delay(100 * ms)
         # Initialize SUServo - this will leave it disabled
         self.suservo.init()
         delay(10 * ms)
@@ -232,7 +245,7 @@ class SUServoManager:  # {{{
             self.channels[ch].set_dds(
                 profile=0, frequency=self.freqs[ch], offset=offset
             )
-            delay(20 * us)
+            delay(200 * us)
             # PI loop params
             self.channels[ch].set_iir(
                 profile=0,
@@ -250,6 +263,6 @@ class SUServoManager:  # {{{
             self.channels[ch].set(
                 en_out=self.en_outs[ch], en_iir=self.en_iirs[ch], profile=0
             )
-            delay(2 * 1.2 * us)
+            delay(5 * 1.2 * us)
 
         self.suservo.set_config(enable=self.enabled)

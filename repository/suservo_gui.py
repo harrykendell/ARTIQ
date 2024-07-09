@@ -78,7 +78,7 @@ class DDSControl(QWidget):
         self.min = 0.0
         self.max = 400.0
         self.manager = manager
-        self.ch = 0
+        self.ch = ch
 
         # Main layout for this widget
         layout = QVBoxLayout()
@@ -110,7 +110,7 @@ class DDSControl(QWidget):
         att_input.setPrefix("-")
         att_input.setSuffix(" dB")
         att_input.editingFinished.connect(
-            lambda: self.manager.set_att((ch, att_input.value()))
+            lambda: self.manager.set_att(ch, att_input.value())
         )
         att_vbox.addWidget(att_input)
         topline.addLayout(att_vbox)
@@ -225,14 +225,6 @@ class PIDControl(QWidget):
         self.setLayout(layout)
 
     def set(self):
-        print(
-            "Setting",
-            self.ch,
-            self.sampler.currentIndex(),
-            self.P.text(),
-            self.I.text(),
-            self.Gl.text(),
-        )
         self.manager.set_iir(
             self.ch,
             int(self.sampler.currentIndex()),
@@ -272,21 +264,21 @@ class SingleChannel(QWidget):  # {{{
         vbox = QVBoxLayout()
         self.groupbox.setLayout(vbox)
 
-        # Top row: ON/OFF switch, channel name
+        # Top row: ON/OFF switch, PID switch, channel name
         # ON/OFF switch {{{
         top = QHBoxLayout()
         self.dds_button = Switch(
-            self.manager.en_outs[channel],
+            default = self.manager.en_outs[channel],
             turn_on=lambda: self.manager.enable(channel),
             turn_off=lambda: self.manager.disable(channel),
         )
         top.addWidget(self.dds_button)
         self.pid_button = Switch(
-            self.manager.en_outs[channel],
-            lambda: self.manager.enable(channel),
-            lambda: self.manager.disable(channel),
-            "PID",
-            "PID",
+            default = self.manager.en_iirs[channel],
+            turn_on=lambda: self.manager.enable_iir(channel),
+            turn_off=lambda: self.manager.disable_iir(channel),
+            on_text="PID",
+            off_text="PID",
         )
         top.addWidget(self.pid_button)
         # }}}
@@ -304,11 +296,11 @@ class SingleChannel(QWidget):  # {{{
         tabs = QTabWidget()
 
         # DDS
-        freq = DDSControl(self.manager, channel)
+        freq = DDSControl(self.manager, ch=channel)
         tabs.addTab(freq, "DDS")
 
         # PID
-        pid = PIDControl(self.manager, channel)
+        pid = PIDControl(self.manager, ch=channel)
         tabs.addTab(pid, "PID")
 
         # GRAPH
