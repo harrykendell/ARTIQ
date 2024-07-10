@@ -24,10 +24,6 @@ import contextlib
 import sys
 import time
 
-import sys
-sys.path.append(
-    __file__.split("repository")[0] + "our devices"
-)  # link to our devices root
 from booster_ import BoosterAPI, TelemetryReader
 
 # The default bias current to tune to.
