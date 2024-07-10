@@ -17,7 +17,7 @@ if [[ -d /opt/Xilinx ]]; then
     nix develop --command bash -c "python -m artiq.gateware.targets.kasli ../../crate\ config/bu2402001.json"
 
     # flash crate
-    cp -TR artiq_kasli/bu2402001 ../../crate/config/bu2402001_github
+    cp -TR artiq_kasli/bu2402001 ../../crate\ config/bu2402001_github
     nix develop --command bash -c "artiq_flash --srcbuild -d artiq_kasli/bu2402001"
 
     echo -e "${GREEN}Flashing complete, firmware updated in 'crate config/bu2402001_github'${NC}"
