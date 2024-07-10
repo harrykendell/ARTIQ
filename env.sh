@@ -1,8 +1,6 @@
 #! /bin/bash
-# This script installs the modules as per flake.nix into the windows_src file which is gitignored
+# This script installs the modules as per flake.nix src directory which is gitignored
 # NB you may need to run this manually step by step
-
-cd src
 
 # Windfreak
 pip install windfreak==0.3.0
@@ -19,8 +17,15 @@ pip install -e "git+https://github.com/OxfordIonTrapGroup/oitg.git#egg=oitg"
 # oxart-devices
 pip install -e "git+https://github.com/OxfordIonTrapGroup/oxart-devices.git#egg=oxart-devices"
 
+# artiq - we currently target whatever is on the release-8 branch to avoid any potentially artiq 9.0+unknown breaking changes
+pip install -e "git+https://github.com/m-labs/artiq.git@release-8#egg=artiq"
+
 # ndscan
 pip install -e "git+https://github.com/OxfordIonTrapGroup/ndscan.git#egg=ndscan"
 
 # pydantic
 pip install pydantic
+
+# Check the installed packages - we should see if any of the above failed
+echo -e "\n\nInstalled packages:\n"
+pip list | grep 'windfreak\|booster\|miniconf-mqtt\|oitg\|oxart-devices\|artiq\|ndscan\|pydantic'
