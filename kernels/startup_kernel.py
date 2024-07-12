@@ -10,7 +10,8 @@ class LED(EnvExperiment):
         # LEDs
         self.setattr_device("led0")
         self.setattr_device("led1")
-        self.led = [self.__dict__["led" + str(i)] for i in range(2)]  # TTLOut
+        self.setattr_device("led2")
+        self.led = [self.__dict__["led" + str(i)] for i in range(3)]  # TTLOut
 
         # TTLs
         for i in range(4):
@@ -28,9 +29,6 @@ class LED(EnvExperiment):
         for i in range(4):
             self.setattr_device(f"mirny_ch{i}")
         self.mirnies = [self.__dict__[f"mirny_ch{i}"] for i in range(4)]  # ADF5356
-
-        # Almazny
-        self.setattr_device("almazny")
 
         # SUServo
         self.setattr_device("suservo")
@@ -63,7 +61,7 @@ class LED(EnvExperiment):
 
         # LEDs
         for led in self.led:
-            led.off()
+            led.on()
 
         # TTLs
         for ttlo in self.ttlOut:
@@ -96,10 +94,6 @@ class LED(EnvExperiment):
             mirny.init()
             mirny.sw.off()
             delay(200 * ms)
-
-        self.almazny.init()
-        delay(200 * ms)
-        self.almazny.output_toggle(False)
 
         # SUServo
         self.suservo.init()

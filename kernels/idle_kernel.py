@@ -4,7 +4,8 @@ class Idle(EnvExperiment):
 # The idle sequence for the experiment.
     def build(self):
         self.setattr_device("core")
-        self.setattr_device("led0")
+        self.setattr_device("led1")
+        self.setattr_device("led2")
 
     @kernel
     def run(self):
@@ -15,9 +16,11 @@ class Idle(EnvExperiment):
         self.core.break_realtime()
     
         while True:
-            self.led0.pulse(250*ms)
+            with parallel:
+                self.led1.pulse(250*ms)
+                self.led2.pulse(250*ms)
             delay(125*ms)
-            self.led0.pulse(125*ms)
+            self.led1.pulse(125*ms)
             delay(125*ms)
-            self.led0.pulse(125*ms)
+            self.led1.pulse(125*ms)
             delay(250*ms)

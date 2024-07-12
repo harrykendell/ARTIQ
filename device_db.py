@@ -247,7 +247,7 @@ for i in range(2):
     )
 
 # 2 front panel user controllable LEDs
-for i in range(2):
+for i in range(3):
     device_db.update(
         {
             "led"
