@@ -1,6 +1,8 @@
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QSlider, QCheckBox
 from PyQt5.QtCore import Qt,QTimer
+from PyQt5.QtGui import QIcon
 from windfreak import SynthHD
+from sys import argv
 
 import argparse
 
@@ -130,7 +132,7 @@ class SynthController(QWidget):
             self.layout.addLayout(channel_layout)
 
         self.setLayout(self.layout)
-        self.setWindowTitle('Synth Controller')
+        self.setWindowTitle('Windfreak Controller')
 
         self.update()
 
@@ -151,7 +153,11 @@ if __name__ == '__main__':
     parser.add_argument('--port', '-p', type=str, help='The port to open the Windfreak device on', default='/dev/ttyACM0')
     args = parser.parse_args()
 
-    app = QApplication([])
+    app = QApplication(argv)
+    # Set a nice icon
+    app.setWindowIcon(QIcon('/usr/share/icons/elementary-xfce/apps/128/utilities-system-monitor.png'))
+    app.setStyle('Fusion')
+    app.setApplicationName("Windfreak Controller")
 
     try:
         controller = SynthController(args.port)
