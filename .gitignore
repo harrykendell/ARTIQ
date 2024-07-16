@@ -172,4 +172,4 @@ results
 
 flake.lock
 src/
-crate config/bu2402001_github/
+crate config/bu2402001_*
