@@ -36,7 +36,8 @@ class Switch(QWidget):
         self.turn_on = turn_on
         self.turn_off = turn_off
         self.state = default
-        self.text = [off_text, on_text]
+        self.text = [on_text, off_text]
+        self.color = ["background-color: #5db75d", "background-color: #b75d5d"]
 
         # Main layout for this widget
         layout = QVBoxLayout()
@@ -44,8 +45,7 @@ class Switch(QWidget):
         self.button = QPushButton()
         self.button.setText(self.text[default])
         self.button.setCheckable(True)
-        self.button.setStyleSheet(
-            ["background-color: #b75d5d", "background-color: #5db75d;"][default]
+        self.button.setStyleSheet(self.color[default]
         )
         self.button.setFixedWidth(
             max(
@@ -64,12 +64,12 @@ class Switch(QWidget):
         self.button.setChecked(False)
         if not self.state:
             self.turn_on()  # Turns it on
-            self.button.setText(self.text[0])  # Change text and color
-            self.button.setStyleSheet("background-color: #5db75d;")
+            self.button.setText(self.text[int(self.state)])  # Change text and color
+            self.button.setStyleSheet(self.color[int(self.state)])
         else:
             self.turn_off()
-            self.button.setText(self.text[1])  # Change text and color
-            self.button.setStyleSheet("background-color: #b75d5d;")
+            self.button.setText(self.text[int(self.state)])  # Change text and color
+            self.button.setStyleSheet(self.color[int(self.state)])
         self.state = not self.state
 
 class DDSControl(QWidget):
