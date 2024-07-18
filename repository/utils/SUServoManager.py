@@ -55,17 +55,16 @@ class SUServoManager:  # {{{
             [0.0] * 8,
             [i for i in range(8)],
         ]
-        units = [None, "dB", "dB", "MHz", None, None, None, "FullScale", None, None, None, None]
+        units = [None, "dB", "dB", "MHz", None, None, None, None, None, None, None, None]
         for dataset, default, unit in zip(datasets, defaults, units):
             temp = experiment.get_dataset(
-                name + "." + dataset, default=default, archive=False
+                name + "." + dataset, default=default
             )
             # we set the values back so we are allowed to mutate then later
             experiment.set_dataset(
                 name + "." + dataset,
                 temp,
                 persist=True,
-                archive=False,
                 unit=unit,
             )
             self.__dict__[dataset] = temp
@@ -145,11 +144,21 @@ class SUServoManager:  # {{{
     def set_att(self, ch, att):
         self._mutate_and_set_float("atts", self.atts, ch, att)
 
-        self.core.break_realtime()
-
-        # We have to write all 4 channels at once
+        # We have to write all 4 channels at once - so convert each to mu and accumulate into reg
+        reg = 0
         for i in range(4):
-            self.suservo.cplds[ch // 4].set_att(i, self.atts[i if ch < 4 else 4 + i])
+            reg += self.suservo.cplds[0].att_to_mu(self.atts[i if ch < 4 else 4 + i]) << (i * 8)
+
+        self.core.break_realtime()
+        self.suservo.cplds[ch // 4].set_all_att_mu(reg)
+
+        # # We have to write all 4 channels at once
+        # for i in range(4):
+        #     self.suservo.cplds[ch // 4].set_att(i, self.atts[i if ch < 4 else 4 + i])
+
+        print("Setting att on cpld", ch // 4, "to", self.atts[ch])
+        for i in range(4):
+            print("-> ",self.atts[i if ch < 4 else 4 + i])
 
     @kernel
     def set_dds(self, ch, freq, offset):
@@ -173,8 +182,11 @@ class SUServoManager:  # {{{
     def set_y(self, ch, y):
         self._mutate_and_set_float("ys", self.ys, ch, y)
 
-        self.core.break_realtime()
-        self.channels[ch].set_y(profile=0, y=y)
+        if self.en_iirs[ch] == 1:
+            print("Cannot set y when IIR is enabled")
+        else:
+            self.core.break_realtime()
+            self.channels[ch].set_y(profile=0, y=y)
 
     @kernel
     def set_iir(self, ch, adc, P, I, Gl):
@@ -211,30 +223,33 @@ class SUServoManager:  # {{{
         # Prepare core
         self.core.reset()
         self.core.break_realtime()
+        self.suservo.set_config(enable=0)
 
-        self.enabled = self.suservo.get_status() & 0b01
-        delay(200 * ms)
+        delay(10 * ms)
         self.experiment.set_dataset(
             self.name + ".enabled", self.enabled, persist=True, archive=False
         )
-        delay(100 * ms)
+        delay(50 * ms)
         # Initialize SUServo - this will leave it disabled
         self.suservo.init()
-        delay(10 * ms)
+        delay(1 * ms)
 
         buffer = [0] * 8
         for ch in range(8):
             self.channels[ch].get_profile_mu(0, buffer)
-            delay(100*us)
-            self._mutate_and_set_float("offsets", self.offsets, ch, buffer[4] / (1 << COEFF_WIDTH - 1))
-            self._mutate_and_set_int("sampler_chs", self.sampler_chs, ch, buffer[3] & 0xFF)
-            self._mutate_and_set_float(
-                "freqs",
-                self.freqs,
-                ch,
-                self.suservo.ddses[0].ftw_to_frequency(buffer[0] << 16 | buffer[6]),
-            )
-            self._mutate_and_set_float("ys", self.ys, ch, self.channels[ch].get_y(0))
+            # if there doesn't seem to be any state held in the suservo channel we just use our dataset values
+            if self.suservo.ddses[0].ftw_to_frequency(buffer[0] << 16 | buffer[6]) != 0.0:
+                delay(100*us)
+                self._mutate_and_set_float("offsets", self.offsets, ch, buffer[4] / (1 << COEFF_WIDTH - 1))
+                self._mutate_and_set_int("sampler_chs", self.sampler_chs, ch, buffer[3] & 0xFF)
+                self._mutate_and_set_float(
+                    "freqs",
+                    self.freqs,
+                    ch,
+                    self.suservo.ddses[0].ftw_to_frequency(buffer[0] << 16 | buffer[6]),
+                )
+                self._mutate_and_set_float("ys", self.ys, ch, self.channels[ch].get_y(0))
+
             self.core.break_realtime()
             # set gain on Sampler channel  to 10^gain - these are wiped in the init
             self.suservo.set_pgia_mu(ch, self.gains[ch])
@@ -254,7 +269,7 @@ class SUServoManager:  # {{{
                 ki=self.Is[ch],
                 g=self.Gls[ch],
             )
-
+            delay(20 * us)
             self.channels[ch].set_y(profile=0, y=self.ys[ch])
 
         for ch in range(8):

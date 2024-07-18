@@ -42,7 +42,7 @@ class SUServoControl(EnvExperiment):
         self.setattr_argument("SamplerChannel", NumberValue(0, min=0, max=7, precision=0, step=1,type='int'),tooltip="Sampler channel to read from", group='IIR') #SUServoChannel.set_iir
 
         self.suservo_ch: SUServoChannel = self.get_device(f"suservo_ch{self.Channel}")
-        self.Attenuations = self.get_dataset("suservo.atts", default=[0.0]*8, archive=False)
+        self.Attenuations = self.get_dataset("suservo.atts", default=[20.0]*8, archive=False)
 
     @kernel
     def run(self):
@@ -64,9 +64,15 @@ class SUServoControl(EnvExperiment):
         delay(2*1.2*us)
 
         # set attenuation on all 4 channels - we set all from the dataset then overwrite the one we want
+        reg = 0
         for i in range(4):
-            self.suservo.cplds[self.Channel//4].set_att(i, self.Attenuations[i if self.Channel<4 else 4+i])
-        self.suservo.cplds[self.Channel//4].set_att(self.Channel%4, self.Attenuation)
+            if i==self.Channel%4:
+                reg += self.suservo.cplds[0].att_to_mu(self.Attenuation) << (i * 8)
+            else:
+                reg += self.suservo.cplds[0].att_to_mu(self.Attenuations[i if self.Channel < 4 else 4 + i]) << (i * 8)
+            
+        self.core.break_realtime()
+        self.suservo.cplds[self.Channel // 4].set_all_att_mu(reg)
 
         # offset to assign to servo to reach target voltage - negative to lock to a positive reference
         offset = -self.TargetV * (10.0 ** (self.Gain - 1))
