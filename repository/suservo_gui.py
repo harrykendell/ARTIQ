@@ -23,7 +23,7 @@ from PyQt5.QtWidgets import (
     QComboBox,
     QTabWidget,
 )
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QDoubleValidator, QIntValidator
 from repository.utils.SUServoManager import SUServoManager
 
@@ -33,12 +33,10 @@ from artiq.language import MHz, ms
 class Switch(QWidget):
     def __init__(self, default: bool, turn_on, turn_off, on_text="ON", off_text="OFF"):
         super().__init__()
-        self.turn_on = turn_on
-        self.turn_off = turn_off
+        self.turn = [turn_on,turn_off]
         self.state = default
-        self.text = [on_text, off_text]
-        self.color = ["background-color: #5db75d", "background-color: #b75d5d"]
-
+        self.text = [off_text, on_text]
+        self.color = ["background-color: #b75d5d", "background-color: #5db75d"]
         # Main layout for this widget
         layout = QVBoxLayout()
 
@@ -49,7 +47,7 @@ class Switch(QWidget):
         )
         self.button.setFixedWidth(
             max(
-                self.button.fontMetrics().boundingRect(i).width() + 10
+                self.button.fontMetrics().boundingRect(i).width() + 20
                 for i in self.text
             )
         )
@@ -61,16 +59,21 @@ class Switch(QWidget):
 
     def switch_state(self):
         """Toggles the state of this button"""
-        self.button.setChecked(False)
-        if not self.state:
-            self.turn_on()  # Turns it on
-            self.button.setText(self.text[int(self.state)])  # Change text and color
-            self.button.setStyleSheet(self.color[int(self.state)])
-        else:
-            self.turn_off()
-            self.button.setText(self.text[int(self.state)])  # Change text and color
-            self.button.setStyleSheet(self.color[int(self.state)])
+        self.button.setChecked(False) # we dont want the button to stay held down
+        self.turn[self.state]()  # Swap state
         self.state = not self.state
+
+        self.button.setText(self.text[self.state])  # Change text and color
+        self.button.setStyleSheet(self.color[self.state])
+
+class SignalDoubleSpinBox(QDoubleSpinBox):
+    stepChanged = pyqtSignal()
+
+    def stepBy(self, step):
+        value = self.value()
+        super(QDoubleSpinBox, self).stepBy(step)
+        if self.value() != value:
+            self.stepChanged.emit()
 
 class DDSControl(QWidget):
     def __init__(self, manager, ch=0):
@@ -95,6 +98,24 @@ class DDSControl(QWidget):
         freq_vbox.addWidget(self.text)
         topline.addLayout(freq_vbox)
         topline.addStretch()
+
+        # Amplitude input
+        amp_vbox = QVBoxLayout()
+        amp_vbox.setAlignment(Qt.AlignBottom)
+        amp_label = QLabel("Amplitude")
+
+        amp_vbox.addWidget(amp_label)
+        amp_vbox.addStretch()
+        amp_input = SignalDoubleSpinBox()
+        amp_input.setRange(0.0, 1.0)
+        amp_input.setSingleStep(0.1)
+        amp_input.setDecimals(1)
+        amp_input.setValue(self.manager.ys[ch])
+        amp_input.editingFinished.connect(lambda: self.manager.set_y(ch, amp_input.value()))
+        amp_input.stepChanged.connect(lambda: self.manager.set_y(ch, amp_input.value()))
+        amp_vbox.addWidget(amp_input)
+        topline.addLayout(amp_vbox)
+
         # Attenuation input
         att_vbox = QVBoxLayout()
         att_vbox.setAlignment(Qt.AlignBottom)
@@ -102,16 +123,14 @@ class DDSControl(QWidget):
 
         att_vbox.addWidget(att_label)
         att_vbox.addStretch()
-        att_input = QDoubleSpinBox()
+        att_input = SignalDoubleSpinBox()
         att_input.setRange(0.0, 31.5)
         att_input.setSingleStep(0.5)
         att_input.setDecimals(1)
         att_input.setValue(self.manager.atts[ch])
-        att_input.setPrefix("-")
         att_input.setSuffix(" dB")
-        att_input.editingFinished.connect(
-            lambda: self.manager.set_att(ch, att_input.value())
-        )
+        att_input.editingFinished.connect(lambda: self.manager.set_att(ch, att_input.value()))
+        att_input.stepChanged.connect(lambda: self.manager.set_att(ch, att_input.value()))
         att_vbox.addWidget(att_input)
         topline.addLayout(att_vbox)
 
@@ -233,7 +252,6 @@ class PIDControl(QWidget):
             float(self.Gl.text()),
         )
 
-
 class SamplerControl(QWidget):
     def __init__(self, manager, ch=0):
         super().__init__()
@@ -247,7 +265,6 @@ class SamplerControl(QWidget):
     @kernel
     def sample(self, gap = 1*ms, num = 100):
         raise NotImplementedError
-
 
 class SingleChannel(QWidget):  # {{{
     """Class to control a single given SUServo channel"""
@@ -330,6 +347,7 @@ class SUServoGUI(QWidget):  # {{{
 
         # Artiq status {{{
         hbox = QHBoxLayout()
+        hbox.addStretch()
         hbox.addWidget(
             Switch(
                 self.manager.enabled,
@@ -337,7 +355,6 @@ class SUServoGUI(QWidget):  # {{{
                 self.manager.disable_servo,
             )
         )
-        hbox.addStretch()
         self.label = QLabel("SUServo")  # Bold large text
         self.label.setStyleSheet("font: bold 14pt")
         hbox.addWidget(self.label)
