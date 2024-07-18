@@ -5,6 +5,7 @@ from artiq.experiment import *
 
 class LED(EnvExperiment):
     def build(self):
+        print("Creating all devices...")
         self.setattr_device("core")
 
         # LEDs
@@ -36,6 +37,7 @@ class LED(EnvExperiment):
             self.setattr_device(f"suservo_ch{i}")  # SUServo Channel
         self.suservo_ch = [self.__dict__[f"suservo_ch{i}"] for i in range(8)]  # Channel
 
+        print("All devices created.")
         """
         We are left with the following devices:
 
@@ -58,7 +60,7 @@ class LED(EnvExperiment):
     def run(self):
         self.core.reset()
         print("Initialising all devices...")
-
+        self.core.break_realtime()
         # LEDs
         for led in self.led:
             led.on()
