@@ -1,6 +1,7 @@
 {
-  inputs.artiq.url = "git+https://github.com/m-labs/artiq.git?ref=release-8";
-  inputs.extrapkg.url = "git+https://git.m-labs.hk/M-Labs/artiq-extrapkg.git?ref=release-8";
+  # for a specific rev use `git+https://github.com/m-lab/artiq?rev=XXX`
+  inputs.artiq.url = "git+https://github.com/m-labs/artiq?ref=release-8";
+  inputs.extrapkg.url = "git+https://git.m-labs.hk/M-Labs/artiq-extrapkg?ref=release-8";
   inputs.extrapkg.inputs.artiq.follows = "artiq";
   # We pull Github packages in as flake inputs so we can conveniently update them
   # using `nix lock`, etc., rather than manually having to track hashes.
