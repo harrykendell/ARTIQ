@@ -152,14 +152,6 @@ class SUServoManager:  # {{{
         self.core.break_realtime()
         self.suservo.cplds[ch // 4].set_all_att_mu(reg)
 
-        # # We have to write all 4 channels at once
-        # for i in range(4):
-        #     self.suservo.cplds[ch // 4].set_att(i, self.atts[i if ch < 4 else 4 + i])
-
-        print("Setting att on cpld", ch // 4, "to", self.atts[ch])
-        for i in range(4):
-            print("-> ",self.atts[i if ch < 4 else 4 + i])
-
     @kernel
     def set_dds(self, ch, freq, offset):
         offset = -offset * (10.0 ** (self.gains[ch] - 1))
