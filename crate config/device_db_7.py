@@ -7,13 +7,7 @@ device_db = {
         "type": "local",
         "module": "artiq.coredevice.core",
         "class": "Core",
-        "arguments": {
-            "host": core_addr,
-            "ref_period": 1e-09,
-            "analyzer_proxy": "core_analyzer",
-            "target": "rv32g",
-            "satellite_cpu_targets": {}
-        },
+        "arguments": {"host": core_addr, "ref_period": 1e-09, "target": "rv32g"},
     },
     "core_log": {
         "type": "controller",
@@ -27,13 +21,6 @@ device_db = {
         "port_proxy": 1383,
         "port": 1384,
         "command": "aqctl_moninj_proxy --port-proxy {port_proxy} --port-control {port} --bind {bind} " + core_addr
-    },
-    "core_analyzer": {
-        "type": "controller",
-        "host": "::1",
-        "port_proxy": 1385,
-        "port": 1386,
-        "command": "aqctl_coreanalyzer_proxy --port-proxy {port_proxy} --port-control {port} --bind {bind} " + core_addr
     },
     "core_cache": {
         "type": "local",
@@ -115,16 +102,6 @@ device_db["mirny0_ch0"] = {
     }
 }
 
-device_db["mirny0_almazny0"] = {
-    "type": "local",
-    "module": "artiq.coredevice.almazny",
-    "class": "AlmaznyChannel",
-    "arguments": {
-        "host_mirny": "mirny0_cpld",
-        "channel": 0,
-    },
-}
-
 device_db["mirny0_ch1"] = {
     "type": "local",
     "module": "artiq.coredevice.adf5356",
@@ -134,16 +111,6 @@ device_db["mirny0_ch1"] = {
         "sw_device": "ttl_mirny0_sw1",
         "cpld_device": "mirny0_cpld",
     }
-}
-
-device_db["mirny0_almazny1"] = {
-    "type": "local",
-    "module": "artiq.coredevice.almazny",
-    "class": "AlmaznyChannel",
-    "arguments": {
-        "host_mirny": "mirny0_cpld",
-        "channel": 1,
-    },
 }
 
 device_db["mirny0_ch2"] = {
@@ -157,16 +124,6 @@ device_db["mirny0_ch2"] = {
     }
 }
 
-device_db["mirny0_almazny2"] = {
-    "type": "local",
-    "module": "artiq.coredevice.almazny",
-    "class": "AlmaznyChannel",
-    "arguments": {
-        "host_mirny": "mirny0_cpld",
-        "channel": 2,
-    },
-}
-
 device_db["mirny0_ch3"] = {
     "type": "local",
     "module": "artiq.coredevice.adf5356",
@@ -178,16 +135,6 @@ device_db["mirny0_ch3"] = {
     }
 }
 
-device_db["mirny0_almazny3"] = {
-    "type": "local",
-    "module": "artiq.coredevice.almazny",
-    "class": "AlmaznyChannel",
-    "arguments": {
-        "host_mirny": "mirny0_cpld",
-        "channel": 3,
-    },
-}
-
 device_db["mirny0_cpld"] = {
     "type": "local",
     "module": "artiq.coredevice.mirny",
@@ -196,6 +143,15 @@ device_db["mirny0_cpld"] = {
         "spi_device": "spi_mirny0",
         "refclk": 125000000.0,
         "clk_sel": "mmcx"
+    },
+}
+
+device_db["mirny0_almazny"] = {
+    "type": "local",
+    "module": "artiq.coredevice.mirny",
+    "class": "Almazny",
+    "arguments": {
+        "host_mirny": "mirny0_cpld",
     },
 }
 
@@ -459,8 +415,7 @@ device_db["suservo0"] = {
         "channel": 0x00002a,
         "pgia_device": "spi_sampler0_pgia",
         "cpld_devices": ['urukul0_cpld', 'urukul1_cpld'],
-        "dds_devices": ['urukul0_dds', 'urukul1_dds'],
-        "sampler_hw_rev": "v2.3"
+        "dds_devices": ['urukul0_dds', 'urukul1_dds']
     }
 }
 
@@ -493,7 +448,6 @@ device_db["urukul0_dds"] = {
     "class": "AD9910",
     "arguments": {
         "pll_n": 32,
-        "pll_en": 1,
         "chip_select": 3,
         "cpld_device": "urukul0_cpld"
     }
@@ -521,7 +475,6 @@ device_db["urukul1_dds"] = {
     "class": "AD9910",
     "arguments": {
         "pll_n": 32,
-        "pll_en": 1,
         "chip_select": 3,
         "cpld_device": "urukul1_cpld"
     }
@@ -539,11 +492,4 @@ device_db["led1"] = {
     "module": "artiq.coredevice.ttl",
     "class": "TTLOut",
     "arguments": {"channel": 0x00002f}
-}
-
-device_db["led2"] = {
-    "type": "local",
-    "module": "artiq.coredevice.ttl",
-    "class": "TTLOut",
-    "arguments": {"channel": 0x000030}
 }

@@ -29,3 +29,10 @@ pip install pydantic
 # Check the installed packages - we should see if any of the above failed
 echo -e "\n\nInstalled packages:\n"
 pip list | grep 'windfreak\|booster\|miniconf-mqtt\|oitg\|oxart-devices\|artiq\|ndscan\|pydantic'
+
+# conda installed artiq doesnt properly link the site-packages to the python3.10 site-packages
+# cd ~/anaconda3/envs/artiq/site-packages
+# for file in *
+# do
+#  ln -sf ../../../site-packages/$file ../lib/python3.10/site-packages/$file
+# done

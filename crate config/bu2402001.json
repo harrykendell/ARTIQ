@@ -3,6 +3,7 @@
     "variant": "BU2402001",
     "hw_rev": "v2.0",
     "base": "standalone",
+    "core_addr" : "192.168.0.2",
     "peripherals": [
         {
             "type": "fastino",
@@ -12,6 +13,7 @@
             "type": "mirny",
             "ports": [4],
             "clk_sel": "mmcx",
+            "refclk":  125000000.0,
             "almazny": true
         },
         {

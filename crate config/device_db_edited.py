@@ -67,7 +67,7 @@ device_db["mirny0_cpld"] = {
     "type": "local",
     "module": "artiq.coredevice.mirny",
     "class": "Mirny",
-    "arguments": {"spi_device": "spi_mirny0", "refclk": 100000000.0, "clk_sel": "mmcx"},
+    "arguments": {"spi_device": "spi_mirny0", "refclk": 125000000.0, "clk_sel": "mmcx"},
 }
 
 for i in range(4):
