@@ -32,9 +32,9 @@ class MirnyTester(EnvExperiment):
     def build(self):
         self.setattr_device("core")
         self.core: Core
-        self.mirny_cplds = dict()
-        self.mirnies = dict()
-        self.almaznys = dict()
+        self.mirny_cplds: dict[Mirny] = dict()
+        self.mirnies: dict[ADF5356] = dict()
+        self.almaznys: dict[AlmaznyChannel] = dict()
 
         ddb = self.get_device_db()
         for name, desc in ddb.items():
@@ -44,8 +44,6 @@ class MirnyTester(EnvExperiment):
                     self.mirny_cplds[name] = self.get_device(name)
                 elif (module, cls) == ("artiq.coredevice.adf5356", "ADF5356"):
                     self.mirnies[name] = self.get_device(name)
-                elif (module, cls) == ("artiq.coredevice.almazny", "AlmaznyLegacy"):
-                    self.legacy_almaznys[name] = self.get_device(name)
                 elif (module, cls) == ("artiq.coredevice.almazny", "AlmaznyChannel"):
                     self.almaznys[name] = self.get_device(name)
 
@@ -130,7 +128,7 @@ class MirnyTester(EnvExperiment):
         print("Frequencies:")
         for card_n, channels in enumerate(chunker(self.mirnies, 4)):
             for channel_n, (channel_name, channel_dev) in enumerate(channels):
-                frequency = 2000 + card_n * 250 + channel_n * 50
+                frequency = 75 + card_n * 10 + channel_n * 1
                 print("{}\t{}MHz".format(channel_name, frequency*2))
                 self.setup_mirny(channel_dev, frequency)
         print("RF ON, attenuators are tested. Press ENTER when done.")
@@ -151,7 +149,7 @@ class MirnyTester(EnvExperiment):
         print("Frequencies:")
         for card_n, channels in enumerate(chunker(self.mirnies, 4)):
             for channel_n, (channel_name, channel_dev) in enumerate(channels):
-                frequency = 1000 + 100 * (card_n + 1) + channel_n * 10
+                frequency = 100 + 10 * (card_n + 1) + channel_n * 1
                 print("{}\t{}MHz".format(channel_name, frequency))
                 self.setup_mirny(channel_dev, frequency)
                 print("{} info: {}".format(channel_name, channel_dev.info()))

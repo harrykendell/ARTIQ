@@ -104,21 +104,33 @@ for i in range(4):
         }
     )
 
-for i in range(4):
-    device_db.update(
-        {
-            "almazny_ch"
-            + str(i): {
-                "type": "local",
-                "module": "artiq.coredevice.almazny",
-                "class": "AlmaznyChannel",
-                "arguments": {
-                    "host_mirny": "mirny_cpld",
-                    "channel": i,
-                },
-            }
-        }
-    )
+device_db.update(
+    {
+        "mirny_almazny" : {
+            "type": "local",
+            "module": "artiq.coredevice.almazny",
+            "class": "AlmaznyLegacy",
+            "arguments": {
+                "host_mirny": "mirny_cpld",
+            },
+        },
+    }
+)
+# for i in range(4):
+#     device_db.update(
+#         {
+#             "almazny_ch"
+#             + str(i): {
+#                 "type": "local",
+#                 "module": "artiq.coredevice.almazny",
+#                 "class": "AlmaznyChannel",
+#                 "arguments": {
+#                     "host_mirny": "mirny_cpld",
+#                     "channel": i,
+#                 },
+#             }
+#         }
+#     )
 
 # 4x4 TTL IOs - switched by sets of 4
 # NB ttl0-ttl3 are OUT only

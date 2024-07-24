@@ -2,6 +2,13 @@
 The startup sequence for the experiment.
 """
 from artiq.experiment import *
+from artiq.coredevice.fastino import Fastino
+from artiq.coredevice.ttl import TTLOut, TTLInOut
+from artiq.coredevice.mirny import Mirny
+from artiq.coredevice.adf5356 import ADF5356
+from artiq.coredevice.almazny import AlmaznyChannel
+from artiq.coredevice.suservo import SUServo, Channel as SUServoChannel
+
 
 class LED(EnvExperiment):
     def build(self):
@@ -9,33 +16,35 @@ class LED(EnvExperiment):
         self.setattr_device("core")
 
         # LEDs
-        self.setattr_device("led0")
-        self.setattr_device("led1")
-        self.setattr_device("led2")
-        self.led = [self.__dict__["led" + str(i)] for i in range(3)]  # TTLOut
+        self.led0: TTLOut = self.get_device("led0")
+        self.led1: TTLOut = self.get_device("led1")
+        self.led2: TTLOut = self.get_device("led2")
+        self.led: list[TTLOut] = [self.__dict__["led" + str(i)] for i in range(3)]  # TTLOut
 
         # TTLs
         for i in range(4):
             self.setattr_device("ttl" + str(i))
         for i in range(12):
             self.setattr_device("ttl" + str(i + 4))
-        self.ttlOut = [self.__dict__["ttl" + str(i)] for i in range(4)]  # TTLOut
-        self.ttl = [self.__dict__["ttl" + str(i + 4)] for i in range(12)]  # TTLInOut
+        self.ttlOut: list[TTLOut] = [self.__dict__["ttl" + str(i)] for i in range(4)]  # TTLOut
+        self.ttl: list[TTLInOut] = [self.__dict__["ttl" + str(i + 4)] for i in range(12)]  # TTLInOut
 
         # Fastino
-        self.setattr_device("fastino")
+        self.fastino: Fastino = self.get_device("fastino")
 
         # Mirny with mezzanine board
-        self.setattr_device("mirny_cpld")
+        self.mirny_cpld: Mirny = self.get_device("mirny_cpld")
         for i in range(4):
             self.setattr_device(f"mirny_ch{i}")
-        self.mirnies = [self.__dict__[f"mirny_ch{i}"] for i in range(4)]  # ADF5356
+            self.setattr_device(f"almazny_ch{i}")
+        self.mirnies: list[ADF5356] = [self.__dict__[f"mirny_ch{i}"] for i in range(4)]  # ADF5356
+        self.almazny: list[AlmaznyChannel] = [self.__dict__[f"almazny_ch{i}"] for i in range(4)]
 
         # SUServo
-        self.setattr_device("suservo")
+        self.suservo: SUServo = self.get_device("suservo")
         for i in range(8):
             self.setattr_device(f"suservo_ch{i}")  # SUServo Channel
-        self.suservo_ch = [self.__dict__[f"suservo_ch{i}"] for i in range(8)]  # Channel
+        self.suservo_ch: list[SUServoChannel] = [self.__dict__[f"suservo_ch{i}"] for i in range(8)]  # Channel
 
         print("All devices created.")
         """
@@ -71,13 +80,10 @@ class LED(EnvExperiment):
             delay(100 * us)
             ttlo.off()
             delay(100 * us)
-        for ttl in self.ttl[:-4]:
+        for ttl in self.ttl:
             ttl.output()
             delay(100 * us)
             ttl.off()
-            delay(100 * us)
-        for ttl in self.ttl[-4:]:
-            ttl.input()
             delay(100 * us)
 
         # Fastino
@@ -86,7 +92,7 @@ class LED(EnvExperiment):
         self.fastino.set_leds(0b00000000)
         delay(100 * us)
         for dac in range(32):
-            self.fastino.set_dac(dac, 0)
+            self.fastino.set_dac(dac, dac/10.)
             delay(100 * us)
 
         # Mirny
