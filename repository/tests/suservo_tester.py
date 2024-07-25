@@ -25,6 +25,7 @@ def chunker(seq, size):
     if res:
         yield res
 
+
 class SUServoTester(EnvExperiment):
     def build(self):
         self.setattr_device("core")
@@ -130,6 +131,7 @@ class SUServoTester(EnvExperiment):
 
         self.test_suservos()
 
+
 def main():
     device_mgr = DeviceManager(DeviceDB("device_db.py"))
     try:
@@ -139,6 +141,7 @@ def main():
         experiment.analyze()
     finally:
         device_mgr.close_devices()
+
 
 if __name__ == "__main__":
     main()

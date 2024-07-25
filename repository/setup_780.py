@@ -8,6 +8,7 @@ from artiq.coredevice.mirny import Mirny
 from artiq.coredevice.adf5356 import ADF5356
 from artiq.coredevice.almazny import AlmaznyChannel
 
+
 class Laser780(EnvExperiment):
     """
     Setup 780nm laser.
@@ -47,9 +48,24 @@ class Laser780(EnvExperiment):
 
         self.channels = [self.suservo_aom_780_locking, self.suservo_aom_780_MOT]
 
-        self.setattr_argument("eom_frequency", NumberValue(default = 7.072e9, precision=3, step=.001, unit = 'GHz'), group = "780nm", tooltip = "[GHz] | Frequency output on Almazny CH0")
-        self.setattr_argument("aom_locking_frequency", NumberValue(default = 80e6, precision=3, step=.001, unit = 'MHz'), group = "780nm", tooltip = "[MHz] | Frequency output on Urukul CH0")
-        self.setattr_argument("aom_MOT_frequency", NumberValue(default = 200e6, precision=3, step=.001, unit = 'MHz'), group = "780nm", tooltip = "[MHz] | Frequency output on Urukul CH1")
+        self.setattr_argument(
+            "eom_frequency",
+            NumberValue(default=7.072e9, precision=3, step=0.001, unit="GHz"),
+            group="780nm",
+            tooltip="[GHz] | Frequency output on Almazny CH0",
+        )
+        self.setattr_argument(
+            "aom_locking_frequency",
+            NumberValue(default=80e6, precision=3, step=0.001, unit="MHz"),
+            group="780nm",
+            tooltip="[MHz] | Frequency output on Urukul CH0",
+        )
+        self.setattr_argument(
+            "aom_MOT_frequency",
+            NumberValue(default=200e6, precision=3, step=0.001, unit="MHz"),
+            group="780nm",
+            tooltip="[MHz] | Frequency output on Urukul CH1",
+        )
 
     @kernel
     def init_EOM(self):
@@ -90,7 +106,9 @@ class Laser780(EnvExperiment):
         # offset to assign to servo to reach target voltage
         offset = -targetV * (10.0 ** (gain - 1))
 
-        self.suservo_aom_780_locking.set_dds(profile=0, frequency=self.aom_locking_frequency, offset=offset)
+        self.suservo_aom_780_locking.set_dds(
+            profile=0, frequency=self.aom_locking_frequency, offset=offset
+        )
 
         # Input parameters, activate Urukul output (en_out=1), activate PI loop (en_iir=1)
 
@@ -121,13 +139,10 @@ class Laser780(EnvExperiment):
         # we need to transiently disable the servo to avoid glitches
         channel.servo.set_config(enable=1)
 
-
         # setpoint 0.5 (5 V with above PGIA gain setting)
         delay(100 * us)
         channel.set_dds(
-            profile=num,
-            offset=0.0,  # 3 V with above PGIA settings
-            frequency=freq
+            profile=num, offset=0.0, frequency=freq  # 3 V with above PGIA settings
         )
 
         channel.set_iir(
@@ -161,17 +176,23 @@ class Laser780(EnvExperiment):
         self.core.break_realtime()
 
         for num in range(len(self.channels)):
-            print('Setting AOM', num, 'to', frequencies[num]/1e6, 'MHz')
-            self.set_AOM(self.channels[num], frequencies[num], attenuations[num], enable[num], num)
+            print("Setting AOM", num, "to", frequencies[num] / 1e6, "MHz")
+            self.set_AOM(
+                self.channels[num],
+                frequencies[num],
+                attenuations[num],
+                enable[num],
+                num,
+            )
 
     @kernel
-    def set_EOM(self, frequency= -1.0, attenuation= 0*dB, enable= False):
+    def set_EOM(self, frequency=-1.0, attenuation=0 * dB, enable=False):
         """
         Set the frequency of the EOM.
         Almazny frequency = frequency
         Mirny frequency = frequency/2.0
         """
-        if frequency==-1.0:
+        if frequency == -1.0:
             frequency = self.eom_frequency
 
         self.core.break_realtime()
@@ -179,9 +200,9 @@ class Laser780(EnvExperiment):
         # at any point
         self.mirny_eom_780.sw.off()
 
-        delay(100*ms)
-        print('Setting EOM frequency to', frequency/1e9, 'GHz')
-        self.mirny_eom_780.set_frequency(frequency/2.0)
+        delay(100 * ms)
+        print("Setting EOM frequency to", frequency / 1e9, "GHz")
+        self.mirny_eom_780.set_frequency(frequency / 2.0)
         self.mirny_eom_780.set_att(attenuation)
 
         self.mirny_eom_780.sw.set_o(enable)

@@ -4,6 +4,7 @@ from artiq.language import us, ms, MHz, dB, delay, TInt64
 from artiq.coredevice.core import Core
 from artiq.coredevice.suservo import SUServo, Channel as SUServoChannel, COEFF_WIDTH
 
+
 class SUServoManager:  # {{{
     """
     Manages a single SUServo device with 8 channels
@@ -55,11 +56,22 @@ class SUServoManager:  # {{{
             [0.0] * 8,
             [i for i in range(8)],
         ]
-        units = [None, "dB", "dB", "MHz", None, None, None, None, None, None, None, None]
+        units = [
+            None,
+            "dB",
+            "dB",
+            "MHz",
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ]
         for dataset, default, unit in zip(datasets, defaults, units):
-            temp = experiment.get_dataset(
-                name + "." + dataset, default=default
-            )
+            temp = experiment.get_dataset(name + "." + dataset, default=default)
             # we set the values back so we are allowed to mutate then later
             experiment.set_dataset(
                 name + "." + dataset,
@@ -68,22 +80,22 @@ class SUServoManager:  # {{{
                 unit=unit,
             )
             self.__dict__[dataset] = temp
-        
+
         self.set_all()
 
     @kernel
     def get_adc(self, ch):
-        '''
+        """
         Get the ADC value for a given channel
         Delays by 20us to ensure the servo was disabled
-        '''
+        """
         self.suservo.set_config(0)
-        delay(10*us)
+        delay(10 * us)
         v = self.channels[ch].get_adc(0)
         self.suservo.set_config(self.enabled)
-        delay(10*us)
+        delay(10 * us)
         return v
-    
+
     @kernel
     def _mutate_and_set_float(self, dataset, variable, index, value):
         """Mutate the dataset and change our internal store of the value
@@ -91,7 +103,7 @@ class SUServoManager:  # {{{
         """
         self.experiment.mutate_dataset(self.name + "." + dataset, index, value)
         variable[index] = value
-        delay(50*ms)
+        delay(50 * ms)
 
     @kernel
     def _mutate_and_set_int(self, dataset, variable, index, value):
@@ -100,7 +112,7 @@ class SUServoManager:  # {{{
         """
         self.experiment.mutate_dataset(self.name + "." + dataset, index, value)
         variable[index] = value
-        delay(50*ms)
+        delay(50 * ms)
 
     @kernel
     def enable_servo(self):
@@ -147,7 +159,9 @@ class SUServoManager:  # {{{
         # We have to write all 4 channels at once - so convert each to mu and accumulate into reg
         reg = 0
         for i in range(4):
-            reg += self.suservo.cplds[0].att_to_mu(self.atts[i if ch < 4 else 4 + i]) << (i * 8)
+            reg += self.suservo.cplds[0].att_to_mu(
+                self.atts[i if ch < 4 else 4 + i]
+            ) << (i * 8)
 
         self.core.break_realtime()
         self.suservo.cplds[ch // 4].set_all_att_mu(reg)
@@ -168,7 +182,9 @@ class SUServoManager:  # {{{
 
         self.core.break_realtime()
 
-        self.channels[ch].set_dds(profile=0, frequency=freq * MHz, offset=self.offsets[ch])
+        self.channels[ch].set_dds(
+            profile=0, frequency=freq * MHz, offset=self.offsets[ch]
+        )
 
     @kernel
     def set_y(self, ch, y):
@@ -230,17 +246,26 @@ class SUServoManager:  # {{{
         for ch in range(8):
             self.channels[ch].get_profile_mu(0, buffer)
             # if there doesn't seem to be any state held in the suservo channel we just use our dataset values
-            if self.suservo.ddses[0].ftw_to_frequency(buffer[0] << 16 | buffer[6]) != 0.0:
-                delay(100*us)
-                self._mutate_and_set_float("offsets", self.offsets, ch, buffer[4] / (1 << COEFF_WIDTH - 1))
-                self._mutate_and_set_int("sampler_chs", self.sampler_chs, ch, buffer[3] & 0xFF)
+            if (
+                self.suservo.ddses[0].ftw_to_frequency(buffer[0] << 16 | buffer[6])
+                != 0.0
+            ):
+                delay(100 * us)
+                self._mutate_and_set_float(
+                    "offsets", self.offsets, ch, buffer[4] / (1 << COEFF_WIDTH - 1)
+                )
+                self._mutate_and_set_int(
+                    "sampler_chs", self.sampler_chs, ch, buffer[3] & 0xFF
+                )
                 self._mutate_and_set_float(
                     "freqs",
                     self.freqs,
                     ch,
                     self.suservo.ddses[0].ftw_to_frequency(buffer[0] << 16 | buffer[6]),
                 )
-                self._mutate_and_set_float("ys", self.ys, ch, self.channels[ch].get_y(0))
+                self._mutate_and_set_float(
+                    "ys", self.ys, ch, self.channels[ch].get_y(0)
+                )
 
             self.core.break_realtime()
             # set gain on Sampler channel  to 10^gain - these are wiped in the init

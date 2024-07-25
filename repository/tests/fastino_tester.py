@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import sys
+
 sys.path.append(
     __file__.split("repository")[0] + "repository"
 )  # link to repository root
@@ -11,6 +12,7 @@ from artiq.master.worker_db import DeviceManager
 from artiq.coredevice.core import Core
 from utils.surpress_missing_imports import *
 from utils.wait_for_enter import is_enter_pressed
+
 
 class FastinoTester(EnvExperiment):
     def build(self):

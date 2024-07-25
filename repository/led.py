@@ -1,10 +1,12 @@
 from artiq.experiment import *
 from time import sleep
 
+
 def input_led_number(num_leds) -> TInt32:
     print("Enter the number of the LED you want to turn on (0 or 1):")
     val = input("Enter desired LED: ")
-    return max(0, min(num_leds-1, int(val)))
+    return max(0, min(num_leds - 1, int(val)))
+
 
 class LED(EnvExperiment):
     def build(self):

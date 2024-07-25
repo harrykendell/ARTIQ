@@ -30,10 +30,11 @@ from repository.utils.SUServoManager import SUServoManager
 from artiq.experiment import *
 from artiq.language import MHz, ms
 
+
 class Switch(QWidget):
     def __init__(self, default: bool, turn_on, turn_off, on_text="ON", off_text="OFF"):
         super().__init__()
-        self.turn = [turn_on,turn_off]
+        self.turn = [turn_on, turn_off]
         self.state = default
         self.text = [off_text, on_text]
         self.color = ["background-color: #b75d5d", "background-color: #5db75d"]
@@ -43,8 +44,7 @@ class Switch(QWidget):
         self.button = QPushButton()
         self.button.setText(self.text[default])
         self.button.setCheckable(True)
-        self.button.setStyleSheet(self.color[default]
-        )
+        self.button.setStyleSheet(self.color[default])
         self.button.setFixedWidth(
             max(
                 self.button.fontMetrics().boundingRect(i).width() + 20
@@ -59,12 +59,13 @@ class Switch(QWidget):
 
     def switch_state(self):
         """Toggles the state of this button"""
-        self.button.setChecked(False) # we dont want the button to stay held down
+        self.button.setChecked(False)  # we dont want the button to stay held down
         self.turn[self.state]()  # Swap state
         self.state = not self.state
 
         self.button.setText(self.text[self.state])  # Change text and color
         self.button.setStyleSheet(self.color[self.state])
+
 
 class SignalDoubleSpinBox(QDoubleSpinBox):
     stepChanged = pyqtSignal()
@@ -74,6 +75,7 @@ class SignalDoubleSpinBox(QDoubleSpinBox):
         super(QDoubleSpinBox, self).stepBy(step)
         if self.value() != value:
             self.stepChanged.emit()
+
 
 class DDSControl(QWidget):
     def __init__(self, manager, ch=0):
@@ -111,7 +113,9 @@ class DDSControl(QWidget):
         amp_input.setSingleStep(0.1)
         amp_input.setDecimals(1)
         amp_input.setValue(self.manager.ys[ch])
-        amp_input.editingFinished.connect(lambda: self.manager.set_y(ch, amp_input.value()))
+        amp_input.editingFinished.connect(
+            lambda: self.manager.set_y(ch, amp_input.value())
+        )
         amp_input.stepChanged.connect(lambda: self.manager.set_y(ch, amp_input.value()))
         amp_vbox.addWidget(amp_input)
         topline.addLayout(amp_vbox)
@@ -129,8 +133,12 @@ class DDSControl(QWidget):
         att_input.setDecimals(1)
         att_input.setValue(self.manager.atts[ch])
         att_input.setSuffix(" dB")
-        att_input.editingFinished.connect(lambda: self.manager.set_att(ch, att_input.value()))
-        att_input.stepChanged.connect(lambda: self.manager.set_att(ch, att_input.value()))
+        att_input.editingFinished.connect(
+            lambda: self.manager.set_att(ch, att_input.value())
+        )
+        att_input.stepChanged.connect(
+            lambda: self.manager.set_att(ch, att_input.value())
+        )
         att_vbox.addWidget(att_input)
         topline.addLayout(att_vbox)
 
@@ -167,7 +175,10 @@ class DDSControl(QWidget):
             return
 
         # guard against recursion
-        if val == self.manager.freqs[self.ch] / MHz or round(float(self.text.text())) == self.slider.value():
+        if (
+            val == self.manager.freqs[self.ch] / MHz
+            or round(float(self.text.text())) == self.slider.value()
+        ):
             return
 
         val = min(max(val, self.min), self.max)
@@ -176,6 +187,7 @@ class DDSControl(QWidget):
 
         self.text.setText(str(round(self.manager.freqs[self.ch] / MHz, 3)))
         self.slider.setValue(int(self.manager.freqs[self.ch] / MHz))
+
 
 class PIDControl(QWidget):
     def __init__(self, manager, ch=0):
@@ -209,8 +221,10 @@ class PIDControl(QWidget):
         top.addWidget(gain_label)
         self.gain = QLineEdit()
         self.gain.setText(str(self.manager.gains[ch]))
-        self.gain.setValidator(QIntValidator(0,3))
-        self.gain.editingFinished.connect(lambda: self.manager.set_gain(ch, int(self.gain.text())))
+        self.gain.setValidator(QIntValidator(0, 3))
+        self.gain.editingFinished.connect(
+            lambda: self.manager.set_gain(ch, int(self.gain.text()))
+        )
         top.addWidget(self.gain)
 
         layout.addLayout(top)
@@ -252,6 +266,7 @@ class PIDControl(QWidget):
             float(self.Gl.text()),
         )
 
+
 class SamplerControl(QWidget):
     def __init__(self, manager, ch=0):
         super().__init__()
@@ -263,8 +278,9 @@ class SamplerControl(QWidget):
         self.setLayout(layout)
 
     @kernel
-    def sample(self, gap = 1*ms, num = 100):
+    def sample(self, gap=1 * ms, num=100):
         raise NotImplementedError
+
 
 class SingleChannel(QWidget):  # {{{
     """Class to control a single given SUServo channel"""
@@ -285,13 +301,13 @@ class SingleChannel(QWidget):  # {{{
         # ON/OFF switch {{{
         top = QHBoxLayout()
         self.dds_button = Switch(
-            default = self.manager.en_outs[channel],
+            default=self.manager.en_outs[channel],
             turn_on=lambda: self.manager.enable(channel),
             turn_off=lambda: self.manager.disable(channel),
         )
         top.addWidget(self.dds_button)
         self.pid_button = Switch(
-            default = self.manager.en_iirs[channel],
+            default=self.manager.en_iirs[channel],
             turn_on=lambda: self.manager.enable_iir(channel),
             turn_off=lambda: self.manager.disable_iir(channel),
             on_text="PID",
@@ -367,6 +383,7 @@ class SUServoGUI(QWidget):  # {{{
         for i in range(8):
             chans.addWidget(self.ch[i].get_widget(), i % 4, i // 4)
         layout.addLayout(chans)
+
 
 # }}}
 

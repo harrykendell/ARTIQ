@@ -9,7 +9,12 @@ device_db = {
         "type": "local",
         "module": "artiq.coredevice.core",
         "class": "Core",
-        "arguments": {"host": core_addr, "ref_period": 1e-09, "target": "rv32g", "analyzer_proxy": "core_analyzer"},
+        "arguments": {
+            "host": core_addr,
+            "ref_period": 1e-09,
+            "target": "rv32g",
+            "analyzer_proxy": "core_analyzer",
+        },
     },
     "core_log": {
         "type": "controller",
@@ -106,7 +111,7 @@ for i in range(4):
 
 device_db.update(
     {
-        "mirny_almazny" : {
+        "mirny_almazny": {
             "type": "local",
             "module": "artiq.coredevice.almazny",
             "class": "AlmaznyLegacy",

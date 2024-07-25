@@ -7,6 +7,7 @@ from artiq.language.types import TBool
 if os.name == "nt":
     import msvcrt
 
+
 def is_enter_pressed() -> TBool:
     if os.name == "nt":
         if msvcrt.kbhit() and msvcrt.getch() == b"\r":

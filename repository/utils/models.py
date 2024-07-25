@@ -8,6 +8,7 @@ By using `Pydantic <https://docs.pydantic.dev/latest/>`_. dataclasses, these
 models act as normal python classes and so are fully compatible with ARTIQ
 kernels.
 """
+
 from typing import List
 from typing import Optional
 

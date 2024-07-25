@@ -14,7 +14,10 @@ class Fastino_Ramp_Generator(EnvExperiment):
         self.setattr_device("core")
         self.setattr_device("fastino")
 
-        self.setattr_argument("voltage", NumberValue(precision=2, min=-9.99, max=9.99, default=10, type='float'))
+        self.setattr_argument(
+            "voltage",
+            NumberValue(precision=2, min=-9.99, max=9.99, default=10, type="float"),
+        )
 
         num = 1000
         self.v = [10.0 * i / num for i in range(-num, num)]
@@ -49,5 +52,5 @@ class Fastino_Ramp_Generator(EnvExperiment):
 
         self.fastino.set_leds(0b00000000)
         delay(100 * us)
-        self.fastino.set_dac(0,0.0)
+        self.fastino.set_dac(0, 0.0)
         delay_mu(gap)
