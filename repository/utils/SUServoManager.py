@@ -240,11 +240,12 @@ class SUServoManager:  # {{{
         delay(50 * ms)
         # Initialize SUServo - this will leave it disabled
         self.suservo.init()
-        delay(1 * ms)
+        delay(10 * ms)
 
         buffer = [0] * 8
         for ch in range(8):
             self.channels[ch].get_profile_mu(0, buffer)
+            delay(10*ms)
             # if there doesn't seem to be any state held in the suservo channel we just use our dataset values
             if (
                 self.suservo.ddses[0].ftw_to_frequency(buffer[0] << 16 | buffer[6])
