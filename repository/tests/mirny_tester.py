@@ -15,7 +15,8 @@ from utils.wait_for_enter import is_enter_pressed
 from artiq.coredevice.core import Core
 from artiq.coredevice.mirny import Mirny
 from artiq.coredevice.adf5356 import ADF5356
-from artiq.coredevice.almazny import AlmaznyChannel
+from artiq.coredevice.almazny import AlmaznyChannel, AlmaznyLegacy
+
 
 def chunker(seq, size):
     res = []
@@ -35,6 +36,7 @@ class MirnyTester(EnvExperiment):
         self.mirny_cplds: dict[Mirny] = dict()
         self.mirnies: dict[ADF5356] = dict()
         self.almaznys: dict[AlmaznyChannel] = dict()
+        self.legacy_almaznys: dict[AlmaznyLegacy] = dict()
 
         ddb = self.get_device_db()
         for name, desc in ddb.items():
@@ -46,11 +48,15 @@ class MirnyTester(EnvExperiment):
                     self.mirnies[name] = self.get_device(name)
                 elif (module, cls) == ("artiq.coredevice.almazny", "AlmaznyChannel"):
                     self.almaznys[name] = self.get_device(name)
+                elif (module, cls) == ("artiq.coredevice.almazny", "AlmaznyLegacy"):
+                    self.legacy_almaznys[name] = self.get_device(name)
 
         # guard against the whole DummyDevice shit
         if self.mirnies and type(self.mirnies[next(iter(self.mirnies))]) is ADF5356:
-            self.mirnies = sorted(self.mirnies.items(), key=lambda x: (x[1].cpld.bus.channel, x[1].channel))
-
+            self.mirnies = sorted(
+                self.mirnies.items(),
+                key=lambda x: (x[1].cpld.bus.channel, x[1].channel),
+            )
 
     @kernel
     def init_mirny(self, cpld):
@@ -62,12 +68,12 @@ class MirnyTester(EnvExperiment):
         self.core.break_realtime()
         channel.init()
 
-        channel.set_att(11.5*dB)
+        channel.set_att(11.5 * dB)
         channel.sw.on()
         self.core.break_realtime()
 
-        channel.set_frequency(frequency*MHz)
-        delay(5*ms)
+        channel.set_frequency(frequency * MHz)
+        delay(5 * ms)
 
     @kernel
     def sw_off_mirny(self, channel):
@@ -83,8 +89,67 @@ class MirnyTester(EnvExperiment):
             while self.core.get_rtio_counter_mu() < t:
                 pass
             for channel in channels:
-                channel.pulse(100*ms)
-                delay(100*ms)
+                channel.pulse(100 * ms)
+                delay(100 * ms)
+
+            delay(100 * ms)
+
+    @kernel
+    def init_legacy_almazny(self, almazny):
+        self.core.break_realtime()
+        almazny.init()
+        almazny.output_toggle(True)
+
+    @kernel
+    def legacy_almazny_set_attenuators_mu(self, almazny, ch, atts):
+        self.core.break_realtime()
+        almazny.set_att_mu(ch, atts)
+
+    @kernel
+    def legacy_almazny_att_test(self, almazny):
+        # change attenuation bit by bit over time for all channels
+        att_mu = 0
+        while not is_enter_pressed():
+            self.core.break_realtime()
+            t = now_mu() - self.core.seconds_to_mu(0.5)
+            while self.core.get_rtio_counter_mu() < t:
+                pass
+            for ch in range(4):
+                almazny.set_att_mu(ch, att_mu)
+            delay(250 * ms)
+            if att_mu == 0:
+                att_mu = 1
+            else:
+                att_mu = (att_mu << 1) & 0x3F
+
+    @kernel
+    def legacy_almazny_toggle_output(self, almazny, rf_on):
+        self.core.break_realtime()
+        almazny.output_toggle(rf_on)
+
+    def test_legacy_almaznys(self):
+        print("*** Testing legacy Almaznys (v1.1 or older).")
+        for name, almazny in sorted(self.legacy_almaznys.items(), key=lambda x: x[0]):
+            print(name + "...")
+            print("Initializing Mirny CPLDs...")
+            for name, cpld in sorted(self.mirny_cplds.items(), key=lambda x: x[0]):
+                print(name + "...")
+                self.init_mirny(cpld)
+            print("...done")
+            print("Testing attenuators. Frequencies:")
+            for card_n, channels in enumerate(chunker(self.mirnies, 4)):
+                for channel_n, (channel_name, channel_dev) in enumerate(channels):
+                    frequency = 75 + card_n * 10 + channel_n * 1
+                    print("Almazny freq: {}\t{}MHz".format(channel_name, frequency * 2))
+                    self.setup_mirny(channel_dev, frequency)
+            self.init_legacy_almazny(almazny)
+            print("SR outputs are OFF. Press ENTER when done.")
+            self.legacy_almazny_toggle_output(almazny, False)
+            input()
+            print("RF ON, attenuators are tested. Press ENTER when done.")
+            self.legacy_almazny_toggle_output(almazny, True)
+            self.legacy_almazny_att_test(almazny)
+            self.legacy_almazny_toggle_output(almazny, False)
 
     @kernel
     def almazny_led_wave(self, almaznys):
@@ -96,9 +161,9 @@ class MirnyTester(EnvExperiment):
                 pass
             for ch in almaznys:
                 ch.set(31.5, False, True)
-                delay(100*ms)
+                delay(100 * ms)
                 ch.set(31.5, False, False)
-    
+
     @kernel
     def almazny_att_test(self, almaznys):
         rf_en = 1
@@ -112,7 +177,7 @@ class MirnyTester(EnvExperiment):
             setting = led << 7 | rf_en << 6 | (att_mu & 0x3F)
             for ch in almaznys:
                 ch.set_mu(setting)
-            delay(250*ms)
+            delay(250 * ms)
             if att_mu == 0:
                 att_mu = 1
             else:
@@ -129,7 +194,7 @@ class MirnyTester(EnvExperiment):
         for card_n, channels in enumerate(chunker(self.mirnies, 4)):
             for channel_n, (channel_name, channel_dev) in enumerate(channels):
                 frequency = 75 + card_n * 10 + channel_n * 1
-                print("{}\t{}MHz".format(channel_name, frequency*2))
+                print("Almazny freq: {}\t{}MHz".format(channel_name, frequency * 2))
                 self.setup_mirny(channel_dev, frequency)
         print("RF ON, attenuators are tested. Press ENTER when done.")
         self.almazny_att_test([ch for _, ch in self.almaznys.items()])
@@ -150,13 +215,17 @@ class MirnyTester(EnvExperiment):
         for card_n, channels in enumerate(chunker(self.mirnies, 4)):
             for channel_n, (channel_name, channel_dev) in enumerate(channels):
                 frequency = 100 + 10 * (card_n + 1) + channel_n * 1
-                print("{}\t{}MHz".format(channel_name, frequency))
+                print("Mirny freq: {}\t{}MHz".format(channel_name, frequency))
                 self.setup_mirny(channel_dev, frequency)
                 print("{} info: {}".format(channel_name, channel_dev.info()))
         print("Press ENTER when done.")
         input()
 
-        sw = [channel_dev for channel_name, channel_dev in self.mirnies if hasattr(channel_dev, "sw")]
+        sw = [
+            channel_dev
+            for channel_name, channel_dev in self.mirnies
+            if hasattr(channel_dev, "sw")
+        ]
         if sw:
             print("Testing RF switch control. Check LEDs at mirny RF ports.")
             print("Press ENTER when done.")
@@ -173,6 +242,7 @@ class MirnyTester(EnvExperiment):
 
         self.test_almaznys()
 
+        self.test_legacy_almaznys()
 
 def main():
     device_mgr = DeviceManager(DeviceDB("device_db.py"))
