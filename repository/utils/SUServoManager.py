@@ -241,9 +241,11 @@ class SUServoManager:  # {{{
         # Initialize SUServo - this will leave it disabled
         self.suservo.init()
         self.core.break_realtime()
+        delay(500*ms)
 
         buffer = [0] * 8
         for ch in range(8):
+            self.core.break_realtime()
             self.channels[ch].get_profile_mu(0, buffer)
             delay(50*ms)
             # if there doesn't seem to be any state held in the suservo channel we just use our dataset values
