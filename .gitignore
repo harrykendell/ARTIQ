@@ -172,4 +172,5 @@ results
 
 flake.lock
 src/
+artiq_kasli/
 crate config/bu2402001_*
