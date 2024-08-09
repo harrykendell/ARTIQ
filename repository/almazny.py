@@ -53,9 +53,6 @@ class TestMirny(EnvExperiment):
         self.core.break_realtime()
         self.almazny.output_toggle(True)
         for ch in range(4):
-            self.almazny.set_att_mu(ch, 63)
-
-        # self.almazny.set(att=0.0*dB, enable=True, led=True)
-        # self.almazny.set_mu(self.almazny.to_mu(0.0,True,True))
+            self.almazny.set_att(ch, 0.0 * dB, True)
 
         # print(self.mirny.info())
