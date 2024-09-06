@@ -1,13 +1,13 @@
 {
-  # for a specific rev use `git+https://github.com/m-lab/artiq?rev=XXX`
+  # for a specific rev use `git+https://github.com/m-lab/artiq?rev=0ac9e77dc3bc803058d0473e423862d39d49d3f8`
   inputs.artiq.url = "git+https://github.com/m-labs/artiq?ref=release-8";
   inputs.extrapkg.url = "git+https://git.m-labs.hk/M-Labs/artiq-extrapkg?ref=release-8";
   inputs.extrapkg.inputs.artiq.follows = "artiq";
   # We pull Github packages in as flake inputs so we can conveniently update them
   # using `nix lock`, etc., rather than manually having to track hashes.
-  inputs.src-ndscan = {url = "github:OxfordIonTrapGroup/ndscan"; flake= false;};
-  inputs.src-oitg = {url = "github:OxfordIonTrapGroup/oitg"; flake= false;};
-  inputs.src-oxart-devices = {url = "github:OxfordIonTrapGroup/oxart-devices"; flake= false;};
+  inputs.src-ndscan = {url = "github:OxfordIonTrapGroup/ndscan/e7c0211019e3fc77ae0c032869e4833e407874f0"; flake= false;};
+  inputs.src-oitg = {url = "github:OxfordIonTrapGroup/oitg/3ecba4b2ea1d407be02a87193e2fde4cd9c09af3"; flake= false;};
+  inputs.src-oxart-devices = {url = "github:OxfordIonTrapGroup/oxart-devices/8074c330bc718bda2b0a91eb74b1988dcb5cbdb7"; flake= false;};
   inputs.src-miniconf-mqtt = {url = "github:quartiq/miniconf/d03726db064c61fdbaf55db4788fa56cc09ece10"; flake= false;};
   inputs.src-booster = {url = "github:quartiq/booster/a1f83b63180511ecd68f88a04621624941d17a41"; flake= false;};
   
