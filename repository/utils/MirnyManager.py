@@ -29,37 +29,38 @@ class MirnyManager:  # {{{
         self.almazny: AlmaznyLegacy = almazny
         self.name = name
 
-        print("do init here...")
-        self.core.reset()
+        assert len(self.channels) == 8, "There must be 8 channels per SUServo"
 
-        # init Mirny CPLD - shared by all Mirny channels
-        self.channels[0].cpld.init()
+        datasets = [
+            "en_almazny",
+            "atts",
+            "freqs",
+            "en_outs",
+        ]
+        defaults = [
+            True,
+            [31.5] * 4,
+            [6800e6] * 4,
+            [1] * 4,
+        ]
+        units = [
+            None,
+            "dB",
+            "MHz",
+            None,
+        ]
+        for dataset, default, unit in zip(datasets, defaults, units):
+            temp = experiment.get_dataset(name + "." + dataset, default=default)
+            # we set the values back so we are allowed to mutate then later
+            experiment.set_dataset(
+                name + "." + dataset,
+                temp,
+                persist=True,
+                unit=unit,
+            )
+            self.__dict__[dataset] = temp
 
-        # init Mirny channel 0
-        self.core.break_realtime()
-        self.mirny.init()
-        self.mirny.set_att(11.5 * dB)
-        self.mirny.sw.on()
-        self.core.break_realtime()
-        self.mirny.set_frequency(self.frequency)
-        delay(100 * ms)
-        self.core.break_realtime()
-
-        self.almazny.init()
-        self.mirny.info()
-
-    @kernel
-    def get_adc(self, ch):
-        """
-        Get the ADC value for a given channel
-        Delays by 20us to ensure the servo was disabled
-        """
-        self.suservo.set_config(0)
-        delay(10 * us)
-        v = self.channels[ch].get_adc(0)
-        self.suservo.set_config(self.enabled)
-        delay(10 * us)
-        return v
+        self.set_all()
 
     @kernel
     def _mutate_and_set_float(self, dataset, variable, index, value):
@@ -80,108 +81,72 @@ class MirnyManager:  # {{{
         delay(50 * ms)
 
     @kernel
-    def enable_servo(self):
+    def set_almazny(self, state=True):
         self.experiment.set_dataset(
-            self.name + ".enabled", 1, persist=True, archive=False
+            self.name + ".almazny", state, persist=True, archive=False
         )
-        self.enabled = 1
+        self.en_almazny = state
         self.core.break_realtime()
-        self.suservo.set_config(enable=1)
-
-    @kernel
-    def disable_servo(self):
-        self.experiment.set_dataset(
-            self.name + ".enabled", 0, persist=True, archive=False
-        )
-        self.enabled = 0
-        self.core.break_realtime()
-        self.suservo.set_config(enable=0)
+        self.almazny.output_toggle(state)
 
     @kernel
     def enable(self, ch):
         """Enable a given channel"""
         self._mutate_and_set_int("en_outs", self.en_outs, ch, 1)
         self.core.break_realtime()
-        self.channels[ch].set(1, self.en_iirs[ch])
+        self.channels[ch].sw.on()
 
     @kernel
     def disable(self, ch):
         """Disable a given channel"""
         self._mutate_and_set_int("en_outs", self.en_outs, ch, 0)
         self.core.break_realtime()
-        self.channels[ch].set(0, self.en_iirs[ch])
-
-    @kernel
-    def set_gain(self, ch, gain):
-        self._mutate_and_set_float("gains", self.gains, ch, gain)
-        self.core.break_realtime()
-        self.suservo.set_pgia_mu(ch, gain)
+        self.channels[ch].sw.off()
 
     @kernel
     def set_att(self, ch, att):
         self._mutate_and_set_float("atts", self.atts, ch, att)
-
-        # We have to write all 4 channels at once - so convert each to mu and accumulate into reg
-        reg = 0
-        for i in range(4):
-            reg += self.suservo.cplds[0].att_to_mu(
-                self.atts[i if ch < 4 else 4 + i]
-            ) << (i * 8)
-
         self.core.break_realtime()
-        self.suservo.cplds[ch // 4].set_all_att_mu(reg)
-
-    @kernel
-    def set_dds(self, ch, freq, offset):
-        offset = -offset * (10.0 ** (self.gains[ch] - 1))
-        self._mutate_and_set_float("freqs", self.freqs, ch, freq)
-        self._mutate_and_set_float("offsets", ch, offset)
-
-        self.core.break_realtime()
-
-        self.channels[ch].set_dds(profile=0, frequency=freq * MHz, offset=offset)
+        # set Att for Mirny channel ch
+        self.channels[ch].set_att(0.0 * dB)
+        # set Att for Almazny channel ch
+        self.almazny.set_att(ch, att * dB, True)
 
     @kernel
     def set_freq(self, ch, freq):
         self._mutate_and_set_float("freqs", self.freqs, ch, freq * MHz)
-
         self.core.break_realtime()
 
-        self.channels[ch].set_dds(
-            profile=0, frequency=freq * MHz, offset=self.offsets[ch]
-        )
+        self.channels[ch].set_frequency(freq * MHz)
 
     @kernel
-    def set_y(self, ch, y):
-        self._mutate_and_set_float("ys", self.ys, ch, y)
+    def set_all(self):
+        """
+        Ensures the Mirny/Almazny is set to the current state of the manager
+        Where possible we extract state and update the dataset
+        """
 
-        if self.en_iirs[ch] == 1:
-            print("Cannot set y when IIR is enabled")
-        else:
-            self.core.break_realtime()
-            self.channels[ch].set_y(profile=0, y=y)
-
-    @kernel
-    def set_iir(self, ch, adc, P, I, Gl):
-        self._mutate_and_set_int("sampler_chs", self.sampler_chs, ch, adc)
-        self._mutate_and_set_float("Ps", self.Ps, ch, P)
-        self._mutate_and_set_float("Is", self.Is, ch, I)
-        self._mutate_and_set_float("Gls", self.Gls, ch, Gl)
-
+        # Prepare core
+        self.core.reset()
         self.core.break_realtime()
 
-        self.channels[ch].set_iir(profile=0, adc=adc, kp=P, ki=I, g=Gl)
+        # Initialize Mirny CPLD - shared by all Mirny channels
+        self.cpld.init()
 
-    @kernel
-    def enable_iir(self, ch):
-        self._mutate_and_set_int("en_iirs", self.en_iirs, ch, 1)
+        # Initialize Mirny channels
+        for ch in self.channels:
+            # Initialize Mirny channel ch
+            self.channels[ch].init()
+            self.set_att(ch, self.atts[ch])
+            self.set_freq(ch, self.freqs[ch])
+            if self.en_outs[ch]:
+                self.enable(ch)
+            else:
+                self.disable(ch)
 
+        # Initialize Almazny
+        self.almazny.init()
         self.core.break_realtime()
-        self.channels[ch].set(self.en_outs[ch], 1)
-
-    @kernel
-    def disable_iir(self, ch):
-        self._mutate_and_set_int("en_iirs", self.en_iirs, ch, 0)
-
-        self.core.break_realtime()
-        self.channels[ch].set(self.en_outs[ch], 0)
+        self.set_almazny(self, self.en_almazny)
+        for ch in range(4):
+            self.almazny.set_att(ch, self.atts[ch] * dB, True)

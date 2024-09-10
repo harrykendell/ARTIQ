@@ -357,7 +357,7 @@ class SUServoGUI(QWidget):  # {{{
         self.manager = SUServoManager(experiment, core, suservo, suservo_chs)
         self.ch = [SingleChannel(self.manager, i) for i in range(8)]
 
-        self.setWindowTitle("SUServo Manager GUI")
+        self.setWindowTitle("SUServo GUI")
         layout = QVBoxLayout()
         self.setLayout(layout)
 
@@ -386,7 +386,12 @@ class SUServoGUI(QWidget):  # {{{
 
 
 # }}}
-
+class dummyGUI(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Mirny GUI")
+        layout = QVBoxLayout()
+        self.setLayout(layout)
 
 class SUServoGUIExperiment(EnvExperiment):  # {{{
     """SUServo GUI"""
@@ -402,6 +407,10 @@ class SUServoGUIExperiment(EnvExperiment):  # {{{
         app = QApplication(sys.argv)
         screen = SUServoGUI(self, self.core, self.suservo, self.suservo_chs)
         screen.show()
+
+        screen2 = dummyGUI()
+        screen2.show()
+
         app.exec_()
 
     @kernel
