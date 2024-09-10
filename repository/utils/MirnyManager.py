@@ -29,7 +29,7 @@ class MirnyManager:  # {{{
         self.almazny: AlmaznyLegacy = almazny
         self.name = name
 
-        assert len(self.channels) == 8, "There must be 8 channels per SUServo"
+        assert len(self.channels) == 4, "There must be 8 channels per Mirny"
 
         datasets = [
             "en_almazny",
@@ -40,7 +40,7 @@ class MirnyManager:  # {{{
         defaults = [
             True,
             [31.5] * 4,
-            [6800e6] * 4,
+            [3400e6] * 4,
             [1] * 4,
         ]
         units = [
@@ -117,7 +117,7 @@ class MirnyManager:  # {{{
         self._mutate_and_set_float("freqs", self.freqs, ch, freq * MHz)
         self.core.break_realtime()
 
-        self.channels[ch].set_frequency(freq * MHz)
+        self.channels[ch].set_frequency(freq*MHz)
 
     @kernel
     def set_all(self):
@@ -127,18 +127,19 @@ class MirnyManager:  # {{{
         """
 
         # Prepare core
-        self.core.reset()
+        # self.core.reset()
         self.core.break_realtime()
 
         # Initialize Mirny CPLD - shared by all Mirny channels
         self.cpld.init()
 
         # Initialize Mirny channels
-        for ch in self.channels:
+        for ch in range(4):
             # Initialize Mirny channel ch
             self.channels[ch].init()
+
             self.set_att(ch, self.atts[ch])
-            self.set_freq(ch, self.freqs[ch])
+            self.set_freq(ch, self.freqs[ch]/MHz)
             if self.en_outs[ch]:
                 self.enable(ch)
             else:
@@ -147,6 +148,6 @@ class MirnyManager:  # {{{
         # Initialize Almazny
         self.almazny.init()
         self.core.break_realtime()
-        self.set_almazny(self, self.en_almazny)
+        self.set_almazny(self.en_almazny)
         for ch in range(4):
             self.almazny.set_att(ch, self.atts[ch] * dB, True)

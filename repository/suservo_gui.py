@@ -26,6 +26,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QDoubleValidator, QIntValidator
 from repository.utils.SUServoManager import SUServoManager
+from repository.utils.MirnyManager import MirnyManager
 
 from artiq.experiment import *
 from artiq.language import MHz, ms
@@ -354,8 +355,8 @@ class SingleChannel(QWidget):  # {{{
 class SUServoGUI(QWidget):  # {{{
     def __init__(self, experiment, core, suservo, suservo_chs):
         super().__init__()
-        self.manager = SUServoManager(experiment, core, suservo, suservo_chs)
-        self.ch = [SingleChannel(self.manager, i) for i in range(8)]
+        self.suservo_manager = SUServoManager(experiment, core, suservo, suservo_chs)
+        self.ch = [SingleChannel(self.suservo_manager, i) for i in range(8)]
 
         self.setWindowTitle("SUServo GUI")
         layout = QVBoxLayout()
@@ -366,9 +367,9 @@ class SUServoGUI(QWidget):  # {{{
         hbox.addStretch()
         hbox.addWidget(
             Switch(
-                self.manager.enabled,
-                self.manager.enable_servo,
-                self.manager.disable_servo,
+                self.suservo_manager.enabled,
+                self.suservo_manager.enable_servo,
+                self.suservo_manager.disable_servo,
             )
         )
         self.label = QLabel("SUServo")  # Bold large text
@@ -386,21 +387,26 @@ class SUServoGUI(QWidget):  # {{{
 
 
 # }}}
-class dummyGUI(QWidget):
-    def __init__(self):
+class MirnyGUI(QWidget):
+
+    def __init__(self, experiment, core, mirny_chs, almazny):
         super().__init__()
+        self.mirny_manager = MirnyManager(experiment, core, mirny_chs, almazny)
         self.setWindowTitle("Mirny GUI")
         layout = QVBoxLayout()
         self.setLayout(layout)
 
-class SUServoGUIExperiment(EnvExperiment):  # {{{
-    """SUServo GUI"""
+
+class ArtiqGUIExperiment(EnvExperiment):  # {{{
+    """Artiq GUI"""
 
     def build(self):
         self.setattr_device("scheduler")
         self.core = self.get_device("core")
         self.suservo = self.get_device("suservo")
         self.suservo_chs = [self.get_device(f"suservo_ch{i}") for i in range(8)]
+        self.mirny_chs = [self.get_device(f"mirny_ch{i}") for i in range(4)]
+        self.almazny = self.get_device("mirny_almazny")
 
     def run(self):
         self.init_kernel()
@@ -408,7 +414,7 @@ class SUServoGUIExperiment(EnvExperiment):  # {{{
         screen = SUServoGUI(self, self.core, self.suservo, self.suservo_chs)
         screen.show()
 
-        screen2 = dummyGUI()
+        screen2 = MirnyGUI(self, self.core, self.mirny_chs, self.almazny)
         screen2.show()
 
         app.exec_()
@@ -417,6 +423,5 @@ class SUServoGUIExperiment(EnvExperiment):  # {{{
     def init_kernel(self):
         """Initialize core"""
         self.core.reset()
-
 
 # }}}
