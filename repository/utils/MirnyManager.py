@@ -90,6 +90,14 @@ class MirnyManager:  # {{{
         self.almazny.output_toggle(state)
 
     @kernel
+    def enable_almazny(self):
+        self.set_almazny(True)
+
+    @kernel
+    def disable_almazny(self):
+        self.set_almazny(False)
+
+    @kernel
     def enable(self, ch):
         """Enable a given channel"""
         self._mutate_and_set_int("en_outs", self.en_outs, ch, 1)
@@ -115,9 +123,13 @@ class MirnyManager:  # {{{
     @kernel
     def set_freq(self, ch, freq):
         self._mutate_and_set_float("freqs", self.freqs, ch, freq * MHz)
+        # 53.125 MHz <= f <= 6800 MHz
+        if freq < 53.125:
+            raise ValueError("Frequency too low")
+        if freq > 6800.0:
+            raise ValueError("Frequency too high")
         self.core.break_realtime()
-
-        self.channels[ch].set_frequency(freq*MHz)
+        self.channels[ch].set_frequency(freq * MHz)
 
     @kernel
     def set_all(self):
@@ -139,7 +151,7 @@ class MirnyManager:  # {{{
             self.channels[ch].init()
 
             self.set_att(ch, self.atts[ch])
-            self.set_freq(ch, self.freqs[ch]/MHz)
+            self.set_freq(ch, self.freqs[ch] / MHz)
             if self.en_outs[ch]:
                 self.enable(ch)
             else:

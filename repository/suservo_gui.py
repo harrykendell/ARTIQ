@@ -79,10 +79,10 @@ class SignalDoubleSpinBox(QDoubleSpinBox):
 
 
 class DDSControl(QWidget):
-    def __init__(self, manager, ch=0):
+    def __init__(self, manager, ch=0, minimum=0.0, maximum=400.0):
         super().__init__()
-        self.min = 0.0
-        self.max = 400.0
+        self.min = minimum
+        self.max = maximum
         self.manager = manager
         self.ch = ch
 
@@ -101,25 +101,6 @@ class DDSControl(QWidget):
         freq_vbox.addWidget(self.text)
         topline.addLayout(freq_vbox)
         topline.addStretch()
-
-        # Amplitude input
-        amp_vbox = QVBoxLayout()
-        amp_vbox.setAlignment(Qt.AlignBottom)
-        amp_label = QLabel("Amplitude")
-
-        amp_vbox.addWidget(amp_label)
-        amp_vbox.addStretch()
-        amp_input = SignalDoubleSpinBox()
-        amp_input.setRange(0.0, 1.0)
-        amp_input.setSingleStep(0.1)
-        amp_input.setDecimals(1)
-        amp_input.setValue(self.manager.ys[ch])
-        amp_input.editingFinished.connect(
-            lambda: self.manager.set_y(ch, amp_input.value())
-        )
-        amp_input.stepChanged.connect(lambda: self.manager.set_y(ch, amp_input.value()))
-        amp_vbox.addWidget(amp_input)
-        topline.addLayout(amp_vbox)
 
         # Attenuation input
         att_vbox = QVBoxLayout()
@@ -255,6 +236,25 @@ class PIDControl(QWidget):
         self.Gl.editingFinished.connect(lambda: self.set())
         bottom.addWidget(self.Gl)
 
+        # Amplitude input
+        amp_vbox = QVBoxLayout()
+        amp_vbox.setAlignment(Qt.AlignBottom)
+        amp_label = QLabel("Amplitude")
+
+        amp_vbox.addWidget(amp_label)
+        amp_vbox.addStretch()
+        amp_input = SignalDoubleSpinBox()
+        amp_input.setRange(0.0, 1.0)
+        amp_input.setSingleStep(0.1)
+        amp_input.setDecimals(1)
+        amp_input.setValue(self.manager.ys[ch])
+        amp_input.editingFinished.connect(
+            lambda: self.manager.set_y(ch, amp_input.value())
+        )
+        amp_input.stepChanged.connect(lambda: self.manager.set_y(ch, amp_input.value()))
+        amp_vbox.addWidget(amp_input)
+        bottom.addLayout(amp_vbox)
+
         layout.addLayout(bottom)
         self.setLayout(layout)
 
@@ -283,7 +283,7 @@ class SamplerControl(QWidget):
         raise NotImplementedError
 
 
-class SingleChannel(QWidget):  # {{{
+class SingleChannelSUServo(QWidget):
     """Class to control a single given SUServo channel"""
 
     def __init__(self, manager, channel=0):
@@ -330,7 +330,7 @@ class SingleChannel(QWidget):  # {{{
         tabs = QTabWidget()
 
         # DDS
-        freq = DDSControl(self.manager, ch=channel)
+        freq = DDSControl(self.manager, ch=channel, minimum=0.0, maximum=400.0)
         tabs.addTab(freq, "DDS")
 
         # PID
@@ -348,15 +348,66 @@ class SingleChannel(QWidget):  # {{{
         """Return the widgets to the main app"""
         return self.groupbox
 
+class SingleChannelMirny(QWidget):
+    """Class to control a single given Mirny channel
+    NB this is an on button for the channel and a freq/att/on off control much like the SUServo DDS panel
+    """
 
-# }}}
+    def __init__(self, manager, channel=0):
+        # manager : MirnyManager
+        QWidget.__init__(self)
+        self.manager = manager
+        self.channel = channel
+
+        self.groupbox = QGroupBox()
+
+        # Stack all other widgets vertically
+        vbox = QVBoxLayout()
+        self.groupbox.setLayout(vbox)
+
+        # Top row: ON/OFF switch, channel name
+        # ON/OFF switch {{{
+        top = QHBoxLayout()
+        self.dds_button = Switch(
+            default=self.manager.en_outs[channel],
+            turn_on=lambda: self.manager.enable(channel),
+            turn_off=lambda: self.manager.disable(channel),
+        )
+        top.addWidget(self.dds_button)
+
+        top.addStretch()
+
+        # Channel name
+        name = QLabel(f"Ch {channel}")
+        name.setStyleSheet("font: bold 12pt")
+        top.addWidget(name)
+
+        vbox.addLayout(top)
+
+        # DDS
+        freq = DDSControl(self.manager, ch=channel, minimum=53.125, maximum=6800.0)
+        # tabs.addTab(freq, "DDS")
+
+        vbox.addWidget(freq)
+
+        # note that almazny is double the frequency of mirny
+        # center label
+        hhbox = QHBoxLayout()
+        hhbox.addStretch()
+        hhbox.addWidget(QLabel("Almazny is 2x Mirny frequency"))
+        hhbox.addStretch()
+        vbox.addLayout(hhbox)
+        
+    def get_widget(self):
+        """Return the widgets to the main app"""
+        return self.groupbox
 
 
 class SUServoGUI(QWidget):  # {{{
     def __init__(self, experiment, core, suservo, suservo_chs):
         super().__init__()
-        self.suservo_manager = SUServoManager(experiment, core, suservo, suservo_chs)
-        self.ch = [SingleChannel(self.suservo_manager, i) for i in range(8)]
+        self.manager = SUServoManager(experiment, core, suservo, suservo_chs)
+        self.ch = [SingleChannelSUServo(self.manager, i) for i in range(8)]
 
         self.setWindowTitle("SUServo GUI")
         layout = QVBoxLayout()
@@ -367,9 +418,9 @@ class SUServoGUI(QWidget):  # {{{
         hbox.addStretch()
         hbox.addWidget(
             Switch(
-                self.suservo_manager.enabled,
-                self.suservo_manager.enable_servo,
-                self.suservo_manager.disable_servo,
+                self.manager.enabled,
+                self.manager.enable_servo,
+                self.manager.disable_servo,
             )
         )
         self.label = QLabel("SUServo")  # Bold large text
@@ -391,10 +442,36 @@ class MirnyGUI(QWidget):
 
     def __init__(self, experiment, core, mirny_chs, almazny):
         super().__init__()
-        self.mirny_manager = MirnyManager(experiment, core, mirny_chs, almazny)
+        self.manager = MirnyManager(experiment, core, mirny_chs, almazny)
+        self.ch = [SingleChannelMirny(self.manager, i) for i in range(4)]
+
         self.setWindowTitle("Mirny GUI")
         layout = QVBoxLayout()
         self.setLayout(layout)
+
+        # Almazny on/off switch
+        hbox = QHBoxLayout()
+        hbox.addStretch()
+        hbox.addWidget(
+            Switch(
+                self.manager.en_almazny,
+                self.manager.enable_almazny,
+                self.manager.disable_almazny,
+                on_text="ON",
+                off_text="OFF",
+            )
+        )
+        self.label = QLabel("Almazny")  # Bold large text
+        self.label.setStyleSheet("font: bold 14pt")
+        hbox.addWidget(self.label)
+        hbox.addStretch()
+        layout.addLayout(hbox)
+        # }}}
+        # create channels controls
+        chans = QGridLayout()
+        for i in range(4):
+            chans.addWidget(self.ch[i].get_widget(), i % 2, i // 2)
+        layout.addLayout(chans)
 
 
 class ArtiqGUIExperiment(EnvExperiment):  # {{{
@@ -411,6 +488,7 @@ class ArtiqGUIExperiment(EnvExperiment):  # {{{
     def run(self):
         self.init_kernel()
         app = QApplication(sys.argv)
+        
         screen = SUServoGUI(self, self.core, self.suservo, self.suservo_chs)
         screen.show()
 

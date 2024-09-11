@@ -179,7 +179,11 @@ class SUServoManager:  # {{{
     @kernel
     def set_freq(self, ch, freq):
         self._mutate_and_set_float("freqs", self.freqs, ch, freq * MHz)
-
+        # 0 MHz <= f <= 400 MHz
+        if freq < 0:
+            raise ValueError("Frequency too low")
+        if freq > 400.0:
+            raise ValueError("Frequency too high")
         self.core.break_realtime()
 
         self.channels[ch].set_dds(
