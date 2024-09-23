@@ -115,9 +115,9 @@ class MirnyManager:  # {{{
     def set_att(self, ch, att):
         self._mutate_and_set_float("atts", self.atts, ch, att)
         self.core.break_realtime()
-        # set Att for Mirny channel ch
-        self.channels[ch].set_att(0.0 * dB)
-        # set Att for Almazny channel ch
+        # # set Att for Mirny channel ch
+        self.channels[ch].set_att(att * dB)
+        # # set Att for Almazny channel ch
         self.almazny.set_att(ch, att * dB, True)
 
     @kernel
