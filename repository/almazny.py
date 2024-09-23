@@ -14,7 +14,8 @@ class TestMirny(EnvExperiment):
 
     def build(self):
         self.setattr_argument("Channel", NumberValue(default=0, precision=0, min=0, max=3, step=1, type="int"), tooltip="Mirny channel.")
-
+        self.setattr_argument("attenuation", NumberValue(default=0.0, unit="dB", precision=1, min=0.0, max=31.5, step=0.5, type="float"), tooltip="Attenuation to set on the Mirny.")
+        
         self.setattr_argument(
             "frequency",
             NumberValue(
@@ -31,7 +32,6 @@ class TestMirny(EnvExperiment):
         self.core: Core = self.get_device("core")
         self.mirny: ADF5356 = self.get_device(f"mirny_ch{self.Channel}")
         self.almazny: AlmaznyLegacy = self.get_device("mirny_almazny")
-        self.frequency_2 = self.frequency / 2.0 if self.frequency else 0.0 * MHz
 
     @kernel
     def run(self):
@@ -43,15 +43,15 @@ class TestMirny(EnvExperiment):
         # init Mirny channel 0
         self.core.break_realtime()
         self.mirny.init()
-        self.mirny.set_att(0.0 * dB)
-        self.mirny.sw.on()
-        self.core.break_realtime()
-        self.mirny.set_frequency(self.frequency)
+        self.mirny.set_att(self.attenuation)
+        self.mirny.set_frequency(self.frequency / 2.0)
         delay(100 * ms)
+        self.core.break_realtime()
+        self.mirny.sw.on()
         self.core.break_realtime()
 
         self.almazny.init()
         self.core.break_realtime()
         self.almazny.output_toggle(True)
         for ch in range(4):
-            self.almazny.set_att(ch, 0.0 * dB, True)
+            self.almazny.set_att(ch, self.attenuation, True)
