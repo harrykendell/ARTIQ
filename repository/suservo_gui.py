@@ -470,7 +470,7 @@ class MirnyGUI(QWidget):
         # create channels controls
         chans = QGridLayout()
         for i in range(4):
-            chans.addWidget(self.ch[i].get_widget(), i % 2, i // 2)
+            chans.addWidget(self.ch[i].get_widget(), i, 0)
         layout.addLayout(chans)
 
 
