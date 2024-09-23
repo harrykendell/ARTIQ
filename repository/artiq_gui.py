@@ -394,7 +394,8 @@ class SingleChannelMirny(QWidget):
         # center label
         hhbox = QHBoxLayout()
         hhbox.addStretch()
-        hhbox.addWidget(QLabel("Almazny is 2x Mirny frequency"))
+        almazny_freq = QLabel(f"Almazny is 2x Mirny")
+        hhbox.addWidget(almazny_freq)
         hhbox.addStretch()
         vbox.addLayout(hhbox)
         
@@ -406,6 +407,7 @@ class SingleChannelMirny(QWidget):
 class SUServoGUI(QWidget):  # {{{
     def __init__(self, experiment, core, suservo, suservo_chs):
         super().__init__()
+        self.setGeometry(self.x(), self.y(), self.minimumWidth(), self.minimumHeight())
         self.manager = SUServoManager(experiment, core, suservo, suservo_chs)
         self.ch = [SingleChannelSUServo(self.manager, i) for i in range(8)]
 
@@ -488,11 +490,17 @@ class ArtiqGUIExperiment(EnvExperiment):  # {{{
     def run(self):
         self.init_kernel()
         app = QApplication(sys.argv)
-        
+
         screen = SUServoGUI(self, self.core, self.suservo, self.suservo_chs)
         screen.show()
 
         screen2 = MirnyGUI(self, self.core, self.mirny_chs, self.almazny)
+        screen2.setGeometry(
+            screen.x() + screen.minimumWidth(),
+            screen.y(),
+            screen.minimumWidth() // 2,
+            screen.minimumHeight(),
+        )
         screen2.show()
 
         app.exec_()
