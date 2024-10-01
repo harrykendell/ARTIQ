@@ -29,7 +29,7 @@ class MirnyManager:  # {{{
         self.almazny: AlmaznyLegacy = almazny
         self.name = name
 
-        assert len(self.channels) == 4, "There must be 8 channels per Mirny"
+        assert len(self.channels) == 4, "There must be 4 channels per Mirny"
 
         datasets = [
             "en_almazny",
