@@ -480,7 +480,6 @@ class ArtiqGUIExperiment(EnvExperiment):  # {{{
     """Artiq GUI"""
 
     def build(self):
-        self.setattr_device("scheduler")
         self.core = self.get_device("core")
         self.suservo = self.get_device("suservo")
         self.suservo_chs = [self.get_device(f"suservo_ch{i}") for i in range(8)]
