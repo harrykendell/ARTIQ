@@ -15,7 +15,7 @@
             "clk_sel": "mmcx",
             "refclk":  125000000.0,
             "almazny": true,
-            "almazny_hw_rev": "v1.1"
+            "almazny_hw_rev": "v1.3"
         },
         {
             "type": "dio",

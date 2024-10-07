@@ -2,7 +2,7 @@ from artiq.experiment import *
 from artiq.language import us, ms, MHz, dB, delay, TInt64
 
 from artiq.coredevice.core import Core
-from artiq.coredevice.almazny import AlmaznyLegacy
+from artiq.coredevice.almazny import AlmaznyChannel
 from artiq.coredevice.adf5356 import ADF5356
 from artiq.coredevice.mirny import Mirny
 
@@ -19,14 +19,14 @@ class MirnyManager:  # {{{
         experiment: EnvExperiment,
         core: Core,
         channels: list[ADF5356],
-        almazny: AlmaznyLegacy,
+        almazny: list[AlmaznyChannel],
         name="mirny",
     ):
         self.experiment = experiment
         self.core: Core = core
         self.cpld: Mirny = channels[0].cpld
         self.channels: list[ADF5356] = channels
-        self.almazny: AlmaznyLegacy = almazny
+        self.almazny: list[AlmaznyChannel] = almazny
         self.name = name
 
         assert len(self.channels) == 4, "There must be 4 channels per Mirny"
@@ -38,7 +38,7 @@ class MirnyManager:  # {{{
             "en_outs",
         ]
         defaults = [
-            True,
+            [True] * 4,
             [31.5] * 4,
             [3400e6] * 4,
             [1] * 4,
@@ -81,21 +81,27 @@ class MirnyManager:  # {{{
         delay(50 * ms)
 
     @kernel
-    def set_almazny(self, state=True):
-        self.experiment.set_dataset(
-            self.name + ".almazny", state, persist=True, archive=False
-        )
-        self.en_almazny = state
+    def _mutate_and_set_bool(self, dataset, variable, index, value):
+        """Mutate the dataset and change our internal store of the value
+        We have to pass both the dataset reference and local variable as __dict__ access is illegal on kernel
+        """
+        self.experiment.mutate_dataset(self.name + "." + dataset, index, value)
+        variable[index] = value
+        delay(50 * ms)
+
+    @kernel
+    def set_almazny(self, ch, state=True):
+        self._mutate_and_set_int("en_almazny", self.en_almazny, ch, state)
         self.core.break_realtime()
-        self.almazny.output_toggle(state)
+        self.almazny[ch].set(self.atts[ch], state, led=1 if state else 0)
 
     @kernel
-    def enable_almazny(self):
-        self.set_almazny(True)
+    def enable_almazny(self, ch):
+        self.set_almazny(ch, True)
 
     @kernel
-    def disable_almazny(self):
-        self.set_almazny(False)
+    def disable_almazny(self, ch):
+        self.set_almazny(ch, False)
 
     @kernel
     def enable(self, ch):
@@ -118,7 +124,7 @@ class MirnyManager:  # {{{
         # # set Att for Mirny channel ch
         self.channels[ch].set_att(att * dB)
         # # set Att for Almazny channel ch
-        self.almazny.set_att(ch, att * dB, True)
+        self.almazny[ch].set(att * dB, self.en_almazny[ch], bool(self.en_almazny[ch]))
 
     @kernel
     def set_freq(self, ch, freq):
@@ -158,8 +164,8 @@ class MirnyManager:  # {{{
                 self.disable(ch)
 
         # Initialize Almazny
-        self.almazny.init()
         self.core.break_realtime()
-        self.set_almazny(self.en_almazny)
         for ch in range(4):
-            self.almazny.set_att(ch, self.atts[ch] * dB, True)
+            self.almazny[ch].set(
+                self.atts[ch] * dB, self.en_almazny[ch], bool(self.en_almazny[ch])
+            )

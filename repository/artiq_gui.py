@@ -484,7 +484,7 @@ class ArtiqGUIExperiment(EnvExperiment):  # {{{
         self.suservo = self.get_device("suservo")
         self.suservo_chs = [self.get_device(f"suservo_ch{i}") for i in range(8)]
         self.mirny_chs = [self.get_device(f"mirny_ch{i}") for i in range(4)]
-        self.almazny = self.get_device("mirny_almazny")
+        self.almazny = [self.get_device(f"almazny_ch{i}") for i in range(4)]
 
     def run(self):
         self.init_kernel()

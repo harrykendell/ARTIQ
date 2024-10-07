@@ -12,6 +12,9 @@ if [[ -d /opt/Xilinx/Vivado/2022.2 ]]; then
     echo -e "${GREEN}Vivado 2020.2 found, flashing artiq crate${NC}"
     cd src/artiq
 
+    # ensure the reference device_db reflects the currently flashed details
+    nix develop --command bash -c "artiq_ddb_template ../../crate\ config/bu2402001.json > ../../crate\ config/device_db.py"
+    
     # build firmware - 8.0+
     nix develop --command bash -c "export PYTHONPATH=$(pwd):$PYTHONPATH"
     nix develop --command bash -c "python -m artiq.gateware.targets.kasli ../../crate\ config/bu2402001.json"
