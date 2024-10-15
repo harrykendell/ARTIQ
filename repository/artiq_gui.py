@@ -89,26 +89,23 @@ class DDSControl(QWidget):
         # Main layout for this widget
         layout = QVBoxLayout()
 
-        topline = QHBoxLayout()
-        # Frequency input
-        freq_vbox = QVBoxLayout()
+        # labels
         freq_label = QLabel("Frequency (MHz)")
-        freq_vbox.addWidget(freq_label)
+        att_label = QLabel("Attenuation (dB)")
+
+        labelline = QHBoxLayout()
+        labelline.addWidget(freq_label)
+        labelline.addStretch()
+        labelline.addWidget(att_label)
+        layout.addLayout(labelline)
+
+        # text inputs
         self.text = QLineEdit()
         self.text.setText(str(round(self.manager.freqs[ch] / MHz, 3)))
         self.text.setValidator(QDoubleValidator())
         self.text.setAlignment(Qt.AlignCenter)
-        freq_vbox.addWidget(self.text)
-        topline.addLayout(freq_vbox)
-        topline.addStretch()
+        self.text.editingFinished.connect(lambda: self.setfreq(self.text.text()))
 
-        # Attenuation input
-        att_vbox = QVBoxLayout()
-        att_vbox.setAlignment(Qt.AlignBottom)
-        att_label = QLabel("Attenuation")
-
-        att_vbox.addWidget(att_label)
-        att_vbox.addStretch()
         att_input = SignalDoubleSpinBox()
         att_input.setRange(0.0, 31.5)
         att_input.setSingleStep(0.5)
@@ -121,31 +118,27 @@ class DDSControl(QWidget):
         att_input.stepChanged.connect(
             lambda: self.manager.set_att(ch, att_input.value())
         )
-        att_vbox.addWidget(att_input)
-        topline.addLayout(att_vbox)
 
-        layout.addLayout(topline)
+        inputline = QHBoxLayout()
+        inputline.addWidget(self.text)
+        inputline.addStretch()
+        inputline.addWidget(att_input)
+        layout.addLayout(inputline)
 
         # Slider and min/max labels
-        slider_layout = QHBoxLayout()
         min_label = QLabel(f"{self.min} <b>MHz</b>")
-        slider_layout.addWidget(min_label)
-
+        max_label = QLabel(f"{self.max} <b>MHz</b>")
         self.slider = QSlider(Qt.Horizontal)
         self.slider.setSingleStep(1)
-        slider_layout.addWidget(self.slider)
-
         self.slider.setRange(int(self.min), int(self.max))
-        max_label = QLabel(f"{self.max} <b>MHz</b>")
-        slider_layout.addWidget(max_label)
-
         self.slider.setValue(int(self.manager.freqs[ch] / MHz))
-        layout.addLayout(slider_layout)
-
-        # connections
-        self.text.editingFinished.connect(lambda: self.setfreq(self.text.text()))
         self.slider.valueChanged.connect(lambda x: self.setfreq(x))
 
+        sliderline = QHBoxLayout()
+        sliderline.addWidget(min_label)
+        sliderline.addWidget(self.slider)
+        sliderline.addWidget(max_label)
+        layout.addLayout(sliderline)
         self.setLayout(layout)
 
     def setfreq(self, val):
@@ -156,19 +149,15 @@ class DDSControl(QWidget):
             self.text.setText(str(self.slider.value()))
             return
 
-        # guard against recursion
-        if (
-            val == self.manager.freqs[self.ch] / MHz
-            or round(float(self.text.text())) == self.slider.value()
-        ):
+        # guard against recursion already at the correct frequency
+        if val == self.manager.freqs[self.ch] / MHz:
             return
 
         val = min(max(val, self.min), self.max)
+        self.text.setText(str(val))
+        self.slider.setValue(int(val))
 
         self.manager.set_freq(self.ch, val)
-
-        self.text.setText(str(round(self.manager.freqs[self.ch] / MHz, 3)))
-        self.slider.setValue(int(self.manager.freqs[self.ch] / MHz))
 
 
 class PIDControl(QWidget):
@@ -348,6 +337,7 @@ class SingleChannelSUServo(QWidget):
         """Return the widgets to the main app"""
         return self.groupbox
 
+
 class SingleChannelMirny(QWidget):
     """Class to control a single given Mirny channel
     NB this is an on button for the channel and a freq/att/on off control much like the SUServo DDS panel
@@ -365,7 +355,7 @@ class SingleChannelMirny(QWidget):
         vbox = QVBoxLayout()
         self.groupbox.setLayout(vbox)
 
-        # Top row: ON/OFF switch, channel name
+        # Top row: ON/OFF switch, almazny on/off, channel name
         # ON/OFF switch {{{
         top = QHBoxLayout()
         self.dds_button = Switch(
@@ -374,6 +364,15 @@ class SingleChannelMirny(QWidget):
             turn_off=lambda: self.manager.disable(channel),
         )
         top.addWidget(self.dds_button)
+
+        self.almazny_button = Switch(
+            default=self.manager.en_almazny[channel],
+            turn_on=lambda: self.manager.enable_almazny(channel),
+            turn_off=lambda: self.manager.disable_almazny(channel),
+            on_text="Almazny",
+            off_text="Almazny",
+        )
+        top.addWidget(self.almazny_button)
 
         top.addStretch()
 
@@ -398,7 +397,7 @@ class SingleChannelMirny(QWidget):
         hhbox.addWidget(almazny_freq)
         hhbox.addStretch()
         vbox.addLayout(hhbox)
-        
+
     def get_widget(self):
         """Return the widgets to the main app"""
         return self.groupbox
@@ -451,24 +450,6 @@ class MirnyGUI(QWidget):
         layout = QVBoxLayout()
         self.setLayout(layout)
 
-        # Almazny on/off switch
-        hbox = QHBoxLayout()
-        hbox.addStretch()
-        hbox.addWidget(
-            Switch(
-                self.manager.en_almazny,
-                self.manager.enable_almazny,
-                self.manager.disable_almazny,
-                on_text="ON",
-                off_text="OFF",
-            )
-        )
-        self.label = QLabel("Almazny")  # Bold large text
-        self.label.setStyleSheet("font: bold 14pt")
-        hbox.addWidget(self.label)
-        hbox.addStretch()
-        layout.addLayout(hbox)
-        # }}}
         # create channels controls
         chans = QGridLayout()
         for i in range(4):
@@ -508,5 +489,6 @@ class ArtiqGUIExperiment(EnvExperiment):  # {{{
     def init_kernel(self):
         """Initialize core"""
         self.core.reset()
+
 
 # }}}

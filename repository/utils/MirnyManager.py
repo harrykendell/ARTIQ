@@ -1,7 +1,7 @@
 from artiq.experiment import *
 from artiq.language import us, ms, MHz, dB, delay, TInt64
 
-from artiq.coredevice.core import Core
+from artiq.coredevice.core import Core, rtio_get_counter, at_mu
 from artiq.coredevice.almazny import AlmaznyChannel
 from artiq.coredevice.adf5356 import ADF5356
 from artiq.coredevice.mirny import Mirny
@@ -81,19 +81,11 @@ class MirnyManager:  # {{{
         delay(50 * ms)
 
     @kernel
-    def _mutate_and_set_bool(self, dataset, variable, index, value):
-        """Mutate the dataset and change our internal store of the value
-        We have to pass both the dataset reference and local variable as __dict__ access is illegal on kernel
-        """
-        self.experiment.mutate_dataset(self.name + "." + dataset, index, value)
-        variable[index] = value
-        delay(50 * ms)
-
-    @kernel
     def set_almazny(self, ch, state=True):
-        self._mutate_and_set_int("en_almazny", self.en_almazny, ch, state)
+        self.experiment.mutate_dataset(self.name + ".en_almazny", ch, state)
+        self.en_almazny[ch] = 0 if not state else 1
         self.core.break_realtime()
-        self.almazny[ch].set(self.atts[ch], state, led=1 if state else 0)
+        self.almazny[ch].set(self.atts[ch], state, state)
 
     @kernel
     def enable_almazny(self, ch):
@@ -134,7 +126,9 @@ class MirnyManager:  # {{{
             raise ValueError("Frequency too low")
         if freq > 6800.0:
             raise ValueError("Frequency too high")
-        self.core.break_realtime()
+        
+        # self.core.break_realtime() but faster
+        at_mu(rtio_get_counter() + 1000)
         self.channels[ch].set_frequency(freq * MHz)
 
     @kernel
