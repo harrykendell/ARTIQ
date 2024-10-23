@@ -437,6 +437,19 @@ class SUServoGUI(QWidget):  # {{{
             chans.addWidget(self.ch[i].get_widget(), i % 4, i // 4)
         layout.addLayout(chans)
 
+        # capture the keyboard numbers to enable/disable channels
+        self.installEventFilter(self)
+    
+    def eventFilter(self, obj, event):
+        if event.type() == event.KeyPress and event.key() >= Qt.Key_0 and event.key() <= Qt.Key_7:
+            # just click the button for the channel to avoid implementing any logic here
+            if QApplication.keyboardModifiers() == Qt.ControlModifier:
+                self.ch[event.key() - Qt.Key_0].pid_button.switch_state()
+            else:
+                self.ch[event.key() - Qt.Key_0].dds_button.switch_state()
+            return 1
+        return super().eventFilter(obj, event)
+
 
 # }}}
 class MirnyGUI(QWidget):
@@ -455,6 +468,19 @@ class MirnyGUI(QWidget):
         for i in range(4):
             chans.addWidget(self.ch[i].get_widget(), i, 0)
         layout.addLayout(chans)
+
+        # capture the keyboard numbers to enable/disable channels
+        self.installEventFilter(self)
+
+    def eventFilter(self, obj, event):
+        if event.type() == event.KeyPress and event.key() >= Qt.Key_0 and event.key() <= Qt.Key_3:
+            # just click the button for the channel to avoid implementing any logic here
+            if QApplication.keyboardModifiers() == Qt.ControlModifier:
+                self.ch[event.key() - Qt.Key_0].almazny_button.switch_state()
+            else:
+                self.ch[event.key() - Qt.Key_0].dds_button.switch_state()
+            return 1
+        return super().eventFilter(obj, event)
 
 
 class ArtiqGUIExperiment(EnvExperiment):  # {{{
