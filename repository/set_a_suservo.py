@@ -30,7 +30,7 @@ class SUServoControl(EnvExperiment):
         # Channel parameters
         self.setattr_argument(
             "Channel",
-            NumberValue(0, min=0, max=7, precision=0, step=1, type="int"),
+            NumberValue(-1, min=-1, max=7, precision=0, step=1, type="int"),
             tooltip="Channel to use for the DDS",
             group="Channel",
         )
