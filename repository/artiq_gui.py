@@ -24,7 +24,7 @@ from PyQt5.QtWidgets import (
     QTabWidget,
 )
 from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtGui import QDoubleValidator, QIntValidator
+from PyQt5.QtGui import QDoubleValidator, QIntValidator, QIcon
 from repository.utils.SUServoManager import SUServoManager
 from repository.utils.MirnyManager import MirnyManager
 
@@ -496,6 +496,12 @@ class ArtiqGUIExperiment(EnvExperiment):  # {{{
     def run(self):
         self.init_kernel()
         app = QApplication(sys.argv)
+        # Set a nice icon
+        app.setWindowIcon(
+        QIcon("/usr/share/icons/elementary-xfce/apps/128/do.png")
+        )
+        app.setStyle("Fusion")
+        app.setApplicationName("ARTIQ GUI")
 
         screen = SUServoGUI(self, self.core, self.suservo, self.suservo_chs)
         screen.show()

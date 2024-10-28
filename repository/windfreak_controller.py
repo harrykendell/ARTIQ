@@ -197,9 +197,7 @@ if __name__ == "__main__":
 
     app = QApplication(argv)
     # Set a nice icon
-    app.setWindowIcon(
-        QIcon("/usr/share/icons/elementary-xfce/apps/128/utilities-system-monitor.png")
-    )
+    app.setWindowIcon(QIcon("/usr/share/icons/elementary-xfce/apps/128/do.png"))
     app.setStyle("Fusion")
     app.setApplicationName("Windfreak Controller")
 
