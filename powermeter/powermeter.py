@@ -3,7 +3,7 @@ from usbtmc import USBTMC
 
 import sys, os
 import numpy as np
-from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget, QLabel, QSpinBox
+from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QWidget, QLabel, QSpinBox
 from PyQt5.QtCore import QTimer
 from PyQt5.QtGui import QIcon
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
@@ -17,16 +17,21 @@ class PlotCanvas(FigureCanvas):
         super().__init__(fig)
         self.setParent(parent)
         self.data = []
+        self.xs = []
 
-    def update_plot(self, new_data, num_points=100):
-        self.data = self.data[-num_points:]
+    def update_plot(self, new_data, start=0,end=100):
         self.data.append(new_data)
+        self.xs.append(len(self.data))
         self.ax.clear()
+
+        start = max(0, start)
+        end = min(len(self.data), end)
 
         # set axis labels and title
         self.ax.set_xlabel('reading #')
         self.ax.set_ylabel('Power (mW)')
-        self.ax.plot(self.data, 'r-')
+        # make sure we have enough points
+        self.ax.plot(self.xs[start:end],self.data[start:end], 'r-')
         self.draw()
 
 class MainWindow(QMainWindow):
@@ -40,20 +45,25 @@ class MainWindow(QMainWindow):
         self.mean_label = QLabel('Mean: 0', self)
         self.std_label = QLabel('Std Dev: 0', self)
 
-        self.num_points = 10_000
-        self.n_selector = QSpinBox(self)
-        self.n_selector.setRange(1, 10_000)
-        self.n_selector.setValue(self.num_points)
-        # update nump_points when editing finished
-        def update_num_points(num):
-            self.num_points = num
-        self.n_selector.editingFinished.connect(lambda: update_num_points(self.n_selector.value()))
+        maxval = 1_000_000
+        self.start_selector = QSpinBox(self)
+        self.end_selector = QSpinBox(self)
+        self.start_selector.setMaximum(maxval)
+        self.start_selector.setValue(0)
+        self.end_selector.setMaximum(maxval)
+        self.end_selector.setValue(maxval)
 
         layout = QVBoxLayout()
         layout.addWidget(self.plot_canvas)
         layout.addWidget(self.mean_label)
         layout.addWidget(self.std_label)
-        layout.addWidget(self.n_selector)
+
+        rangebox = QHBoxLayout()
+        rangebox.addWidget(QLabel("Start:"))
+        rangebox.addWidget(self.start_selector)
+        rangebox.addWidget(QLabel("End:"))
+        rangebox.addWidget(self.end_selector)
+        layout.addLayout(rangebox)
 
         container = QWidget()
         container.setLayout(layout)
@@ -67,7 +77,7 @@ class MainWindow(QMainWindow):
             if backoff > 60:
                 print("Device not found, exiting...")
                 sys.exit(1)
-                
+
         inst = USBTMC('/dev/usbtmc1')
         self.power_meter = ThorlabsPM100(inst = inst)
         self.power_meter.system.beeper.immediate()
@@ -86,16 +96,15 @@ class MainWindow(QMainWindow):
 
         self.power_meter.sense.average.count = 10
 
-        # set windows title 
+        # set windows title
         self.setWindowTitle(f'Power Meter Readings ({self.power_meter.sense.correction.wavelength} nm)')
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.update)
         self.timer.start(100)  # Update every .1 seconds
 
-
     def update(self):
         new_value = self.power_meter.read*1e3
-        self.plot_canvas.update_plot(new_value,self.n_selector.value())
+        self.plot_canvas.update_plot(new_value,self.start_selector.value(),self.end_selector.value())
 
         data = self.plot_canvas.data
         self.mean_label.setText(f'Mean: {np.mean(data)}')
