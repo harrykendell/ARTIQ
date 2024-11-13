@@ -309,7 +309,8 @@ class SingleChannelSUServo(QWidget):
         top.addStretch()
 
         # Channel name
-        name = QLabel(f"Ch {channel}")
+        channelsMap = ["Lock", "MOT", "IMG", "PUMP", "852 X", "852 Y", "CDT 1", "CDT 2"]
+        name = QLabel(f"Ch {channel} - ({channelsMap[channel]})")
         name.setStyleSheet("font: bold 12pt")
         top.addWidget(name)
 
