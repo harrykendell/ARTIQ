@@ -2,7 +2,7 @@
 # This script sets the PyQt5 environment variables that are missing in the Nix build.
 # Without these variables PyQt5 programs will crash unless explicitly hooked like artiq_dashboard.
 if [ ${_} != ${0} ]; then
-    export QT_PLUGIN_PATH=$(find /nix/store -maxdepth 4 -mindepth 4 -wholename '/*/lib/qt-5.15.14/plugins' | paste -sd ":" -)
+    export QT_PLUGIN_PATH=$(find /nix/store -maxdepth 4 -mindepth 4 -wholename '/*/lib/qt-5.15.15/plugins' | paste -sd ":" -)
     export QT_XCB_GL_INTEGRATION=none
     unset XDG_SESSION_TYPE
     export LANG=C
