@@ -8,10 +8,11 @@
   inputs.src-ndscan = {url = "github:OxfordIonTrapGroup/ndscan/e7c0211019e3fc77ae0c032869e4833e407874f0"; flake= false;};
   inputs.src-oitg = {url = "github:OxfordIonTrapGroup/oitg/3ecba4b2ea1d407be02a87193e2fde4cd9c09af3"; flake= false;};
   inputs.src-oxart-devices = {url = "github:OxfordIonTrapGroup/oxart-devices/8074c330bc718bda2b0a91eb74b1988dcb5cbdb7"; flake= false;};
-  inputs.src-miniconf-mqtt = {url = "github:quartiq/miniconf/d03726db064c61fdbaf55db4788fa56cc09ece10"; flake= false;};
-  inputs.src-booster = {url = "github:quartiq/booster/a1f83b63180511ecd68f88a04621624941d17a41"; flake= false;};
+  inputs.src-miniconf-mqtt = {url = "github:quartiq/miniconf/6b0173ea5e540e1b3c3916bb6c7701cc06db47f0"; flake= false;};
+  inputs.src-booster = {url = "github:quartiq/booster/3afc152cfbc5c313df76e238cca0be2b0394477a"; flake= false;};
+  inputs.src-aiomqtt = {url = "github:sbtinstruments/aiomqtt/f1a61398f346a8e3a051cf5ea2a4cbbf1df9dbe6"; flake= false;};
   
-  outputs = { self, artiq, extrapkg, src-ndscan, src-oitg, src-oxart-devices, src-miniconf-mqtt, src-booster}:
+  outputs = { self, artiq, extrapkg, src-ndscan, src-oitg, src-oxart-devices, src-miniconf-mqtt, src-booster, src-aiomqtt }:
     let
       pkgs = artiq.inputs.nixpkgs.legacyPackages.x86_64-linux;
       aqmain = artiq.packages.x86_64-linux;
@@ -29,14 +30,28 @@
         };
 
       # booster packages
-      gmqtt = pkgs.python3Packages.buildPythonPackage rec {
-        pname = "gmqtt";
-        version = "0.6.12";
+      paho-mqtt = pkgs.python3Packages.buildPythonPackage rec {
+        pname = "paho_mqtt";
+        version = "2.1.0";
         doCheck = false;
+        pyproject = true;
         src = pkgs.python3Packages.fetchPypi {
           inherit pname version;
-          sha256 = "7df03792343089ae62dc7cd6f8be356861c4fc68768cefa22f3d8de5e7e5be48";
+          sha256 = "12d6e7511d4137555a3f6ea167ae846af2c7357b10bc6fa4f7c3968fc1723834";
         };
+        propagatedBuildInputs = [pkgs.python3Packages.hatchling];
+        };
+      aiomqtt = pkgs.python3Packages.buildPythonPackage rec {
+        name = "aiomqtt";
+        src = "${src-aiomqtt}";
+        format = "pyproject";
+        version = "2.1.0";
+        propagatedBuildInputs = [
+          pkgs.python3Packages.poetry-core
+          pkgs.python3Packages.poetry-dynamic-versioning
+          paho-mqtt
+          pkgs.python3Packages.typing-extensions
+        ];
         };
       miniconf-mqtt = pkgs.python3Packages.buildPythonPackage {
         name = "miniconf_mqtt";
@@ -44,7 +59,8 @@
         format = "pyproject";
         propagatedBuildInputs = [
           pkgs.python3Packages.setuptools
-          gmqtt
+          pkgs.python3Packages.typing-extensions
+          aiomqtt
         ];
         };
       booster = pkgs.python3Packages.buildPythonPackage {
