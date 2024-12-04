@@ -7,7 +7,7 @@
 #      [-] add a & to the end of the call to run as a background process
 ##########################################################################################
 
-import sys
+import sys, json
 from PyQt5.QtWidgets import (
     QWidget,
     QGroupBox,
@@ -27,6 +27,7 @@ from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QDoubleValidator, QIntValidator, QIcon
 from repository.utils.SUServoManager import SUServoManager
 from repository.utils.MirnyManager import MirnyManager
+from repository.utils.boosterTelemetry import BoosterTelemetry
 
 from artiq.experiment import *
 from artiq.language import MHz, ms
@@ -67,7 +68,6 @@ class Switch(QWidget):
         self.button.setText(self.text[self.state])  # Change text and color
         self.button.setStyleSheet(self.color[self.state])
 
-
 class SignalDoubleSpinBox(QDoubleSpinBox):
     stepChanged = pyqtSignal()
 
@@ -76,7 +76,6 @@ class SignalDoubleSpinBox(QDoubleSpinBox):
         super(QDoubleSpinBox, self).stepBy(step)
         if self.value() != value:
             self.stepChanged.emit()
-
 
 class DDSControl(QWidget):
     def __init__(self, manager, ch=0, minimum=0.0, maximum=400.0):
@@ -158,6 +157,64 @@ class DDSControl(QWidget):
         self.slider.setValue(int(val))
 
         self.manager.set_freq(self.ch, val)
+
+class BoosterControl(QWidget):
+    def __init__(self, manager, booster_tripped, ch=0):
+        super().__init__()
+        self.manager = manager
+        self.booster_tripped = booster_tripped
+        self.tripped = False
+        layout = QVBoxLayout()
+
+        # labels
+        state = QHBoxLayout()
+        state.setAlignment(Qt.AlignCenter)
+        self.status = QLabel("-")
+        state.addWidget(self.status)
+        layout.addLayout(state)
+        layout.addStretch()
+
+        pows = QHBoxLayout()
+        pows.setAlignment(Qt.AlignCenter)
+        self.in_power = QLabel("0 <b>dBm</b>")
+        pows.addWidget(self.in_power)
+        rarrow = QLabel("<b>→</b>")
+        rarrow.setStyleSheet("font-size: 20px")
+        pows.addWidget(rarrow)
+        self.out_power = QLabel("0 <b>dBm</b>")
+        pows.addWidget(self.out_power)
+        layout.addLayout(pows)
+
+        ref = QHBoxLayout()
+        ref.setAlignment(Qt.AlignCenter)
+        carrow = QLabel("<b>↻</b>")
+        carrow.setToolTip("Reflected power")
+        carrow.setStyleSheet("font-size: 20px")
+        ref.addWidget(carrow)
+        layout.addLayout(ref)
+
+        ref2 = QHBoxLayout()
+        ref2.setAlignment(Qt.AlignCenter)
+        self.ref_power = QLabel("0 <b>dBm</b>")
+        ref2.addWidget(self.ref_power)
+        layout.addLayout(ref2)
+
+        layout.addStretch()
+        self.setLayout(layout)
+
+    def update(self, data):
+        self.in_power.setText(f"{data['input_power']:.1f}<b> dBm</b>")
+        self.out_power.setText(f"{data['output_power']:.1f}<b> dBm</b>")
+        self.ref_power.setText(f"{data['reflected_power']:.1f}<b> dBm</b>")
+
+        tripped = data["state"] != "Enabled"
+        if tripped:
+            self.status.setText(f"<b><font color='red'>{data['state']}</font></b>")
+            if not self.tripped:
+                self.booster_tripped()
+        else:
+            self.status.setText(data["state"])
+        self.tripped = tripped
 
 
 class PIDControl(QWidget):
@@ -256,7 +313,6 @@ class PIDControl(QWidget):
             float(self.Gl.text()),
         )
 
-
 class SamplerControl(QWidget):
     def __init__(self, manager, ch=0):
         super().__init__()
@@ -271,11 +327,10 @@ class SamplerControl(QWidget):
     def sample(self, gap=1 * ms, num=100):
         raise NotImplementedError
 
-
 class SingleChannelSUServo(QWidget):
     """Class to control a single given SUServo channel"""
 
-    def __init__(self, manager, channel=0):
+    def __init__(self, manager, boostermanager, channel=0):
         # manager : SUServoManager
         QWidget.__init__(self)
         self.manager = manager
@@ -309,7 +364,7 @@ class SingleChannelSUServo(QWidget):
         top.addStretch()
 
         # Channel name
-        channelsMap = ["Lock", "MOT", "IMG", "PUMP", "852 X", "852 Y", "CDT 1", "CDT 2"]
+        channelsMap = ["LOCK", "MOT", "IMG", "PUMP", "852 X", "852 Y", "CDT 1", "CDT 2"]
         name = QLabel(f"Ch {channel} - ({channelsMap[channel]})")
         name.setStyleSheet("font: bold 12pt")
         top.addWidget(name)
@@ -317,27 +372,28 @@ class SingleChannelSUServo(QWidget):
         vbox.addLayout(top)
 
         # Initialize tab screen
-        tabs = QTabWidget()
+        self.tabs = QTabWidget()
 
         # DDS
         freq = DDSControl(self.manager, ch=channel, minimum=0.0, maximum=400.0)
-        tabs.addTab(freq, "DDS")
+        self.tabs.addTab(freq, "DDS")
 
         # PID
         pid = PIDControl(self.manager, ch=channel)
-        tabs.addTab(pid, "PID")
+        self.tabs.addTab(pid, "PID")
 
-        # GRAPH
-        # TODO: Add graphing functionality
-        scope = QLabel("")
-        tabs.addTab(scope, "Scope")
+        # Booster
+        self.booster = BoosterControl(boostermanager, self.booster_tripped, ch=channel)
+        self.tabs.addTab(self.booster, "Booster")
 
-        vbox.addWidget(tabs)
+        vbox.addWidget(self.tabs)
+
+    def booster_tripped(self):
+        self.tabs.setCurrentIndex(2)
 
     def get_widget(self):
         """Return the widgets to the main app"""
         return self.groupbox
-
 
 class SingleChannelMirny(QWidget):
     """Class to control a single given Mirny channel
@@ -403,13 +459,13 @@ class SingleChannelMirny(QWidget):
         """Return the widgets to the main app"""
         return self.groupbox
 
-
 class SUServoGUI(QWidget):  # {{{
     def __init__(self, experiment, core, suservo, suservo_chs):
         super().__init__()
         self.setGeometry(self.x(), self.y(), self.minimumWidth(), self.minimumHeight())
         self.manager = SUServoManager(experiment, core, suservo, suservo_chs)
-        self.ch = [SingleChannelSUServo(self.manager, i) for i in range(8)]
+        self.booster = BoosterTelemetry(self.update_booster)
+        self.ch = [SingleChannelSUServo(self.manager, self.booster, i) for i in range(8)]
 
         self.setWindowTitle("SUServo GUI")
         layout = QVBoxLayout()
@@ -451,6 +507,8 @@ class SUServoGUI(QWidget):  # {{{
             return 1
         return super().eventFilter(obj, event)
 
+    def update_booster(self, ch, data):
+        self.ch[ch].booster.update(json.loads(data))
 
 # }}}
 class MirnyGUI(QWidget):
