@@ -163,7 +163,7 @@ class BoosterControl(QWidget):
         super().__init__()
         self.manager = manager
         self.set_tab = set_tab
-        self.tripped = False
+        self.tripped = 'unknown'
         layout = QVBoxLayout()
 
         # labels
