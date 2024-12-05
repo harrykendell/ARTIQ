@@ -159,10 +159,10 @@ class DDSControl(QWidget):
         self.manager.set_freq(self.ch, val)
 
 class BoosterControl(QWidget):
-    def __init__(self, manager, booster_tripped, ch=0):
+    def __init__(self, manager, set_tab, ch=0):
         super().__init__()
         self.manager = manager
-        self.booster_tripped = booster_tripped
+        self.set_tab = set_tab
         self.tripped = False
         layout = QVBoxLayout()
 
@@ -186,18 +186,13 @@ class BoosterControl(QWidget):
         layout.addLayout(pows)
 
         ref = QHBoxLayout()
-        ref.setAlignment(Qt.AlignCenter)
         carrow = QLabel("<b>↻</b>")
-        carrow.setToolTip("Reflected power")
         carrow.setStyleSheet("font-size: 20px")
         ref.addWidget(carrow)
-        layout.addLayout(ref)
-
-        ref2 = QHBoxLayout()
-        ref2.setAlignment(Qt.AlignCenter)
+        ref.setAlignment(Qt.AlignCenter)
         self.ref_power = QLabel("0 <b>dBm</b>")
-        ref2.addWidget(self.ref_power)
-        layout.addLayout(ref2)
+        ref.addWidget(self.ref_power)
+        layout.addLayout(ref)
 
         layout.addStretch()
         self.setLayout(layout)
@@ -208,12 +203,14 @@ class BoosterControl(QWidget):
         self.ref_power.setText(f"{data['reflected_power']:.1f}<b> dBm</b>")
 
         tripped = data["state"] != "Enabled"
-        if tripped:
-            self.status.setText(f"<b><font color='red'>{data['state']}</font></b>")
-            if not self.tripped:
-                self.booster_tripped()
-        else:
-            self.status.setText(data["state"])
+        if tripped != self.tripped:
+            if tripped:
+                self.status.setText(f"<b><font color='red'>{data['state']}</font></b>")
+                self.set_tab(2)
+            else:
+                self.status.setText(f"{data['state']}")
+                self.set_tab(0)
+
         self.tripped = tripped
 
 
@@ -383,13 +380,13 @@ class SingleChannelSUServo(QWidget):
         self.tabs.addTab(pid, "PID")
 
         # Booster
-        self.booster = BoosterControl(boostermanager, self.booster_tripped, ch=channel)
+        self.booster = BoosterControl(boostermanager, self.set_tab, ch=channel)
         self.tabs.addTab(self.booster, "Booster")
 
         vbox.addWidget(self.tabs)
 
-    def booster_tripped(self):
-        self.tabs.setCurrentIndex(2)
+    def set_tab(self, index):
+        self.tabs.setCurrentIndex(index)
 
     def get_widget(self):
         """Return the widgets to the main app"""
