@@ -7,7 +7,7 @@
 #      [-] add a & to the end of the call to run as a background process
 ##########################################################################################
 
-import sys, json
+import sys, os, json
 from PyQt5.QtWidgets import (
     QWidget,
     QGroupBox,
@@ -25,9 +25,10 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QDoubleValidator, QIntValidator, QIcon
-from repository.utils.SUServoManager import SUServoManager
-from repository.utils.MirnyManager import MirnyManager
-from repository.utils.boosterTelemetry import BoosterTelemetry
+sys.path.append(os.path.abspath(os.path.dirname(__file__)))
+from utils.SUServoManager import SUServoManager
+from utils.MirnyManager import MirnyManager
+from utils.boosterTelemetry import BoosterTelemetry
 
 from artiq.experiment import *
 from artiq.language import MHz, ms
