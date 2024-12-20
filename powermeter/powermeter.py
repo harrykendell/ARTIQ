@@ -1,11 +1,15 @@
 from ThorlabsPM100 import ThorlabsPM100
 from usbtmc import USBTMC
 
+import argparse
+
 import sys, os
 import numpy as np
 from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QWidget, QLabel, QSpinBox
 from PyQt5.QtCore import QTimer
 from PyQt5.QtGui import QIcon
+import pyqtgraph as pg
+
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from time import sleep
@@ -35,9 +39,9 @@ class PlotCanvas(FigureCanvas):
         self.draw()
 
 class MainWindow(QMainWindow):
-    def __init__(self):
+    def __init__(self, device):
         super().__init__()
-        self.setWindowTitle('Power Meter GUI')
+        self.setWindowTitle(f'Power Meter GUI ({device})')
         self.setGeometry(100, 100, 800, 600)
 
         self.plot_canvas = PlotCanvas(self)
@@ -70,15 +74,15 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(container)
         # check if the path exists and if not retry with exponential backoff
         backoff = 1
-        while not os.path.exists('/dev/usbtmc1'):
-            print("Device not found, retrying in %d seconds..." % backoff)
+        while not os.path.exists(device):
+            print(f"Device  {device} not found, retrying in {backoff} seconds...")
             sleep(backoff)
             backoff *= 2
             if backoff > 60:
                 print("Device not found, exiting...")
                 sys.exit(1)
 
-        inst = USBTMC('/dev/usbtmc1')
+        inst = USBTMC(device)
         self.power_meter = ThorlabsPM100(inst = inst)
         self.power_meter.system.beeper.immediate()
 
@@ -97,7 +101,7 @@ class MainWindow(QMainWindow):
         self.power_meter.sense.average.count = 10
 
         # set windows title
-        self.setWindowTitle(f'Power Meter Readings ({self.power_meter.sense.correction.wavelength} nm)')
+        self.setWindowTitle(f'Power Meter Readings ({device} @ {self.power_meter.sense.correction.wavelength} nm)')
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.update)
         self.timer.start(100)  # Update every .1 seconds
@@ -110,7 +114,7 @@ class MainWindow(QMainWindow):
         self.mean_label.setText(f'Mean: {np.mean(data)}')
         self.std_label.setText(f'Std Dev: {np.std(data)}')
 
-if __name__ == '__main__':
+def launchWindow(device):
     app = QApplication(sys.argv)
     # Set a nice icon
     app.setWindowIcon(
@@ -118,6 +122,39 @@ if __name__ == '__main__':
     )
     app.setStyle("Fusion")
     app.setApplicationName("Power Meter")
-    main_window = MainWindow()
-    main_window.show()
+
+    window = MainWindow(device)
+    window.show()
     sys.exit(app.exec_())
+
+if __name__ == '__main__':
+    # parse command line arguments for the device path
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--all", help="Display all devices", action="store_true")
+    parser.add_argument("--device", help="USB device path", default="/dev/usbtmc1")
+    args = parser.parse_args()
+
+    if args.all:
+        # spin off separate processes for each device in /dev/usbtmc*to increase robustness
+        from multiprocessing import Process
+        processes = {}
+
+        # start the main loop
+        while True:
+            # check if any of the processes have finished and if so, remove them
+            for device in list(processes.keys()):
+                if not processes[device].is_alive():
+                    print(f"Process for {device} has finished")
+                    del processes[device]
+
+            # start any new powermeters
+            for device in os.listdir("/dev"):
+                if "usbtmc" in device and device not in processes:
+                    print(f"Starting process for {device}")
+                    processes[device] = Process(target=launchWindow, args=(f"/dev/{device}",))
+                    processes[device].start()
+
+            sleep(1)
+    else:
+        print(f"Starting process for {args.device}")
+        launchWindow(args.device)
