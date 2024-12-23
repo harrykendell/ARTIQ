@@ -103,7 +103,8 @@ class PowerMeterPlot(QWidget):
         self.region.setRegion([minX, maxX])
 
         self.current_power.setText(f"{self.powerData[-1]*1e3:.2f} mW")
-        self.numvals.setText(f"# readings: {numvals}")
+        # format with commas
+        self.numvals.setText(f"# readings: {numvals:,}")
         self.framecnt.update()
 
     # callback to reset region
@@ -169,8 +170,8 @@ class PowerMeterPlot(QWidget):
     def set_wavelength(self, wavelength):
         if self.pm is not None:
             self.pm.sense.correction.wavelength = wavelength
-            self.wavelength.setMinimum(self.pm.sense.correction.minimum_wavelength)
-            self.wavelength.setMaximum(self.pm.sense.correction.maximum_wavelength)
+            self.wavelength.setMinimum(int(self.pm.sense.correction.minimum_wavelength))
+            self.wavelength.setMaximum(int(self.pm.sense.correction.maximum_wavelength))
         else:
             print("Cannot set wavelength without a powermeter")
 
