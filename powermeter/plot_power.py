@@ -7,7 +7,7 @@ import pyqtgraph as pg
 from ThorlabsPM100 import ThorlabsPM100
 from usbtmc import USBTMC
 
-from PyQt5.QtWidgets import (
+from PyQt6.QtWidgets import (
     QApplication,
     QWidget,
     QVBoxLayout,
@@ -18,28 +18,29 @@ from PyQt5.QtWidgets import (
     QSpinBox,
     QComboBox,
 )
-from pyqtgraph.Qt import QtCore
-from PyQt5.QtGui import QIcon, QPalette, QColor, QFontDatabase
-from PyQt5.QtCore import Qt
+from PyQt6.QtGui import QIcon, QPalette, QColor, QFontDatabase
+from PyQt6.QtCore import Qt
+import PyQt6.QtCore as QtCore
+from PyQt6.QtCore import pyqtSignal as Signal
 
 
 # Now use a palette to switch to dark colors:
 palette = QPalette()
-palette.setColor(QPalette.Window, QColor(53, 53, 53))
-palette.setColor(QPalette.WindowText, Qt.white)
-palette.setColor(QPalette.Base, QColor(25, 25, 25))
-palette.setColor(QPalette.AlternateBase, QColor(53, 53, 53))
-palette.setColor(QPalette.ToolTipBase, Qt.black)
-palette.setColor(QPalette.ToolTipText, Qt.white)
-palette.setColor(QPalette.Text, Qt.white)
-palette.setColor(QPalette.Button, QColor(53, 53, 53))
-palette.setColor(QPalette.ButtonText, Qt.white)
-palette.setColor(QPalette.BrightText, Qt.red)
-palette.setColor(QPalette.Link, QColor(42, 130, 218))
-palette.setColor(QPalette.Highlight, QColor(42, 130, 218))
-palette.setColor(QPalette.HighlightedText, Qt.black)
+palette.setColor(QPalette.ColorRole.Window, QColor(53, 53, 53))
+palette.setColor(QPalette.ColorRole.WindowText, QColor(255, 255, 255))
+palette.setColor(QPalette.ColorRole.Base, QColor(25, 25, 25))
+palette.setColor(QPalette.ColorRole.AlternateBase, QColor(53, 53, 53))
+palette.setColor(QPalette.ColorRole.ToolTipBase, QColor(0, 0, 0))
+palette.setColor(QPalette.ColorRole.ToolTipText, QColor(255, 255, 255))
+palette.setColor(QPalette.ColorRole.Text, QColor(255, 255, 255))
+palette.setColor(QPalette.ColorRole.Button, QColor(53, 53, 53))
+palette.setColor(QPalette.ColorRole.ButtonText, QColor(255, 255, 255))
+palette.setColor(QPalette.ColorRole.BrightText, QColor(255, 0, 0))
+palette.setColor(QPalette.ColorRole.Link, QColor(42, 130, 218))
+palette.setColor(QPalette.ColorRole.Highlight, QColor(42, 130, 218))
+palette.setColor(QPalette.ColorRole.HighlightedText, QColor(0, 0, 0))
 class FrameCounter(QtCore.QObject):
-    sigFpsUpdate = QtCore.Signal(object)
+    sigFpsUpdate = Signal(object)
 
     def __init__(self, interval=1000):
         super().__init__()
@@ -238,7 +239,7 @@ class PowerMeterPlot(QWidget):
 
         # data
         self.current_power = QLabel("W")
-        font = QFontDatabase.systemFont(QFontDatabase.FixedFont)
+        font = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
         font.setPointSize(60)
         font.setBold(True)
         self.current_power.setFont(font)
@@ -270,7 +271,7 @@ class PowerMeterPlot(QWidget):
         main.addWidget(self.samplerate, 1, 1)
         main.addWidget(QLabel("Averaging:"), 2, 0)
         main.addWidget(self.average, 2, 1)
-        main.addWidget(self.current_power, 0, 2, 4, 1,Qt.AlignCenter)
+        main.addWidget(self.current_power, 0, 2, 4, 1,Qt.AlignmentFlag.AlignCenter)
         main.addWidget(self.startstop, 3, 0)
         main.addWidget(self.reset, 3, 1)
 
@@ -324,7 +325,7 @@ def launchWindow(device):
 
     window = PowerMeterPlot(powermeter=power_meter)
     window.show()
-    sys.exit(app.exec_())
+    sys.exit(app.exec())
 
 def init_powermeter(device):
     # check if the path exists and if not retry with exponential backoff
