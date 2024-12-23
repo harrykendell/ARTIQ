@@ -19,7 +19,7 @@ from PyQt5.QtWidgets import (
     QComboBox,
 )
 from pyqtgraph.Qt import QtCore
-from PyQt5.QtGui import QIcon, QPalette, QColor, QFontDatabase
+from PyQt5.QtGui import QIcon, QPalette, QColor
 from PyQt5.QtCore import Qt
 
 
