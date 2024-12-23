@@ -19,7 +19,7 @@ from PyQt5.QtWidgets import (
     QComboBox,
 )
 from pyqtgraph.Qt import QtCore
-from PyQt5.QtGui import QIcon, QPalette, QColor
+from PyQt5.QtGui import QIcon, QPalette, QColor, QFontDatabase
 from PyQt5.QtCore import Qt
 
 
@@ -238,6 +238,10 @@ class PowerMeterPlot(QWidget):
 
         # data
         self.current_power = QLabel("W")
+        font = QFontDatabase.systemFont(QFontDatabase.FixedFont)
+        font.setPointSize(60)
+        font.setBold(True)
+        self.current_power.setFont(font)
         self.reset = QPushButton("Reset")
         def reset():
             self.timeData = []
