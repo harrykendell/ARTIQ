@@ -238,10 +238,6 @@ class PowerMeterPlot(QWidget):
 
         # data
         self.current_power = QLabel("W")
-        font = QFontDatabase.systemFont(QFontDatabase.FixedFont)
-        font.setPointSize(60)
-        font.setBold(True)
-        self.current_power.setFont(font)
         self.reset = QPushButton("Reset")
         def reset():
             self.timeData = []
