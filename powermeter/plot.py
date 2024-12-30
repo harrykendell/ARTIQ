@@ -419,7 +419,7 @@ class PowerMeterTracker(QMainWindow):
                 if item.checkState() == Qt.CheckState.Checked:
                     if item.data is None:
                         # item.data = launchPowerMeterPlot(f"/dev/{dev}")
-                        item.data = mp.Process(target=forkPlot, args=(f"/dev/{dev}",))
+                        item.data = mp.Process(target=forkPlot, args=(dev,))
                         print(f"Starting process for {dev}")
                         item.data.start()
                     elif not item.data.is_alive():
