@@ -20,6 +20,7 @@ from PyQt6.QtWidgets import (
     QLabel,
     QSpinBox,
     QComboBox,
+    QFileDialog,
 )
 from PyQt6.QtGui import QIcon, QFontDatabase
 import PyQt6.QtCore as QtCore
@@ -87,8 +88,8 @@ class PowerMeterPlot(QWidget):
         # only plot at max 1000 points so downsample them with the relevant stride
         numvals = len(self.timeData)
         stride = numvals // 1000 + 1
-        zoom = (self.timeData[-1] - self.timeData[0]) / (maxX - minX)
-        stride2 = int(stride / (zoom + 0.001)) + 1
+        zoom = (self.timeData[-1] - self.timeData[0]) / (maxX - minX + 0.000001)
+        stride2 = int(stride / (zoom + 0.000001)) + 1
         self.maincurve.setData(self.timeData[::stride2], self.powerData[::stride2])
         self.timecurve.setData(self.timeData[::stride], self.powerData[::stride])
 
@@ -247,17 +248,10 @@ class PowerMeterPlot(QWidget):
         self.reset.clicked.connect(lambda: reset())
 
         # layout
-        """
-        wavelength : val     |
-        ---------------------      Current Power
-        sample rate : val    | 
-        --------------------------------------------
-        averaging : val      | Stop/Start | Reset
-        """
         main = QGridLayout()
-        main.setColumnStretch(2, 5)
         main.setColumnStretch(0, 2)
         main.setColumnStretch(1, 1)
+        main.setColumnStretch(2, 5)
         main.addWidget(QLabel("Wavelength:"), 0, 0)
         main.addWidget(self.wavelength, 0, 1)
         main.addWidget(QLabel("Sample rate:"), 1, 0)
@@ -291,10 +285,34 @@ class PowerMeterPlot(QWidget):
         statsHBox = QHBoxLayout()
         self.fps = QLabel("0 Hz")
         self.fps.setStyleSheet("QLabel { color : gray; }")
-        statsHBox.addWidget(self.fps)
-        statsHBox.addStretch()
+
+        self.save = QPushButton("Save")
+
+        def save(self):
+            filename = f"power_{self.pm.sense.correction.wavelength}nm_{time()}.csv"
+            options = QFileDialog.Option.DontUseNativeDialog
+            fileName, _ = QFileDialog.getSaveFileName(
+                self, f"Save File", filename, "All Files(*);;Text Files(*.txt)", options=options
+            )
+            if fileName:
+                with open(fileName, "w") as f:
+                    f.write("Time (s), Power (W)\n")
+                    for t, p in zip(self.timeData, self.powerData):
+                        f.write(f"{t}, {p}\n")
+                self.fileName = fileName
+                self.setWindowTitle(str(os.path.basename(fileName)) + " - Notepad Alpha[*]")
+
+        self.save.clicked.connect(lambda: save(self))
+        self.save.setFlat(True)
+        self.save.setStyleSheet("color: gray; font-weight: bold")
+
         self.numvals = QLabel("# readings: 0")
         self.numvals.setStyleSheet("QLabel { color : gray; }")
+
+        statsHBox.addWidget(self.fps)
+        statsHBox.addStretch()
+        statsHBox.addWidget(self.save)
+        statsHBox.addStretch()
         statsHBox.addWidget(self.numvals)
         self.layout.addLayout(statsHBox)
 
@@ -351,19 +369,44 @@ class PowerMeterTracker(QMainWindow):
         self.initUI()
 
     def initUI(self):
-        # main list with a start/stop button on each PM listed in /dev/usbtmc*
-        # a shutdown button to close all windows
-        # a timer to keep the active powermeters up to date with the selection in qlistwidget
 
         self.setWindowTitle("Power Meter Tracker")
+        self.setGeometry(self.x(), self.y(), 300, 50)
 
         self.listWidget = QListWidget(self)
         self.shutdownButton = QPushButton("Shutdown", self)
+        self.shutdownButton.setStyleSheet("color: red; font-weight: bold")
         self.shutdownButton.clicked.connect(self.shutdown_program)
+        # automatically launch all powermeters
+        self.autoButton = QPushButton("Auto")
+        self.autoButton.setStyleSheet(
+            "background-color: green; color: white; font-weight: bold"
+        )
+
+        def setauto():
+            self.auto = not self.auto
+            if not self.autoButton.isChecked():
+                self.autoButton.setStyleSheet("color: green; font-weight: bold")
+                self.autoButton.setText("Manual")
+            else:
+                self.autoButton.setStyleSheet(
+                    "background-color: green; color: white; font-weight: bold"
+                )
+                self.autoButton.setText("Auto")
+
+        self.autoButton.setCheckable(True)
+        self.autoButton.setChecked(True)
+        self.auto = True
+        self.autoButton.clicked.connect(setauto)
 
         layout = QVBoxLayout()
         layout.addWidget(self.listWidget)
-        layout.addWidget(self.shutdownButton)
+
+        hbox = QHBoxLayout()
+        # 1 : 3 ratio of auto to shutdown button
+        hbox.addWidget(self.autoButton, 1)
+        hbox.addWidget(self.shutdownButton, 3)
+        layout.addLayout(hbox)
 
         container = QWidget()
         container.setLayout(layout)
@@ -371,7 +414,7 @@ class PowerMeterTracker(QMainWindow):
 
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.main_loop)
-        self.timer.start(1000)
+        self.timer.start(250)
 
     def shutdown_program(self):
         print("Shutting down program")
@@ -379,26 +422,6 @@ class PowerMeterTracker(QMainWindow):
             if item.data is not None:
                 item.data.kill()
         QApplication.instance().quit()
-
-    class PowerMeterListItem(QListWidgetItem):
-        def __init__(self, device, parent=None):
-            super().__init__(parent)
-
-            self.setText(self.device)
-            self.setFlags(self.flags() | Qt.ItemFlag.ItemIsUserCheckable)
-            self.setCheckState(Qt.CheckState.Unchecked)
-
-            self.previous_state = self.checkState()
-
-        def start(self):
-            self.window = launchPowerMeterPlot(self.device)
-            self.window.show()
-
-        def stop(self):
-            self.window.close()
-
-    def item_state_changed(self, state):
-        print("Item state changed")
 
     def main_loop(self):
         def add_device(dev):
@@ -408,29 +431,34 @@ class PowerMeterTracker(QMainWindow):
             item.setCheckState(Qt.CheckState.Unchecked)
             item.data = None
             self.listWidget.addItem(item)
-        
+
         # keep the active powermeters up to date with the selection in qlistwidget
         for dev in glob.glob("/dev/usbtmc*"):
             # make sure all plugged in powermeters are listed
             items = self.listWidget.findItems(dev, Qt.MatchFlag.MatchExactly) 
-            if items:
-                # if the powermeter is checked, start it
-                item = items[0]
-                if item.checkState() == Qt.CheckState.Checked:
-                    if item.data is None:
-                        # item.data = launchPowerMeterPlot(f"/dev/{dev}")
-                        item.data = mp.Process(target=forkPlot, args=(dev,))
-                        print(f"Starting process for {dev}")
-                        item.data.start()
-                    elif not item.data.is_alive():
-                        item.data.kill()
-                        item.data=None
-                        item.setCheckState(Qt.CheckState.Unchecked)
-                elif item.data is not None:
-                    item.data.kill()
-                    item.data = None
-            else: # if the powermeter is not listed, add it
+            if not items:
                 add_device(dev)
+                continue
+
+            # if the powermeter is checked, start it
+            item = items[0]
+            if item.checkState() == Qt.CheckState.Checked:
+                if item.data is None: # someone just checked it
+                    item.data = mp.Process(target=forkPlot, args=(dev,))
+                    print(f"Starting process for {dev}")
+                    item.data.start()
+                elif not item.data.is_alive(): # someone killed the plot window
+                    item.data.kill()
+                    item.data=None
+                    item.setCheckState(Qt.CheckState.Unchecked)
+                    # if self.auto: # force restart in auto mode
+                    #     item.setCheckState(Qt.CheckState.Checked)
+            elif item.data is not None: # someone just unchecked it
+                item.data.kill()
+                item.data = None
+            else: # its unchecked and not running
+                if self.auto: # force startup in auto mode
+                    item.setCheckState(Qt.CheckState.Checked)
 
         # remove any powermeters that are not plugged in
         for i in range(self.listWidget.count()):
@@ -441,8 +469,7 @@ class PowerMeterTracker(QMainWindow):
 if __name__ == "__main__":
     mp.set_start_method("spawn")
     parser = argparse.ArgumentParser()
-    parser.add_argument("--all", help="Display all devices", action="store_true")
-    parser.add_argument("--device", help="USB device path", default="/dev/usbtmc1")
+    parser.add_argument("--device", help="USB device path")
     args = parser.parse_args()
 
     app = QApplication([])
@@ -450,11 +477,11 @@ if __name__ == "__main__":
 
     app.setStyle("Fusion")
 
-    if args.all:
+    if args.device:
+        launchPowerMeterPlot(args.device)
+    else:
         window = PowerMeterTracker()
         window.show()
         window.setWindowIcon(QIcon("/usr/share/icons/elementary-xfce/apps/128/invest-applet.png"))
-    else:
-        launchPowerMeterPlot(args.device)
 
     app.exec()
