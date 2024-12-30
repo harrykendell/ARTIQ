@@ -1,7 +1,7 @@
 import os, glob, sys
 from time import perf_counter,sleep,time
 import argparse
-import serial.tools.list_ports
+from serial.tools.list_ports import comports
 import multiprocessing as mp
 import pyqtgraph as pg
 
@@ -412,7 +412,7 @@ class PowerMeterTracker(QMainWindow):
 
         # keep the active powermeters up to date with the selection in qlistwidget
         if sys.platform.startswith('win'):
-            ports = ['COM%s' % (i + 1) for i in range(256)]
+            ports = comports()
         elif sys.platform.startswith('linux') or sys.platform.startswith('cygwin'):
             # this excludes your current terminal "/dev/tty"
             ports = glob.glob("/dev/usbtmc*")
