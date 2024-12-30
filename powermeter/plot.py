@@ -412,7 +412,7 @@ class PowerMeterTracker(QMainWindow):
 
         # keep the active powermeters up to date with the selection in qlistwidget
         if sys.platform.startswith('win'):
-            ports = comports()
+            ports = [p.usb_description() for p in comports()]
         elif sys.platform.startswith('linux') or sys.platform.startswith('cygwin'):
             # this excludes your current terminal "/dev/tty"
             ports = glob.glob("/dev/usbtmc*")
