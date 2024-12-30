@@ -1,6 +1,7 @@
-import os, glob
+import os, glob, sys
 from time import perf_counter,sleep,time
 import argparse
+import serial.tools.list_ports
 import multiprocessing as mp
 import pyqtgraph as pg
 
@@ -408,9 +409,14 @@ class PowerMeterTracker(QMainWindow):
             item.setCheckState(Qt.CheckState.Unchecked)
             item.data = None
             self.listWidget.addItem(item)
-        
+
         # keep the active powermeters up to date with the selection in qlistwidget
-        for dev in glob.glob("/dev/usbtmc*"):
+        if sys.platform.startswith('win'):
+            ports = ['COM%s' % (i + 1) for i in range(256)]
+        elif sys.platform.startswith('linux') or sys.platform.startswith('cygwin'):
+            # this excludes your current terminal "/dev/tty"
+            ports = glob.glob("/dev/usbtmc*")
+        for dev in ports:
             # make sure all plugged in powermeters are listed
             items = self.listWidget.findItems(dev, Qt.MatchFlag.MatchExactly) 
             if items:
