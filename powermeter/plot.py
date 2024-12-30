@@ -1,4 +1,4 @@
-import os
+import os, glob
 from time import perf_counter,sleep,time
 import argparse
 import multiprocessing as mp
@@ -409,11 +409,8 @@ class PowerMeterTracker(QMainWindow):
             item.data = None
             self.listWidget.addItem(item)
         
-        
         # keep the active powermeters up to date with the selection in qlistwidget
-        for dev in os.listdir("/dev"):
-            if not "usbtmc" in dev:
-                continue
+        for dev in glob.glob("/dev/usbtmc*"):
             # make sure all plugged in powermeters are listed
             items = self.listWidget.findItems(dev, Qt.MatchFlag.MatchExactly) 
             if items:
@@ -434,6 +431,12 @@ class PowerMeterTracker(QMainWindow):
                     item.data = None
             else: # if the powermeter is not listed, add it
                 add_device(dev)
+
+        # remove any powermeters that are not plugged in
+        for i in range(self.listWidget.count()):
+            item = self.listWidget.item(i)
+            if not os.path.exists(item.text()):
+                self.listWidget.takeItem(i)
 
 if __name__ == "__main__":
     mp.set_start_method("spawn")
