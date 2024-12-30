@@ -1,6 +1,7 @@
 import sys, os
 from time import perf_counter,sleep,time
 import argparse
+from multiprocessing import Process
 import numpy as np
 import pyqtgraph as pg
 
@@ -8,37 +9,24 @@ from ThorlabsPM100 import ThorlabsPM100
 from usbtmc import USBTMC
 
 from PyQt6.QtWidgets import (
+    QMainWindow,
     QApplication,
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
     QGridLayout,
+    QListWidget,
+    QListWidgetItem,
     QPushButton,
     QLabel,
     QSpinBox,
     QComboBox,
+    QStyle,
 )
-from PyQt6.QtGui import QIcon, QPalette, QColor, QFontDatabase
-from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QIcon, QFontDatabase
 import PyQt6.QtCore as QtCore
-from PyQt6.QtCore import pyqtSignal as Signal
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal as Signal
 
-
-# Now use a palette to switch to dark colors:
-palette = QPalette()
-palette.setColor(QPalette.ColorRole.Window, QColor(53, 53, 53))
-palette.setColor(QPalette.ColorRole.WindowText, QColor(255, 255, 255))
-palette.setColor(QPalette.ColorRole.Base, QColor(25, 25, 25))
-palette.setColor(QPalette.ColorRole.AlternateBase, QColor(53, 53, 53))
-palette.setColor(QPalette.ColorRole.ToolTipBase, QColor(0, 0, 0))
-palette.setColor(QPalette.ColorRole.ToolTipText, QColor(255, 255, 255))
-palette.setColor(QPalette.ColorRole.Text, QColor(255, 255, 255))
-palette.setColor(QPalette.ColorRole.Button, QColor(53, 53, 53))
-palette.setColor(QPalette.ColorRole.ButtonText, QColor(255, 255, 255))
-palette.setColor(QPalette.ColorRole.BrightText, QColor(255, 0, 0))
-palette.setColor(QPalette.ColorRole.Link, QColor(42, 130, 218))
-palette.setColor(QPalette.ColorRole.Highlight, QColor(42, 130, 218))
-palette.setColor(QPalette.ColorRole.HighlightedText, QColor(0, 0, 0))
 class FrameCounter(QtCore.QObject):
     sigFpsUpdate = Signal(object)
 
@@ -63,13 +51,13 @@ class FrameCounter(QtCore.QObject):
         self.count = 0
         self.sigFpsUpdate.emit(fps)
 
-
 class PowerMeterPlot(QWidget):
 
-    def __init__(self, powermeter: ThorlabsPM100 = None):
+    def __init__(self, powermeter: ThorlabsPM100 = None, device: str = None):
         super().__init__()
 
         self.pm = powermeter
+        self.device = device
 
         self.timeData = []
         self.powerData = []
@@ -87,6 +75,14 @@ class PowerMeterPlot(QWidget):
                 maxX = now
             elif maxX >= self.timeData[-1]:
                 maxX = now
+
+        # check if we can read from pm and if not stop the timer
+        try:
+            self.pm.read
+        except:
+            self.timer.stop()
+            self.startstop.setStyleSheet("background-color: red; color: white; font-weight: bold")
+            self.startstop.setText("Disconnected")
 
         self.timeData.append(now)
         self.powerData.append(self.pm.read if self.pm is not None else np.random.rand())
@@ -126,7 +122,7 @@ class PowerMeterPlot(QWidget):
         maincurve = mainplot.plot(
             self.timeData,
             self.powerData,
-            pen=pg.mkPen("w", width=2),
+            pen=pg.mkPen("k", width=2),
             autoDownsample=True,
             downsampleMethod="peak",
             clipToView=True,
@@ -151,7 +147,7 @@ class PowerMeterPlot(QWidget):
         self.timecurve = timeplot.plot(
             self.timeData,
             self.powerData,
-            pen=pg.mkPen("w", width=1),
+            pen=pg.mkPen("k", width=1),
             autoDownsample=True,
             downsampleMethod="peak",
             clipToView=True,
@@ -182,23 +178,24 @@ class PowerMeterPlot(QWidget):
             print("Cannot set average without a powermeter")
 
     def initUI(self):
-        self.setWindowTitle("Powermeter Plot")
+        self.setWindowTitle(f"Powermeter Plot ({self.device})")
         self.setGeometry(100, 100, 800, 600)
-        pg.setConfigOption("background", "#535353")
-        pg.setConfigOption("foreground", "#ffffff")
+        pg.setConfigOption("background", "#eeeeee")
+        pg.setConfigOption("foreground", "#000000")
         # pg.setConfigOptions(antialias=True)
 
         self.layout = QVBoxLayout()
         self.setLayout(self.layout)
-        self.setStyleSheet("color: white;")
+        # self.setStyleSheet("color: white;")
 
         # Wavelength
         self.wavelength = QSpinBox()
         self.wavelength.setMinimum(400)
         self.wavelength.setMaximum(1100)
-        self.wavelength.setValue(800)
+        self.wavelength.setValue(780)
         self.wavelength.setSuffix(" nm")
         self.wavelength.valueChanged.connect(self.set_wavelength)
+        self.set_wavelength(780)
 
         # sample rate
         self.samplerate = QComboBox()
@@ -248,8 +245,6 @@ class PowerMeterPlot(QWidget):
         def reset():
             self.timeData = []
             self.powerData = []
-            self.maincurve.setData(self.timeData, self.powerData)
-            self.timecurve.setData(self.timeData, self.powerData)
             self.current_power.setText("W")
             self.numvals.setText("# readings: 0")
         self.reset.clicked.connect(lambda: reset())
@@ -308,87 +303,181 @@ class PowerMeterPlot(QWidget):
 
         self.show()
 
-
-def launchWindow(device):
-    app = QApplication(sys.argv)
-    # Set a nice icon
-    app.setWindowIcon(
-        QIcon("/usr/share/icons/elementary-xfce/apps/128/invest-applet.png")
-    )
-    app.setStyle("Fusion")
-    app.setPalette(palette)
-    app.setApplicationName("Power Meter")
-
+def launchPowerMeterPlot(device):
     if device is not None:
-        power_meter = init_powermeter(device)
+        power_meter = initPowermeter(device)
     else:
         power_meter = None
 
-    window = PowerMeterPlot(powermeter=power_meter)
+    window = PowerMeterPlot(powermeter=power_meter, device=device)
     window.show()
-    sys.exit(app.exec())
+    window.setWindowIcon(
+        QIcon("/usr/share/icons/elementary-xfce/apps/128/invest-applet.png")
+    )
+    return window
 
-def init_powermeter(device):
+def initPowermeter(device, backoff = True):
     # check if the path exists and if not retry with exponential backoff
     backoff = 1
     while not os.path.exists(device):
         print(f"Device  {device} not found, retrying in {backoff} seconds...")
-        sleep(backoff)
         backoff *= 2
-        if backoff > 60:
+        if backoff > 60 or not backoff:
             print("Device not found, exiting...")
-            sys.exit(1)
+            return
+        sleep(backoff)
 
     inst = USBTMC(device)
     power_meter = ThorlabsPM100(inst = inst)
     power_meter.system.beeper.immediate()
-
-    print("Measurement type :", power_meter.getconfigure)
-    print("Current value    :", power_meter.read)
-    print("Wavelength       :", power_meter.sense.correction.wavelength)
-    print("Power range limit:", power_meter.sense.power.dc.range.upper)
-    print("Set range auto...")
     power_meter.sense.power.dc.range.auto = "ON"
-    print("Set bandwidth to High")
     power_meter.input.pdiode.filter.lpass.state = 0
+    power_meter.sense.correction.wavelength = 780
 
     return power_meter
 
+
+class PowerMeterTracker(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.windows = {}
+        self.initUI()
+
+    def initUI(self):
+        # main list with a start/stop button on each PM listed in /dev/usbtmc*
+        # a shutdown button to close all windows
+        # a timer to keep the active powermeters up to date with the selection in qlistwidget
+
+        self.setWindowTitle("Power Meter Tracker")
+
+        self.listWidget = QListWidget(self)
+        self.shutdownButton = QPushButton("Shutdown", self)
+        self.shutdownButton.clicked.connect(self.shutdown_program)
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.listWidget)
+        layout.addWidget(self.shutdownButton)
+
+        container = QWidget()
+        container.setLayout(layout)
+        self.setCentralWidget(container)
+
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.main_loop)
+        self.timer.start(1000)
+
+    def shutdown_program(self):
+        print("Shutting down program")
+        QApplication.instance().quit()
+
+    class PowerMeterListItem(QListWidgetItem):
+        def __init__(self, device, parent=None):
+            super().__init__(parent)
+
+            self.setText(self.device)
+            self.setFlags(self.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            self.setCheckState(Qt.CheckState.Unchecked)
+
+            self.previous_state = self.checkState()
+
+        def start(self):
+            self.window = launchPowerMeterPlot(self.device)
+            self.window.show()
+
+        def stop(self):
+            self.window.close()
+
+    def item_state_changed(self, state):
+        print("Item state changed")
+
+    def main_loop(self):
+        # keep the active powermeters up to date with the selection in qlistwidget
+        for dev in os.listdir("/dev"):
+            if not "usbtmc" in dev:
+                continue
+            # make sure all plugged in powermeters are listed
+            if self.listWidget.findItems(dev, Qt.MatchFlag.MatchExactly):
+                # if the powermeter is checked, start it
+                item = self.listWidget.findItems(dev, Qt.MatchFlag.MatchExactly)[0]
+                if item.checkState() == Qt.CheckState.Checked:
+                    if item.data is None:
+                        item.data = launchPowerMeterPlot(f"/dev/{dev}")
+                    elif not item.data.isVisible():
+                        item.data=None
+                        item.setCheckState(Qt.CheckState.Unchecked)
+                elif item.data is not None:
+                    item.data.close()
+                    item.data = None
+            else:
+                item = QListWidgetItem()
+                item.setText(dev)
+                item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+                item.setCheckState(Qt.CheckState.Unchecked)
+                item.data = None
+                self.listWidget.addItem(item)
+
+
 if __name__ == "__main__":
-    # parse command line arguments for the device path
     parser = argparse.ArgumentParser()
     parser.add_argument("--all", help="Display all devices", action="store_true")
     parser.add_argument("--device", help="USB device path", default="/dev/usbtmc1")
     parser.add_argument("--fake", help="Use fake powermeter", action="store_true")
     args = parser.parse_args()
 
+    app = QApplication([])
+    app.setWindowIcon(QIcon("/usr/share/icons/elementary-xfce/apps/128/invest-applet.png"))
+    
+    app.setStyle("Fusion")
+
     if args.fake:
-        launchWindow(None)
+        launchPowerMeterPlot(None)
 
-    if args.all:
-        # spin off separate processes for each device in /dev/usbtmc*to increase robustness
-        from multiprocessing import Process
-
-        processes = {}
-
-        # start the main loop
-        while True:
-            # check if any of the processes have finished and if so, remove them
-            for device in list(processes.keys()):
-                if not processes[device].is_alive():
-                    print(f"Process for {device} has finished")
-                    del processes[device]
-
-            # start any new powermeters
-            for device in os.listdir("/dev"):
-                if "usbtmc" in device and device not in processes:
-                    print(f"Starting process for {device}")
-                    processes[device] = Process(
-                        target=launchWindow, args=(f"/dev/{device}",)
-                    )
-                    processes[device].start()
-
-            sleep(1)
+    elif args.all:
+        window = PowerMeterTracker()
+        window.show()
+        window.setWindowIcon(QIcon("/usr/share/icons/elementary-xfce/apps/128/invest-applet.png"))
     else:
         print(f"Starting process for {args.device}")
-        launchWindow(args.device)
+        launchPowerMeterPlot(args.device)
+
+    app.exec()
+
+
+# if __name__ == "__main__":
+#     # parse command line arguments for the device path
+#     parser = argparse.ArgumentParser()
+#     parser.add_argument("--all", help="Display all devices", action="store_true")
+#     parser.add_argument("--device", help="USB device path", default="/dev/usbtmc1")
+#     parser.add_argument("--fake", help="Use fake powermeter", action="store_true")
+#     args = parser.parse_args()
+
+#     if args.fake:
+#         launchPowerMeterPlot(None)
+
+#     if args.all:
+#         # spin off separate processes for each device in /dev/usbtmc*to increase robustness
+#         from multiprocessing import Process
+
+#         processes = {}
+
+#         # start the main loop
+#         while True:
+#             # check if any of the processes have finished and if so, remove them
+#             for device in list(processes.keys()):
+#                 if not processes[device].is_alive():
+#                     print(f"Process for {device} has finished")
+#                     del processes[device]
+
+#             # start any new powermeters
+#             for device in os.listdir("/dev"):
+#                 if "usbtmc" in device and device not in processes:
+#                     print(f"Starting process for {device}")
+#                     processes[device] = Process(
+#                         target=launchPowerMeterPlot, args=(f"/dev/{device}",)
+#                     )
+#                     processes[device].start()
+
+#             sleep(1)
+#     else:
+#         print(f"Starting process for {args.device}")
+#         launchPowerMeterPlot(args.device)
