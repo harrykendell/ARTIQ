@@ -357,6 +357,16 @@ class SingleChannelSUServo(QWidget):
             off_text="PID",
         )
         top.addWidget(self.pid_button)
+
+        if channel < 2:
+            self.shutter_button = Switch(
+                default=False,
+                turn_on=lambda: self.manager.open_shutter(channel),
+                turn_off=lambda: self.manager.close_shutter(channel),
+                on_text="OPEN",
+                off_text="CLOSED",
+            )
+            top.addWidget(self.shutter_button)
         # }}}
 
         top.addStretch()
@@ -458,10 +468,10 @@ class SingleChannelMirny(QWidget):
         return self.groupbox
 
 class SUServoGUI(QWidget):  # {{{
-    def __init__(self, experiment, core, suservo, suservo_chs):
+    def __init__(self, experiment, core, suservo, suservo_chs, shutters):
         super().__init__()
         self.setGeometry(self.x(), self.y(), self.minimumWidth(), self.minimumHeight())
-        self.manager = SUServoManager(experiment, core, suservo, suservo_chs)
+        self.manager = SUServoManager(experiment, core, suservo, suservo_chs, shutters)
         self.booster = BoosterTelemetry(self.update_booster)
         self.ch = [SingleChannelSUServo(self.manager, self.booster, i) for i in range(8)]
 
@@ -549,6 +559,7 @@ class ArtiqGUIExperiment(EnvExperiment):  # {{{
         self.suservo_chs = [self.get_device(f"suservo_ch{i}") for i in range(8)]
         self.mirny_chs = [self.get_device(f"mirny_ch{i}") for i in range(4)]
         self.almazny = [self.get_device(f"almazny_ch{i}") for i in range(4)]
+        self.shutters = [self.get_device("shutter_aom_2DMOT"), self.get_device("shutter_aom_3DMOT")]
 
     def run(self):
         self.init_kernel()
@@ -560,7 +571,7 @@ class ArtiqGUIExperiment(EnvExperiment):  # {{{
         app.setStyle("Fusion")
         app.setApplicationName("ARTIQ GUI")
 
-        screen = SUServoGUI(self, self.core, self.suservo, self.suservo_chs)
+        screen = SUServoGUI(self, self.core, self.suservo, self.suservo_chs, self.shutters)
         screen.show()
 
         screen2 = MirnyGUI(self, self.core, self.mirny_chs, self.almazny)
