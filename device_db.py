@@ -288,10 +288,22 @@ for i in range(3):
 
 # Aliases
 aliases = {
-    "suservo_aom_780_locking": "suservo_ch0",
-    "suservo_aom_780_MOT": "suservo_ch1",
-    "mirny_eom_780": "mirny_ch0",
-    "almazny_eom_780": "almazny_ch0",
+    # 780 MOT
+    "suservo_aom_LOCK": "suservo_ch0",
+    "suservo_aom_MOT": "suservo_ch1",
+    "suservo_aom_IMG": "suservo_ch2",
+    "suservo_aom_PUMP": "suservo_ch3",
+    "mirny_eom_repump": "mirny_ch0",
+    "almazny_eom_repump": "almazny_ch0",
+    "shutter_aom_2DMOT": "ttl0",
+    "shutter_aom_3DMOT": "ttl1",
+    # 852 Lattice
+    "suservo_aom_LATX": "suservo_ch4",
+    "suservo_aom_LATY": "suservo_ch5",
+    # 1064 Cross Dipole Trap
+    "suservo_aom_CDT1": "suservo_ch6",
+    "suservo_aom_CDT2": "suservo_ch7",
+    
 }
 
 
