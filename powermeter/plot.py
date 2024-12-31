@@ -326,7 +326,7 @@ class PowerMeterPlot(QWidget):
         self.show()
 
 def forkPlot(device):
-    app = pg.mkQApp("PowerMeter {device}")
+    app = pg.mkQApp(f"PowerMeter {device}")
     app.setWindowIcon(
         QIcon("/usr/share/icons/elementary-xfce/apps/128/invest-applet.png")
     )
@@ -370,8 +370,8 @@ class PowerMeterTracker(QMainWindow):
 
     def initUI(self):
 
-        self.setWindowTitle("Power Meter Tracker")
-        self.setGeometry(self.x(), self.y(), 300, 50)
+        self.setWindowTitle("PM100D")
+        self.setGeometry(self.x(), self.y(), 150, 50)
 
         self.listWidget = QListWidget(self)
         self.shutdownButton = QPushButton("Shutdown", self)
@@ -469,13 +469,11 @@ class PowerMeterTracker(QMainWindow):
 if __name__ == "__main__":
     mp.set_start_method("spawn")
 
-    app = QApplication([])
+    # app = QApplication([])
+    app = pg.mkQApp("PM100D")
     app.setWindowIcon(QIcon("/usr/share/icons/elementary-xfce/apps/128/invest-applet.png"))
-
     app.setStyle("Fusion")
 
     window = PowerMeterTracker()
     window.show()
-    window.setWindowIcon(QIcon("/usr/share/icons/elementary-xfce/apps/128/invest-applet.png"))
-
     app.exec()
