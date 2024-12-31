@@ -59,7 +59,7 @@ class SUServoManager:  # {{{
             [-10.0] * 8,
             [0.0] * 8,
             [i for i in range(8)],
-            [0] * 8,
+            [0] * 2,
         ]
         units = [
             None,
@@ -258,8 +258,11 @@ class SUServoManager:  # {{{
         self.suservo.set_config(enable=0)
 
         # shutters
-        for shutter in self.shutters:
-            shutter.off()
+        for shutter in range(len(self.shutters)):
+            if self.en_shutter[shutter]:
+                self.open_shutter(shutter)
+            else:
+                self.close_shutter(shutter)
 
         delay(10 * ms)
         self.experiment.set_dataset(

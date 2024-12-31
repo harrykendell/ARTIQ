@@ -357,16 +357,6 @@ class SingleChannelSUServo(QWidget):
             off_text="PID",
         )
         top.addWidget(self.pid_button)
-
-        if channel < 2:
-            self.shutter_button = Switch(
-                default=False,
-                turn_on=lambda: self.manager.open_shutter(channel),
-                turn_off=lambda: self.manager.close_shutter(channel),
-                on_text="OPEN",
-                off_text="CLOSED",
-            )
-            top.addWidget(self.shutter_button)
         # }}}
 
         top.addStretch()
@@ -493,6 +483,19 @@ class SUServoGUI(QWidget):  # {{{
         self.label.setStyleSheet("font: bold 14pt")
         hbox.addWidget(self.label)
         hbox.addStretch()
+
+        shutterlabel = QLabel("Shutters")
+        shutterlabel.setStyleSheet("font: bold 14pt")
+        hbox.addWidget(shutterlabel)
+        for ch,name in enumerate(["2DMOT", "3DMOT"]):
+            self.shutter_button = Switch(
+                default=self.manager.en_shutter[ch],
+                turn_on=lambda channel=ch: self.manager.open_shutter(channel),
+                turn_off=lambda channel=ch: self.manager.close_shutter(channel),
+                on_text=name,
+                off_text=name,
+            )
+            hbox.addWidget(self.shutter_button)
         layout.addLayout(hbox)
         # }}}
 
@@ -504,7 +507,7 @@ class SUServoGUI(QWidget):  # {{{
 
         # capture the keyboard numbers to enable/disable channels
         self.installEventFilter(self)
-    
+
     def eventFilter(self, obj, event):
         if event.type() == event.KeyPress and event.key() >= Qt.Key_0 and event.key() <= Qt.Key_7:
             # just click the button for the channel to avoid implementing any logic here
