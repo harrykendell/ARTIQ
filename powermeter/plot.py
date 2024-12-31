@@ -22,7 +22,7 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QFileDialog,
 )
-from PyQt6.QtGui import QIcon, QFontDatabase
+from PyQt6.QtGui import QIcon, QFontDatabase, QColor
 import PyQt6.QtCore as QtCore
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal as Signal
 
@@ -91,6 +91,7 @@ class PowerMeterPlot(QWidget):
         zoom = (self.timeData[-1] - self.timeData[0]) / (maxX - minX + 0.000001)
         stride2 = int(stride / (zoom + 0.000001)) + 1
         self.maincurve.setData(self.timeData[::stride2], self.powerData[::stride2])
+        self.maxline.setValue(max(self.powerData))
         self.timecurve.setData(self.timeData[::stride], self.powerData[::stride])
 
         self.current_power.setText(f"{self.powerData[-1]*1e3:.2f} mW")
@@ -128,7 +129,12 @@ class PowerMeterPlot(QWidget):
             skipFiniteCheck=True,
         )
 
-        return mainplot, maincurve
+        maxline = pg.InfiniteLine(
+            pos=0, angle=0, movable=False, pen=pg.mkPen(QColor(20,20,200,50),width=2)
+        )
+        mainplot.addItem(maxline)
+
+        return maxline, mainplot, maincurve
 
     def create_timeplot(self, mainplot):
         # total time series plot
@@ -265,7 +271,7 @@ class PowerMeterPlot(QWidget):
 
         self.layout.addLayout(main)
         # plot of power
-        self.mainplot, self.maincurve = self.create_mainplot()
+        self.maxline, self.mainplot, self.maincurve = self.create_mainplot()
         self.layout.addWidget(self.mainplot)
         self.timeplot, self.timecurve = self.create_timeplot(mainplot=self.mainplot)
         self.layout.addWidget(self.timeplot)
