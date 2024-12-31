@@ -93,12 +93,13 @@ class PowerMeterPlot(QWidget):
         self.maincurve.setData(self.timeData[::stride2], self.powerData[::stride2])
         self.timecurve.setData(self.timeData[::stride], self.powerData[::stride])
 
-        self.region.setBounds([self.timeData[0], self.timeData[-1]])
-        self.region.setRegion([minX, maxX])
-
         self.current_power.setText(f"{self.powerData[-1]*1e3:.2f} mW")
         # format with commas
         self.numvals.setText(f"# readings: {numvals:,}")
+
+        self.region.setBounds([self.timeData[0], self.timeData[-1]])
+        self.region.setRegion([minX, maxX])
+
         self.framecnt.update()
 
     # callback to reset region
@@ -176,7 +177,7 @@ class PowerMeterPlot(QWidget):
             print("Cannot set average without a powermeter")
 
     def initUI(self):
-        self.setWindowTitle(f"Powermeter Plot ({self.device})")
+        self.setWindowTitle(f"PowerMeter ({self.device})")
         self.setGeometry(100, 100, 800, 600)
         pg.setConfigOption("background", "#eeeeee")
         pg.setConfigOption("foreground", "#000000")
@@ -318,29 +319,22 @@ class PowerMeterPlot(QWidget):
 
         self.show()
 
-def launchPowerMeterPlot(device):
-    if device is not None:
-        power_meter = initPowermeter(device)
-    else:
-        power_meter = None
+def forkPlot(device):
+    app = pg.mkQApp("PowerMeter {device}")
+    app.setWindowIcon(
+        QIcon("/usr/share/icons/elementary-xfce/apps/128/invest-applet.png")
+    )
+    app.setStyle("Fusion")
+
+    power_meter = initPowermeter(device)
 
     window = PowerMeterPlot(powermeter=power_meter, device=device)
     window.show()
     window.setWindowIcon(
         QIcon("/usr/share/icons/elementary-xfce/apps/128/invest-applet.png")
     )
-    return window
 
-def forkPlot(device):
-    app = QApplication([])
-    app.setWindowIcon(
-        QIcon("/usr/share/icons/elementary-xfce/apps/128/invest-applet.png")
-    )
-    app.setStyle("Fusion")
-
-    launchPowerMeterPlot(device)
-
-    app.exec()
+    pg.exec()
 
 def initPowermeter(device, backoff = True):
     # check if the path exists and if not retry with exponential backoff
@@ -468,20 +462,14 @@ class PowerMeterTracker(QMainWindow):
 
 if __name__ == "__main__":
     mp.set_start_method("spawn")
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--device", help="USB device path")
-    args = parser.parse_args()
 
     app = QApplication([])
     app.setWindowIcon(QIcon("/usr/share/icons/elementary-xfce/apps/128/invest-applet.png"))
 
     app.setStyle("Fusion")
 
-    if args.device:
-        launchPowerMeterPlot(args.device)
-    else:
-        window = PowerMeterTracker()
-        window.show()
-        window.setWindowIcon(QIcon("/usr/share/icons/elementary-xfce/apps/128/invest-applet.png"))
+    window = PowerMeterTracker()
+    window.show()
+    window.setWindowIcon(QIcon("/usr/share/icons/elementary-xfce/apps/128/invest-applet.png"))
 
     app.exec()
