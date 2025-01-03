@@ -489,7 +489,7 @@ class SUServoGUI(QWidget):  # {{{
         hbox.addWidget(shutterlabel)
         for ch,name in enumerate(["2DMOT", "3DMOT"]):
             self.shutter_button = Switch(
-                default=self.manager.en_shutter[ch],
+                default=self.manager.en_shutters[ch],
                 turn_on=lambda channel=ch: self.manager.open_shutter(channel),
                 turn_off=lambda channel=ch: self.manager.close_shutter(channel),
                 on_text=name,

@@ -44,7 +44,7 @@ class SUServoManager:  # {{{
             "Is",
             "Gls",
             "sampler_chs",
-            "en_shutter",
+            "en_shutters",
         ]
         defaults = [
             1,
@@ -234,14 +234,14 @@ class SUServoManager:  # {{{
     @kernel
     def open_shutter(self, ch):
         """Enable a given shutter"""
-        self._mutate_and_set_int("en_shutter", self.en_outs, ch, 1)
+        self._mutate_and_set_int("en_shutters", self.en_shutters, ch, 1)
         self.core.break_realtime()
         self.shutters[ch].on()
 
     @kernel
     def close_shutter(self, ch):
         """Disable a given shutter"""
-        self._mutate_and_set_int("en_shutter", self.en_outs, ch, 0)
+        self._mutate_and_set_int("en_shutters", self.en_shutters, ch, 0)
         self.core.break_realtime()
         self.shutters[ch].off()
 
@@ -259,7 +259,7 @@ class SUServoManager:  # {{{
 
         # shutters
         for shutter in range(len(self.shutters)):
-            if self.en_shutter[shutter]:
+            if self.en_shutters[shutter]:
                 self.open_shutter(shutter)
             else:
                 self.close_shutter(shutter)
