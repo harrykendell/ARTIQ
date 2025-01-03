@@ -2,9 +2,9 @@
 # This script sets the PyQt5 environment variables that are missing in the Nix build.
 # Without these variables PyQt5 programs will crash unless explicitly hooked like artiq_dashboard.
 if [ ${_} != ${0} ]; then
-    # export QT_PLUGIN_PATH=$(find /nix/store -maxdepth 4 -mindepth 4 -wholename '/*/lib/qt-5.15.15/plugins' | paste -sd ":" -)
-    # export QT_XCB_GL_INTEGRATION=none
-    # unset XDG_SESSION_TYPE
+    export QT_PLUGIN_PATH=$(find /nix/store -maxdepth 4 -mindepth 4 -wholename '/*/lib/qt-5.15.15/plugins' | paste -sd ":" -)
+    export QT_XCB_GL_INTEGRATION=none
+    unset XDG_SESSION_TYPE
 
     # This avoids the error: qt.qpa.plugin: Could not find the Qt platform plugin "wayland" in ""
     export QT_QPA_PLATFORM=xcb
@@ -16,3 +16,6 @@ else
     echo -e "This script must be run with the dot space script syntax, as in \n${RED}. nix-fix-pyqt.sh${NC}"
     echo -e "Otherwise it cannot export environment variables into your shell"
 fi
+
+    python ./powermeter/plot.py &
+    artiq_session -d="-p=ndscan.dashboard_plugin"
