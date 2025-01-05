@@ -923,7 +923,7 @@ class Display(Group, with_metaclass(InstrumentMetaclass)):
         value = Argument(0, ["<value>"])
 
 
-class ThorlabsPM100(Generic, InstrumentCommand, with_metaclass(InstrumentMetaclass)):
+class PM100D(Generic, InstrumentCommand, with_metaclass(InstrumentMetaclass)):
     status = Status
     configure = Configure
     calibration = Calibration

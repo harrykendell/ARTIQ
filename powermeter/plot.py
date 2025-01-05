@@ -3,7 +3,11 @@ from time import perf_counter, time
 import multiprocessing as mp
 import pyqtgraph as pg
 
-from ThorlabsPM100 import ThorlabsPM100
+# import depending on windows or linux
+if os.name == "nt":
+    from PM100_Windows import PM100D
+else:
+    from PM100_Linux import PM100D
 from usbtmc import USBTMC
 
 from PyQt6.QtWidgets import (
@@ -53,7 +57,7 @@ class FrameCounter(QtCore.QObject):
 
 class PowerMeterPlot(QWidget):
 
-    def __init__(self, powermeter: ThorlabsPM100 = None, device: str = None):
+    def __init__(self, powermeter: PM100D = None, device: str = None):
         super().__init__()
 
         self.pm = powermeter
@@ -63,6 +67,21 @@ class PowerMeterPlot(QWidget):
         self.powerData = []
 
         self.initUI()
+
+    def try_read_pm(self):
+        try:
+            if os.name == "nt":
+                _, pow = self.pm.deviceNET.measPower()
+            else:
+                pow = self.pm.read
+        except:
+            self.timer.stop()
+            self.startstop.setStyleSheet(
+                "background-color: red; color: white; font-weight: bold"
+            )
+            self.startstop.setText("Disconnected")
+            return None
+        return pow
 
     def update(self):
         now = time()
@@ -77,16 +96,10 @@ class PowerMeterPlot(QWidget):
                 maxX = now
 
         # check if we can read from pm and if not stop the timer
-        try:
+        pow = self.try_read_pm()
+        if pow:
             self.timeData.append(now)
-            self.powerData.append(self.pm.read)
-        except:
-            self.timer.stop()
-            self.startstop.setStyleSheet(
-                "background-color: red; color: white; font-weight: bold"
-            )
-            self.startstop.setText("Disconnected")
-            return
+            self.powerData.append(pow)
 
         # only plot at max 1000 points so downsample them with the relevant stride
         numvals = len(self.timeData)
@@ -181,15 +194,27 @@ class PowerMeterPlot(QWidget):
 
     def set_wavelength(self, wavelength):
         if self.pm is not None:
-            self.pm.sense.correction.wavelength = wavelength
-            self.wavelength.setMinimum(int(self.pm.sense.correction.minimum_wavelength))
-            self.wavelength.setMaximum(int(self.pm.sense.correction.maximum_wavelength))
+            if os.name == "nt":
+                self.pm.setWaveLength(wavelength)
+                self.wavelength.setMinimum(int(self.pm.wavelengthMin))
+                self.wavelength.setMaximum(int(self.pm.wavelengthMax))
+            else:
+                self.pm.sense.correction.wavelength = wavelength
+                self.wavelength.setMinimum(
+                    int(self.pm.sense.correction.minimum_wavelength)
+                )
+                self.wavelength.setMaximum(
+                    int(self.pm.sense.correction.maximum_wavelength)
+                )
         else:
             print("Cannot set wavelength without a powermeter")
 
     def set_average(self, average):
         if self.pm is not None:
-            self.pm.sense.average.count = average
+            if os.name == "nt":
+                print("Average not implemented on windows")
+            else:
+                self.pm.sense.average.count = average
         else:
             print("Cannot set average without a powermeter")
 
@@ -218,8 +243,11 @@ class PowerMeterPlot(QWidget):
         self.samplerate.addItem("0.1 Hz", 10000)
         self.samplerate.addItem("1 Hz", 1000)
         self.samplerate.addItem("10 Hz", 100)
-        self.samplerate.addItem("100 Hz", 10)
-        self.samplerate.addItem("Max", 0)
+        if os.name == "nt": # Windows PyQT6 will freeze up if we go too high?!
+            self.samplerate.addItem("50 Hz", 20)
+        else:
+            self.samplerate.addItem("100 Hz", 10)
+            self.samplerate.addItem("Max", 0)
         self.samplerate.setCurrentIndex(2)
         self.samplerate.currentIndexChanged.connect(
             lambda: self.timer.setInterval(self.samplerate.currentData())
@@ -310,7 +338,7 @@ class PowerMeterPlot(QWidget):
         self.save = QPushButton("Save")
 
         def save(self):
-            filename = f"power_{self.pm.sense.correction.wavelength}nm_{time()}.csv"
+            filename = f"PM100D_{time()}.csv"
             options = QFileDialog.Option.DontUseNativeDialog
             fileName, _ = QFileDialog.getSaveFileName(
                 self,
@@ -362,14 +390,21 @@ def forkPlot(device):
 
 
 def initPowermeter(device):
-    inst = USBTMC(device)
-    power_meter = ThorlabsPM100(inst=inst)
-    power_meter.system.beeper.immediate()
-    power_meter.sense.power.dc.range.auto = "ON"
-    power_meter.input.pdiode.filter.lpass.state = 0
-    power_meter.sense.correction.wavelength = 780
+    if os.name == "nt":
+        devices = PM100D.listDevices()
+        power_meter = devices.connect(device)
+        power_meter.setPowerAutoRange(True)
+        power_meter.setWaveLength(780)
+        return power_meter
+    else:
+        inst = USBTMC(device)
+        power_meter = PM100D(inst=inst)
+        power_meter.system.beeper.immediate()
+        power_meter.sense.power.dc.range.auto = "ON"
+        power_meter.input.pdiode.filter.lpass.state = 0
+        power_meter.sense.correction.wavelength = 780
 
-    return power_meter
+        return power_meter
 
 
 class PowerMeterTracker(QMainWindow):
@@ -389,9 +424,7 @@ class PowerMeterTracker(QMainWindow):
         self.shutdownButton.clicked.connect(self.shutdown_program)
         # automatically launch all powermeters
         self.autoButton = QPushButton("Auto")
-        self.autoButton.setStyleSheet(
-            "background-color: green; color: white; font-weight: bold"
-        )
+        self.autoButton.setStyleSheet("color: green; font-weight: bold")
 
         def setauto():
             self.auto = not self.auto
@@ -405,8 +438,8 @@ class PowerMeterTracker(QMainWindow):
                 self.autoButton.setText("Auto")
 
         self.autoButton.setCheckable(True)
-        self.autoButton.setChecked(True)
-        self.auto = True
+        self.auto = False
+        self.autoButton.setChecked(self.auto)
         self.autoButton.clicked.connect(setauto)
 
         layout = QVBoxLayout()
@@ -424,7 +457,8 @@ class PowerMeterTracker(QMainWindow):
 
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.main_loop)
-        self.timer.start(250)
+        self.timer.start(100)
+        self.main_loop()
 
     def shutdown_program(self):
         print("Shutting down program")
@@ -435,6 +469,7 @@ class PowerMeterTracker(QMainWindow):
 
     def main_loop(self):
         def add_device(dev):
+            print(f"Adding {dev}")
             item = QListWidgetItem()
             item.setText(dev)
             item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
@@ -443,7 +478,14 @@ class PowerMeterTracker(QMainWindow):
             self.listWidget.addItem(item)
 
         # keep the active powermeters up to date with the selection in qlistwidget
-        ports = glob.glob("/dev/usbtmc*")
+        if os.name == "nt":
+            list = PM100D.listDevices()
+            ports = list.resourceName
+            serials = list.serialNumber
+            # can only manage those that aren't connected yet as the others are anonymous
+            ports = [p for p,s in zip(ports,serials) if s!='n/a']
+        else:
+            ports = glob.glob("/dev/usbtmc*")
         for dev in ports:
             # make sure all plugged in powermeters are listed
             items = self.listWidget.findItems(dev, Qt.MatchFlag.MatchExactly)
@@ -456,26 +498,35 @@ class PowerMeterTracker(QMainWindow):
             if item.checkState() == Qt.CheckState.Checked:
                 if item.data is None:  # someone just checked it
                     item.data = mp.Process(target=forkPlot, args=(dev,))
-                    print(f"Starting process for {dev}")
                     item.data.start()
                 elif not item.data.is_alive():  # someone killed the plot window
-                    item.data.kill()
-                    item.data = None
-                    item.setCheckState(Qt.CheckState.Unchecked)
-                    # if self.auto: # force restart in auto mode
-                    #     item.setCheckState(Qt.CheckState.Checked)
+                    if self.auto:
+                        item.data = mp.Process(target=forkPlot, args=(dev,))
+                        item.data.start()
+                    else:
+                        item.data.kill()
+                        item.data = None
+                        item.setCheckState(Qt.CheckState.Unchecked)
             elif item.data is not None:  # someone just unchecked it
                 item.data.kill()
                 item.data = None
-            else:  # its unchecked and not running
+            else:  # it's unchecked and not running
                 if self.auto:  # force startup in auto mode
                     item.setCheckState(Qt.CheckState.Checked)
 
         # remove any powermeters that are not plugged in
-        for i in range(self.listWidget.count()):
-            item = self.listWidget.item(i)
-            if not os.path.exists(item.text()):
-                self.listWidget.takeItem(i)
+        for i in range(self.listWidget.count()).__reversed__():
+            if os.name == "nt":
+                if not self.listWidget.item(i).text() in ports:
+                    # if a process is running let it keep going
+                    if (
+                        self.listWidget.item(i).data is None
+                        or not self.listWidget.item(i).data.is_alive()
+                    ):
+                        self.listWidget.takeItem(i)
+            else:
+                if not os.path.exists(self.listWidget.item(i).text()):
+                    self.listWidget.takeItem(i)
 
 
 if __name__ == "__main__":
