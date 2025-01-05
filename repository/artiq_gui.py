@@ -458,10 +458,10 @@ class SingleChannelMirny(QWidget):
         return self.groupbox
 
 class SUServoGUI(QWidget):  # {{{
-    def __init__(self, experiment, core, suservo, suservo_chs):
+    def __init__(self, experiment, core, suservo, suservo_chs, shutters):
         super().__init__()
         self.setGeometry(self.x(), self.y(), self.minimumWidth(), self.minimumHeight())
-        self.manager = SUServoManager(experiment, core, suservo, suservo_chs)
+        self.manager = SUServoManager(experiment, core, suservo, suservo_chs, shutters)
         self.booster = BoosterTelemetry(self.update_booster)
         self.ch = [SingleChannelSUServo(self.manager, self.booster, i) for i in range(8)]
 
@@ -483,6 +483,19 @@ class SUServoGUI(QWidget):  # {{{
         self.label.setStyleSheet("font: bold 14pt")
         hbox.addWidget(self.label)
         hbox.addStretch()
+
+        shutterlabel = QLabel("Shutters")
+        shutterlabel.setStyleSheet("font: bold 14pt")
+        hbox.addWidget(shutterlabel)
+        for ch,name in enumerate(["2DMOT", "3DMOT"]):
+            self.shutter_button = Switch(
+                default=self.manager.en_shutters[ch],
+                turn_on=lambda channel=ch: self.manager.open_shutter(channel),
+                turn_off=lambda channel=ch: self.manager.close_shutter(channel),
+                on_text=name,
+                off_text=name,
+            )
+            hbox.addWidget(self.shutter_button)
         layout.addLayout(hbox)
         # }}}
 
@@ -494,7 +507,7 @@ class SUServoGUI(QWidget):  # {{{
 
         # capture the keyboard numbers to enable/disable channels
         self.installEventFilter(self)
-    
+
     def eventFilter(self, obj, event):
         if event.type() == event.KeyPress and event.key() >= Qt.Key_0 and event.key() <= Qt.Key_7:
             # just click the button for the channel to avoid implementing any logic here
@@ -549,6 +562,7 @@ class ArtiqGUIExperiment(EnvExperiment):  # {{{
         self.suservo_chs = [self.get_device(f"suservo_ch{i}") for i in range(8)]
         self.mirny_chs = [self.get_device(f"mirny_ch{i}") for i in range(4)]
         self.almazny = [self.get_device(f"almazny_ch{i}") for i in range(4)]
+        self.shutters = [self.get_device("shutter_aom_2DMOT"), self.get_device("shutter_aom_3DMOT")]
 
     def run(self):
         self.init_kernel()
@@ -560,7 +574,7 @@ class ArtiqGUIExperiment(EnvExperiment):  # {{{
         app.setStyle("Fusion")
         app.setApplicationName("ARTIQ GUI")
 
-        screen = SUServoGUI(self, self.core, self.suservo, self.suservo_chs)
+        screen = SUServoGUI(self, self.core, self.suservo, self.suservo_chs, self.shutters)
         screen.show()
 
         screen2 = MirnyGUI(self, self.core, self.mirny_chs, self.almazny)

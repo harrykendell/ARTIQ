@@ -3,6 +3,7 @@ from artiq.language import us, ms, MHz, dB, delay, TInt64
 
 from artiq.coredevice.core import Core
 from artiq.coredevice.suservo import SUServo, Channel as SUServoChannel, COEFF_WIDTH
+from artiq.coredevice.ttl import TTLInOut
 
 
 class SUServoManager:  # {{{
@@ -17,13 +18,15 @@ class SUServoManager:  # {{{
         experiment: EnvExperiment,
         core: Core,
         suservo: SUServo,
-        suservo_chs: SUServoChannel,
+        suservo_chs: list[SUServoChannel],
+        shutters: list[TTLInOut],
         name="suservo",
     ):
         self.experiment = experiment
         self.core: Core = core
         self.suservo: SUServo = suservo
-        self.channels: SUServoChannel = suservo_chs
+        self.channels: list[SUServoChannel] = suservo_chs
+        self.shutters: list[TTLInOut] = shutters
         self.name = name
 
         assert len(self.channels) == 8, "There must be 8 channels per SUServo"
@@ -41,6 +44,7 @@ class SUServoManager:  # {{{
             "Is",
             "Gls",
             "sampler_chs",
+            "en_shutters",
         ]
         defaults = [
             1,
@@ -55,12 +59,14 @@ class SUServoManager:  # {{{
             [-10.0] * 8,
             [0.0] * 8,
             [i for i in range(8)],
+            [0] * 2,
         ]
         units = [
             None,
             "dB",
             "dB",
             "MHz",
+            None,
             None,
             None,
             None,
@@ -226,6 +232,20 @@ class SUServoManager:  # {{{
         self.channels[ch].set(self.en_outs[ch], 0)
 
     @kernel
+    def open_shutter(self, ch):
+        """Enable a given shutter"""
+        self._mutate_and_set_int("en_shutters", self.en_shutters, ch, 1)
+        self.core.break_realtime()
+        self.shutters[ch].on()
+
+    @kernel
+    def close_shutter(self, ch):
+        """Disable a given shutter"""
+        self._mutate_and_set_int("en_shutters", self.en_shutters, ch, 0)
+        self.core.break_realtime()
+        self.shutters[ch].off()
+
+    @kernel
     def set_all(self):
         """
         Ensures the SUServo is set to the current state of the manager
@@ -237,6 +257,13 @@ class SUServoManager:  # {{{
         self.core.break_realtime()
         self.suservo.set_config(enable=0)
 
+        # shutters
+        for shutter in range(len(self.shutters)):
+            if self.en_shutters[shutter]:
+                self.open_shutter(shutter)
+            else:
+                self.close_shutter(shutter)
+
         delay(10 * ms)
         self.experiment.set_dataset(
             self.name + ".enabled", self.enabled, persist=True, archive=False
@@ -245,13 +272,14 @@ class SUServoManager:  # {{{
         # Initialize SUServo - this will leave it disabled
         self.suservo.init()
         self.core.break_realtime()
-        delay(500*ms)
+        delay(500 * ms)
 
         buffer = [0] * 8
         for ch in range(8):
             self.core.break_realtime()
+            delay(5 * ms)
             self.channels[ch].get_profile_mu(0, buffer)
-            delay(50*ms)
+            delay(50 * ms)
             # if there doesn't seem to be any state held in the suservo channel we just use our dataset values
             if (
                 self.suservo.ddses[0].ftw_to_frequency(buffer[0] << 16 | buffer[6])
