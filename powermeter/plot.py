@@ -1,5 +1,5 @@
 import os, glob
-from time import perf_counter, time
+from time import perf_counter, time, sleep
 import multiprocessing as mp
 import pyqtgraph as pg
 
@@ -499,10 +499,16 @@ class PowerMeterTracker(QMainWindow):
                 if item.data is None:  # someone just checked it
                     item.data = mp.Process(target=forkPlot, args=(dev,))
                     item.data.start()
+                    now = time()
+                    while not item.data.is_alive() and time() - now < 1:
+                        sleep(0.05)
                 elif not item.data.is_alive():  # someone killed the plot window
                     if self.auto:
                         item.data = mp.Process(target=forkPlot, args=(dev,))
                         item.data.start()
+                        now = time()
+                        while not item.data.is_alive() and time() - now < 1:
+                            sleep(0.05)
                     else:
                         item.data.kill()
                         item.data = None
