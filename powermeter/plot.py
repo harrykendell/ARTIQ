@@ -101,15 +101,21 @@ class PowerMeterPlot(QWidget):
             self.timeData.append(now)
             self.powerData.append(pow)
 
+        # given minX and maxX, crop down to only the relevant data
+        i=0
+        j=len(self.timeData)
+        while self.timeData[i] < minX:
+            i+=1
+        while self.timeData[j-1] > maxX:
+            j-=1
+
         # only plot at max 1000 points so downsample them with the relevant stride
-        numvals = len(self.timeData)
-        stride = numvals // 1000 + 1
-        zoom = (self.timeData[-1] - self.timeData[0]) / (maxX - minX + 0.000001)
-        stride2 = int(stride / (zoom + 0.000001)) + 1
-        self.maincurve.setData(self.timeData[::stride2], self.powerData[::stride2])
+        numvals = j-i
+        stride = len(self.timeData) // 1000 + 1
+        stride2 = int(numvals // 1000 + 1)
+        self.maincurve.setData(self.timeData[i:j:stride2], self.powerData[i:j:stride2])
         self.maxline.setValue(max(self.powerData))
         self.timecurve.setData(self.timeData[::stride], self.powerData[::stride])
-
         # automatically swap between uW and mW
         self.current_power.setText(
             f"{self.powerData[-1]*1e3:.2f} mW"
@@ -243,8 +249,8 @@ class PowerMeterPlot(QWidget):
         self.samplerate.addItem("0.1 Hz", 10000)
         self.samplerate.addItem("1 Hz", 1000)
         self.samplerate.addItem("10 Hz", 100)
-        if os.name == "nt": # Windows PyQT6 will freeze up if we go too high?!
-            self.samplerate.addItem("50 Hz", 20)
+        if os.name == "nt":  # Windows PyQT6 will freeze up if we go too high?!
+            self.samplerate.addItem("30 Hz", 20)
         else:
             self.samplerate.addItem("100 Hz", 10)
             self.samplerate.addItem("Max", 0)
@@ -416,7 +422,7 @@ class PowerMeterTracker(QMainWindow):
     def initUI(self):
 
         self.setWindowTitle("PM100D")
-        self.setGeometry(self.x(), self.y(), 150, 50)
+        self.setGeometry(self.x(), self.y(), 250, 50)
 
         self.listWidget = QListWidget(self)
         self.shutdownButton = QPushButton("Shutdown", self)
@@ -469,7 +475,6 @@ class PowerMeterTracker(QMainWindow):
 
     def main_loop(self):
         def add_device(dev):
-            print(f"Adding {dev}")
             item = QListWidgetItem()
             item.setText(dev)
             item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
@@ -483,7 +488,7 @@ class PowerMeterTracker(QMainWindow):
             ports = list.resourceName
             serials = list.serialNumber
             # can only manage those that aren't connected yet as the others are anonymous
-            ports = [p for p,s in zip(ports,serials) if s!='n/a']
+            ports = [p for p, s in zip(ports, serials) if s != "n/a"]
         else:
             ports = glob.glob("/dev/usbtmc*")
         for dev in ports:

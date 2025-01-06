@@ -214,7 +214,6 @@ class BoosterControl(QWidget):
 
         self.tripped = tripped
 
-
 class PIDControl(QWidget):
     def __init__(self, manager, ch=0):
         super().__init__()
@@ -432,7 +431,7 @@ class SingleChannelMirny(QWidget):
         top.addStretch()
 
         # Channel name
-        name = QLabel(f"Ch {channel}")
+        name = QLabel(["Ch 0 - (EOM)","Ch 1","Ch 2","Ch 3"][channel])
         name.setStyleSheet("font: bold 12pt")
         top.addWidget(name)
 
