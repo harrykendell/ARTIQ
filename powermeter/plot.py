@@ -106,8 +106,9 @@ class PowerMeterPlot(QWidget):
         j=len(self.timeData)
         while self.timeData[i] < minX:
             i+=1
-        while self.timeData[j-1] > maxX:
-            j-=1
+        if j>1:
+            while self.timeData[j-1] > maxX:
+                j-=1
 
         # only plot at max 1000 points so downsample them with the relevant stride
         numvals = j-i
