@@ -38,10 +38,10 @@ class MirnyManager:  # {{{
             "en_outs",
         ]
         defaults = [
-            [True] * 4,
-            [31.5] * 4,
-            [3400e6] * 4,
-            [1] * 4,
+            [True] + [False] * 3,
+            [3.0] + [31.5] * 3,
+            [3285e6]  + [4000]* 3,
+            [1]  + [0] * 3,
         ]
         units = [
             None,
