@@ -16,6 +16,3 @@ else
     echo -e "This script must be run with the dot space script syntax, as in \n${RED}. nix-fix-pyqt.sh${NC}"
     echo -e "Otherwise it cannot export environment variables into your shell"
 fi
-
-    python ./powermeter/plot.py &
-    artiq_session -d="-p=ndscan.dashboard_plugin"

@@ -10,7 +10,7 @@ NC='\033[0m' # No Color
 # check for required build tool
 if [[ -d /opt/Xilinx/Vivado/2022.2 ]]; then
     echo -e "${GREEN}Vivado 2020.2 found, flashing artiq crate${NC}"
-    cd src/artiq
+    cd ../src/artiq
 
     # ensure the reference device_db reflects the currently flashed details
     nix develop --command bash -c "artiq_ddb_template ../../crate\ config/bu2402001.json > ../../crate\ config/device_db.py"
