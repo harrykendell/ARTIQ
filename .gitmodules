@@ -31,3 +31,6 @@
 [submodule "submodules/jax"]
 	path = submodules/jax
 	url = https://github.com/Jayich-Lab/jax
+[submodule "ThorlabsPM"]
+	path = ThorlabsPM
+	url = https://github.com/harrykendell/ThorlabsPM
