@@ -10,6 +10,7 @@ if [ ${_} != ${0} ]; then
     export QT_QPA_PLATFORM=xcb
     # this avoids the error: Gtk-WARNING **: 18:37:02.039: Locale not supported by C library. Using the fallback 'C' locale.
     export LANG=C
+    echo -e "PyQt5 environment variables set"
 else
     RED='\033[0;31m'
     NC='\033[0m' # No Color
