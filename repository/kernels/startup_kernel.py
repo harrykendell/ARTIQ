@@ -77,7 +77,7 @@ class Startup(EnvExperiment):
         self.fastino.set_leds(0b00000000)
         delay(100 * us)
         for dac in range(32):
-            self.fastino.set_dac(dac, dac / 10.0)
+            self.fastino.set_dac(dac, 0)
             delay(100 * us)
 
         # SUServo
