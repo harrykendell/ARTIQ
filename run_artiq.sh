@@ -14,4 +14,4 @@ if [ "$SCRIPT_DIR" != "$(pwd)" ]; then
     cd $SCRIPT_DIR
 fi
 
-nix shell --command bash -c '. ./scripts/nix-fix-pyqt.sh ; (python ./ThorlabsPM/ThorlabsPM.py &) ; artiq_session -d="-s=137.222.69.28" -d="-p=ndscan.dashboard_plugin" -m="--bind=137.222.69.28"'
+nix shell --command bash -c '. ./scripts/nix-fix-pyqt.sh ; (python ./ThorlabsPM/ThorlabsPM.py &) ; artiq_session -d="-s=137.222.69.28" -d="-p=ndscan.dashboard_plugin" -m="--bind=137.222.69.28" -c="--bind=137.222.69.28"'
