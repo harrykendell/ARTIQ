@@ -24,8 +24,10 @@ class FastinoManager:  # {{{
         self.fastino = fastino
         self.name = name
 
-        self.MIN = (-0x8000) / (0x8000 / 10.0) # number from inverting the voltage_to_mu for fastino
-        self.MAX = (0xFFFF - 0x8000) / (0x8000 / 10.0) # NB these can be extended as round allows +-0.5 but as the inequality is strict we can't reach the limit anyway
+        # numbers from inverting the voltage_to_mu for fastino NB these can be extended as round allows +-0.5 but as the inequality is strict we can't reach the limit anyway
+        self.MIN = (-0x8000) / (0x8000 / 10.0)
+        self.MAX = (0xFFFF - 0x8000) / (0x8000 / 10.0)
+        self.unit = "V"
 
         datasets = [
             "voltages",
@@ -92,11 +94,15 @@ class FastinoManager:  # {{{
         self._mutate_and_set_float("voltages", self.voltages, ch, voltage)
         self.core.break_realtime()
         self.fastino.set_dac(
-            ch, min(max(voltage, self.MIN), self.MAX) # number from inverting the voltage_to_mu for fastino
+            ch,
+            min(
+                max(voltage, self.MIN), self.MAX
+            ),  # number from inverting the voltage_to_mu for fastino
         )
         self.set_led(ch, 1 if voltage != 0 else 0)
 
-        print("Set voltage", ch, voltage)
+    def get_voltage(self, ch):
+        return self.voltages[ch]
 
     @kernel
     def set_all(self):
@@ -120,3 +126,32 @@ class FastinoManager:  # {{{
         for i in range(len(self.voltages)):
             self.fastino.set_dac(i, self.voltages[i])
             delay(100 * us)
+
+
+# superclass FastinoManager to limit voltage output
+class DeltaElektronikaManager(FastinoManager):
+
+    # extra init that calls the FastinoManager init too - we need to limit to 0-5V
+    def __init__(self, experiment, core, fastino, name="fastino"):
+        super().__init__(experiment, core, fastino, name)
+
+        self.unit = "A"
+        self.voltage_range = [0, 5]
+        self.current_range = [0, 10]
+
+    def convert_range(self, value, old_range, new_range):
+        return (value - old_range[0]) / (old_range[1] - old_range[0]) * (
+            new_range[1] - new_range[0]
+        ) + new_range[0]
+
+    def VtoI(self, voltage):
+        return self.convert_range(voltage, self.voltage_range, self.current_range)
+
+    def ItoV(self, current):
+        return self.convert_range(current, self.current_range, self.voltage_range)
+
+    def set_current(self, ch, current):
+        self.set_voltage(ch, self.ItoV(current))
+
+    def get_current(self, ch):
+        return self.VtoI(self.voltages[ch])

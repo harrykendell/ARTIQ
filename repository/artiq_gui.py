@@ -25,11 +25,12 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QDoubleValidator, QIntValidator, QIcon
+
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 from utils.SUServoManager import SUServoManager
 from utils.boosterTelemetry import BoosterTelemetry
 from utils.MirnyManager import MirnyManager
-from utils.FastinoManager import FastinoManager
+from utils.FastinoManager import FastinoManager, DeltaElektronikaManager
 
 from artiq.experiment import *
 from artiq.language import MHz, ms
@@ -70,6 +71,7 @@ class Switch(QWidget):
         self.button.setText(self.text[self.state])  # Change text and color
         self.button.setStyleSheet(self.color[self.state])
 
+
 class SignalDoubleSpinBox(QDoubleSpinBox):
     stepChanged = pyqtSignal()
 
@@ -78,6 +80,7 @@ class SignalDoubleSpinBox(QDoubleSpinBox):
         super(QDoubleSpinBox, self).stepBy(step)
         if self.value() != value:
             self.stepChanged.emit()
+
 
 class DDSControl(QWidget):
     def __init__(self, manager, ch=0, minimum=0.0, maximum=400.0):
@@ -160,12 +163,13 @@ class DDSControl(QWidget):
 
         self.manager.set_freq(self.ch, val)
 
+
 class BoosterControl(QWidget):
     def __init__(self, manager, set_tab, ch=0):
         super().__init__()
         self.manager = manager
         self.set_tab = set_tab
-        self.tripped = 'unknown'
+        self.tripped = "unknown"
         layout = QVBoxLayout()
 
         # labels
@@ -214,6 +218,7 @@ class BoosterControl(QWidget):
                 self.set_tab(0)
 
         self.tripped = tripped
+
 
 class PIDControl(QWidget):
     def __init__(self, manager, ch=0):
@@ -311,6 +316,7 @@ class PIDControl(QWidget):
             float(self.Gl.text()),
         )
 
+
 class SamplerControl(QWidget):
     def __init__(self, manager, ch=0):
         super().__init__()
@@ -324,6 +330,7 @@ class SamplerControl(QWidget):
     @kernel
     def sample(self, gap=1 * ms, num=100):
         raise NotImplementedError
+
 
 class SingleChannelSUServo(QWidget):
     """Class to control a single given SUServo channel"""
@@ -393,6 +400,7 @@ class SingleChannelSUServo(QWidget):
         """Return the widgets to the main app"""
         return self.groupbox
 
+
 class SingleChannelMirny(QWidget):
     """Class to control a single given Mirny channel
     NB this is an on button for the channel and a freq/att/on off control much like the SUServo DDS panel
@@ -432,7 +440,7 @@ class SingleChannelMirny(QWidget):
         top.addStretch()
 
         # Channel name
-        name = QLabel(["Ch 0 - (EOM)","Ch 1","Ch 2","Ch 3"][channel])
+        name = QLabel(["Ch 0 - (EOM)", "Ch 1", "Ch 2", "Ch 3"][channel])
         name.setStyleSheet("font: bold 12pt")
         top.addWidget(name)
 
@@ -457,13 +465,16 @@ class SingleChannelMirny(QWidget):
         """Return the widgets to the main app"""
         return self.groupbox
 
-class SUServoGUI(QWidget):  # {{{
+
+class SUServoGUI(QWidget):
     def __init__(self, experiment, core, suservo, suservo_chs, shutters):
         super().__init__()
         self.setGeometry(self.x(), self.y(), self.minimumWidth(), self.minimumHeight())
         self.manager = SUServoManager(experiment, core, suservo, suservo_chs, shutters)
         self.booster = BoosterTelemetry(self.update_booster)
-        self.ch = [SingleChannelSUServo(self.manager, self.booster, i) for i in range(8)]
+        self.ch = [
+            SingleChannelSUServo(self.manager, self.booster, i) for i in range(8)
+        ]
 
         self.setWindowTitle("SUServo GUI")
         layout = QVBoxLayout()
@@ -487,7 +498,7 @@ class SUServoGUI(QWidget):  # {{{
         shutterlabel = QLabel("Shutters")
         shutterlabel.setStyleSheet("font: bold 14pt")
         hbox.addWidget(shutterlabel)
-        for ch,name in enumerate(["2DMOT", "3DMOT"]):
+        for ch, name in enumerate(["2DMOT", "3DMOT"]):
             self.shutter_button = Switch(
                 default=self.manager.en_shutters[ch],
                 turn_on=lambda channel=ch: self.manager.open_shutter(channel),
@@ -509,7 +520,11 @@ class SUServoGUI(QWidget):  # {{{
         self.installEventFilter(self)
 
     def eventFilter(self, obj, event):
-        if event.type() == event.KeyPress and event.key() >= Qt.Key_0 and event.key() <= Qt.Key_7:
+        if (
+            event.type() == event.KeyPress
+            and event.key() >= Qt.Key_0
+            and event.key() <= Qt.Key_7
+        ):
             # just click the button for the channel to avoid implementing any logic here
             if QApplication.keyboardModifiers() == Qt.ControlModifier:
                 self.ch[event.key() - Qt.Key_0].pid_button.switch_state()
@@ -521,7 +536,7 @@ class SUServoGUI(QWidget):  # {{{
     def update_booster(self, ch, data):
         self.ch[ch].booster.update(json.loads(data))
 
-# }}}
+
 class MirnyGUI(QWidget):
 
     def __init__(self, experiment, core, mirny_chs, almazny):
@@ -535,7 +550,7 @@ class MirnyGUI(QWidget):
 
         # create channels controls
         chans = QGridLayout()
-        for i in range(4):
+        for i in range(1):
             chans.addWidget(self.ch[i].get_widget(), i, 0)
         layout.addLayout(chans)
 
@@ -543,7 +558,11 @@ class MirnyGUI(QWidget):
         self.installEventFilter(self)
 
     def eventFilter(self, obj, event):
-        if event.type() == event.KeyPress and event.key() >= Qt.Key_0 and event.key() <= Qt.Key_3:
+        if (
+            event.type() == event.KeyPress
+            and event.key() >= Qt.Key_0
+            and event.key() <= Qt.Key_3
+        ):
             # just click the button for the channel to avoid implementing any logic here
             if QApplication.keyboardModifiers() == Qt.ControlModifier:
                 self.ch[event.key() - Qt.Key_0].almazny_button.switch_state()
@@ -554,14 +573,27 @@ class MirnyGUI(QWidget):
 
 
 class SingleChannelFastino(QWidget):
-    def __init__(self, manager, ch=0):
+    def __init__(
+        self,
+        manager: FastinoManager,
+        ch=0,
+        name="Ch",
+        getter=None,
+        setter=None,
+        min=None,
+        max=None,
+    ):
         super().__init__()
         self.manager = manager
         self.ch = ch
 
-        self.enabled = self.manager.voltages[ch] > 0.0
-        self.min = -10.
-        self.max = 10.
+        self.getter = getter if getter is not None else self.manager.get_voltage
+        self.setter = setter if setter is not None else self.manager.set_voltage
+
+        self.MIN = min if min is not None else self.manager.MIN
+        self.MAX = max if max is not None else self.manager.MAX
+
+        self.enabled = self.getter(self.ch) != 0.0
 
         self.groupbox = QGroupBox()
 
@@ -582,41 +614,30 @@ class SingleChannelFastino(QWidget):
 
         labelline.addStretch()
         # Channel name
-        name = QLabel(
-            [
-                "Ch 0 - (X+)",
-                "Ch 1 - (X-)",
-                "Ch 2 (Y)",
-                "Ch 3 - (Z)",
-                "Ch 4",
-                "Ch 5",
-                "Ch 6",
-                "Ch 7",
-            ][ch]
-        )
-        name.setStyleSheet("font: bold 12pt")
-        labelline.addWidget(name)
+        self.name = QLabel(name)
+        self.name.setStyleSheet("font: bold 12pt")
+        labelline.addWidget(self.name)
         vbox.addLayout(labelline)
 
         # text inputs
         self.text = QLineEdit()
-        self.text.setText(str(round(self.manager.voltages[ch], 3)))
+        self.text.setText(str(round(self.getter(self.ch), 3)))
         self.text.setValidator(QDoubleValidator())
         self.text.setAlignment(Qt.AlignCenter)
-        self.text.editingFinished.connect(lambda: self.setvoltage(self.text.text()))
+        self.text.editingFinished.connect(lambda: self.set(self.text.text()))
 
         inputline = QHBoxLayout()
         inputline.addWidget(self.text)
         vbox.addLayout(inputline)
 
         # Slider and min/max labels
-        min_label = QLabel(f"{round(self.min)} <b>V</b>")
-        max_label = QLabel(f"{round(self.max)} <b>V</b>")
+        min_label = QLabel(f"{round(self.MIN)} <b>{self.manager.unit}</b>")
+        max_label = QLabel(f"{round(self.MAX)} <b>{self.manager.unit}</b>")
         self.slider = QSlider(Qt.Horizontal)
-        self.slider.setSingleStep(100)
-        self.slider.setRange(int(self.min*1000), int(self.max*1000))
-        self.slider.setValue(int(self.manager.voltages[ch]*1000))
-        self.slider.valueChanged.connect(lambda x: self.setvoltage(x/1000))
+        self.slider.setSingleStep(10)
+        self.slider.setRange(int(self.MIN * 1000), int(self.MAX * 1000))
+        self.slider.setValue(int(self.getter(ch) * 1000))
+        self.slider.valueChanged.connect(lambda x: self.set(x / 1000))
 
         sliderline = QHBoxLayout()
         sliderline.addWidget(min_label)
@@ -625,43 +646,44 @@ class SingleChannelFastino(QWidget):
 
         vbox.addLayout(sliderline)
 
-    def setvoltage(self, val, force=False):
+    def set(self, val, force=False):
         # check its a valid number - if not the text edit went wrong
         try:
             val = float(val)
         except:
-            self.text.setText(str(self.slider.value()/1000))
+            self.text.setText(str(self.slider.value() / 1000))
             return
 
         # guard against recursion already at the correct voltage
-        if val == round(self.manager.voltages[self.ch],3) and not force:
+        if val == round(self.getter(self.ch), 3) and not force:
             return
 
-        val = min(max(val, self.min), self.max)
+        val = min(max(val, self.MIN), self.MAX)
         self.text.setText(str(val))
-        self.slider.setValue(int(val*1000))
+        self.slider.setValue(int(val * 1000))
 
         if self.enabled:
-            print("Setting voltage", val)
-            self.manager.set_voltage(self.ch, float(val))
+            print("Setting ", val)
+            self.setter(self.ch, float(val))
         else:
-            print("Not setting voltage", val)
+            print("Not setting", val)
 
     def switch_on(self):
         print("Switching on")
-        self.enabled=True
-        self.setvoltage(self.text.text())
+        self.enabled = True
+        self.set(self.text.text())
         return
-    
+
     def switch_off(self):
         print("Switching off")
-        self.enabled=False
-        self.manager.set_voltage(self.ch, 0.0)
+        self.enabled = False
+        self.setter(self.ch, 0.0)
         return
 
     def get_widget(self):
         """Return the widgets to the main app"""
         return self.groupbox
+
 
 class FastinoGUI(QWidget):
     def __init__(self, experiment, core, fastino):
@@ -674,7 +696,14 @@ class FastinoGUI(QWidget):
 
         # Create control for 8 DACs
         chans = QGridLayout()
-        self.ch = [SingleChannelFastino(self.manager, i) for i in range(8)]
+        self.ch = [
+            SingleChannelFastino(
+                self.manager,
+                i,
+                f"Ch {i}",
+            )
+            for i in range(8)
+        ]
 
         chans = QGridLayout()
         for i in range(8):
@@ -682,7 +711,37 @@ class FastinoGUI(QWidget):
         layout.addLayout(chans)
 
 
-class ArtiqGUIExperiment(EnvExperiment):  # {{{
+class DeltaElektronikaGUI(QWidget):
+    def __init__(self, experiment, core, fastino):
+        super().__init__()
+        self.manager = DeltaElektronikaManager(experiment, core, fastino)
+
+        self.setWindowTitle("Delta Elektronika GUI")
+        layout = QVBoxLayout()
+        self.setLayout(layout)
+
+        # Create control for 8 DACs
+        chans = QGridLayout()
+        self.ch = [
+            SingleChannelFastino(
+                self.manager,
+                i,
+                ["Ch 0 (X+)", "Ch 1 (X-)", "Ch 2 (Y)", "Ch 3 (Z)"][i],
+                getter=self.manager.get_current,
+                setter=self.manager.set_current,
+                min=0.0,
+                max=3.0,
+            )
+            for i in range(4)
+        ]
+
+        chans = QGridLayout()
+        for i in range(4):
+            chans.addWidget(self.ch[i].get_widget(), i % 2, i // 2)
+        layout.addLayout(chans)
+
+
+class ArtiqGUIExperiment(EnvExperiment):
     """Artiq GUI"""
 
     def build(self):
@@ -690,7 +749,10 @@ class ArtiqGUIExperiment(EnvExperiment):  # {{{
 
         self.suservo = self.get_device("suservo")
         self.suservo_chs = [self.get_device(f"suservo_ch{i}") for i in range(8)]
-        self.shutters = [self.get_device("shutter_aom_2DMOT"), self.get_device("shutter_aom_3DMOT")]
+        self.shutters = [
+            self.get_device("shutter_aom_2DMOT"),
+            self.get_device("shutter_aom_3DMOT"),
+        ]
 
         self.mirny_chs = [self.get_device(f"mirny_ch{i}") for i in range(4)]
         self.almazny = [self.get_device(f"almazny_ch{i}") for i in range(4)]
@@ -701,25 +763,25 @@ class ArtiqGUIExperiment(EnvExperiment):  # {{{
         self.init_kernel()
         app = QApplication(sys.argv)
         # Set a nice icon
-        app.setWindowIcon(
-        QIcon("/usr/share/icons/elementary-xfce/apps/128/do.png")
-        )
+        app.setWindowIcon(QIcon("/usr/share/icons/elementary-xfce/apps/128/do.png"))
         app.setStyle("Fusion")
         app.setApplicationName("ARTIQ GUI")
 
-        screen = SUServoGUI(self, self.core, self.suservo, self.suservo_chs, self.shutters)
+        screen = SUServoGUI(
+            self, self.core, self.suservo, self.suservo_chs, self.shutters
+        )
         screen.show()
 
         screen2 = MirnyGUI(self, self.core, self.mirny_chs, self.almazny)
-        screen2.setGeometry(
-            screen.x() + screen.minimumWidth(),
-            screen.y(),
-            screen.minimumWidth() // 2,
-            screen.minimumHeight(),
-        )
+        # screen2.setGeometry(
+        #     screen.x() + screen.minimumWidth(),
+        #     screen.y(),
+        #     screen.minimumWidth() // 2,
+        #     screen.minimumHeight(),
+        # )
         screen2.show()
 
-        screen3 = FastinoGUI(self, self.core, self.fastino)
+        screen3 = DeltaElektronikaGUI(self, self.core, self.fastino)
         screen3.show()
 
         app.exec_()
@@ -728,6 +790,3 @@ class ArtiqGUIExperiment(EnvExperiment):  # {{{
     def init_kernel(self):
         """Initialize core"""
         self.core.reset()
-
-
-# }}}
