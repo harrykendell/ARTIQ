@@ -26,6 +26,9 @@ pip install -e "git+https://github.com/OxfordIonTrapGroup/oxart-devices.git#egg=
 # artiq - we currently target whatever is on the release-8 branch to avoid any potentially artiq 9.0+unknown breaking changes
 pip install -e "git+https://github.com/m-labs/artiq.git@release-8#egg=artiq"
 
+# artiq-comtools
+pip install -e "git+https://github.com/m-labs/artiq-comtools.git"
+
 # ndscan
 pip install -e "git+https://github.com/OxfordIonTrapGroup/ndscan.git#egg=ndscan"
 
