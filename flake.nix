@@ -18,7 +18,49 @@
       aqmain = artiq.packages.x86_64-linux;
       aqextra = extrapkg.packages.x86_64-linux;
 
-      # windfreak packages
+      /*
+      We can include external packages here, which are not part of the main artiq repository.
+
+      Two main ways to do this, either pulling from github or from pypi.
+
+      For github, use the following:
+        1) define a new input source above
+                e.g. 
+                inputs.src-ndscan = {url = "github:OxfordIonTrapGroup/ndscan/e7c0211019e3fc77ae0c032869e4833e407874f0"; flake= false;};
+        2) include the source in the oututs list above
+        3) include the package in the nixpkgs list below
+                e.g.
+                ndscan = pkgs.python3Packages.buildPythonPackage {
+                  name = "ndscan";
+                  src = src-ndscan;
+                  format = "pyproject";
+                  propagatedBuildInputs = [
+                    artiq.packages.x86_64-linux.artiq
+                    oitg
+                    pkgs.python3Packages.poetry-core
+                    pkgs.python3Packages.pyqt6
+                  ];
+                };
+        4) include the package in the buildEnv desired packages below
+
+      For pypi it is simpler, simply define the package iself.
+      Generally you can use a tar.gz release if there is one on pypi releases, otherwise use a wheel. Note most of these variables shouldn't be needed but match them to the release file on pypi
+                e.g. for a tar.gz (prefer this option)
+                pco = pkgs.python3Packages.buildPythonPackage rec {
+                  pname = "pco";
+                  version = "2.3.0";
+                  doCheck = false;
+                  src = pkgs.python3Packages.fetchPypi {
+                    inherit pname version format;
+                    sha256 = "3mFhw1spvuo2+GDyv09NASetnFa3MLRh2OwJTHy3X0M=";
+                  };
+                };
+      For a wheel define format = "wheel" in the builder
+      ```
+      */
+
+      # DEVICES
+      # windfreak RF synthesizer
       windfreak = pkgs.python3Packages.buildPythonPackage rec {
         pname = "windfreak";
         version = "0.3.0";
@@ -29,7 +71,7 @@
         };
         };
 
-      # booster packages
+      # Booster RF Amplifier
       paho-mqtt = pkgs.python3Packages.buildPythonPackage rec {
         pname = "paho_mqtt";
         version = "2.1.0";
@@ -73,6 +115,19 @@
         ];
         };
       
+      # PCO camera
+      pco = pkgs.python3Packages.buildPythonPackage rec {
+        pname = "pco";
+        version = "2.3.0";
+        doCheck = false;
+        format = "wheel";
+        src = pkgs.python3Packages.fetchPypi {
+          inherit pname version format;
+          python = "py3";
+          platform = "manylinux2014_x86_64";
+          sha256 = "3mFhw1spvuo2+GDyv09NASetnFa3MLRh2OwJTHy3X0M=";
+        };
+        };
       
       # ndscan packages
       oxart-devices = pkgs.python3Packages.buildPythonPackage {
@@ -119,7 +174,6 @@
         dontWrapQtApps = true; # Pulled in via the artiq package; we don't care.
         };
 
-
     in {
       defaultPackage.x86_64-linux = pkgs.buildEnv {
         name = "artiq-env";
@@ -143,6 +197,7 @@
 
             windfreak
             booster
+            pco
 
             oxart-devices
             ndscan
