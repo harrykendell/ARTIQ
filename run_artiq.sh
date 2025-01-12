@@ -14,4 +14,16 @@ if [ "$SCRIPT_DIR" != "$(pwd)" ]; then
     cd $SCRIPT_DIR
 fi
 
-nix shell --command bash -c '. ./scripts/nix-fix-pyqt.sh ; (python ./ThorlabsPM/ThorlabsPM.py &) ; artiq_session -d="-s=137.222.69.28" -d="-p=ndscan.dashboard_plugin" -m="--bind=137.222.69.28" -c="--bind=137.222.69.28"'
+#  PyQt5 fix
+FIX=". ./scripts/nix-fix-pyqt.sh"
+
+# ThorlabsPM
+TLPM="(python ./ThorlabsPM/ThorlabsPM.py &)"
+
+# ARTIQ
+IP_ADDRESS=137.222.69.28
+ARTIQ="artiq_session -d=\"-s=$IP_ADDRESS\" -d=\"-p=ndscan.dashboard_plugin\" -m=\"--bind=$IP_ADDRESS\" -c=\"--bind=$IP_ADDRESS\" -c=\"-s=$IP_ADDRESS\""
+
+nix shell --command bash -c "$FIX ; $TLPM ; $ARTIQ"
+
+# nix shell --command bash -c '. ./scripts/nix-fix-pyqt.sh ; (python ./ThorlabsPM/ThorlabsPM.py &) ; artiq_session -d="-s=137.222.69.28" -d="-p=ndscan.dashboard_plugin" -m="--bind=137.222.69.28" -c="--bind=137.222.69.28" -c="-s=137.222.69.28"'
