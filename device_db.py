@@ -24,7 +24,7 @@ device_db = {
     },
     "core_analyzer": {
         "type": "controller",
-        "host": "::1",
+        "host": server_addr,
         "port_proxy": 1385,
         "port": 1386,
         "command": "aqctl_coreanalyzer_proxy --port-proxy {port_proxy} --port-control {port} --bind {bind} "
@@ -32,7 +32,7 @@ device_db = {
     },
     "core_moninj": {
         "type": "controller",
-        "host": "::1",
+        "host": server_addr,
         "port_proxy": 1383,
         "port": 1384,
         "command": "aqctl_moninj_proxy --port-proxy {port_proxy} --port-control {port} --bind {bind} "
