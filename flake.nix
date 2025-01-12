@@ -146,6 +146,8 @@
 
             oxart-devices
             ndscan
+
+            artiq.inputs.artiq-comtools
           ]))
           aqmain.openocd-bscanspi  # needed if and only if flashing boards
         ];
