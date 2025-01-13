@@ -663,19 +663,14 @@ class SingleChannelFastino(QWidget):
         self.slider.setValue(int(val * 1000))
 
         if self.enabled:
-            print("Setting ", val)
             self.setter(self.ch, float(val))
-        else:
-            print("Not setting", val)
 
     def switch_on(self):
-        print("Switching on")
         self.enabled = True
         self.set(self.text.text())
         return
 
     def switch_off(self):
-        print("Switching off")
         self.enabled = False
         self.setter(self.ch, 0.0)
         return
@@ -767,22 +762,20 @@ class ArtiqGUIExperiment(EnvExperiment):
         app.setStyle("Fusion")
         app.setApplicationName("ARTIQ GUI")
 
-        screen = SUServoGUI(
+        suservoGUI = SUServoGUI(
             self, self.core, self.suservo, self.suservo_chs, self.shutters
         )
-        screen.show()
+        suservoGUI.show()
 
-        screen2 = MirnyGUI(self, self.core, self.mirny_chs, self.almazny)
-        # screen2.setGeometry(
-        #     screen.x() + screen.minimumWidth(),
-        #     screen.y(),
-        #     screen.minimumWidth() // 2,
-        #     screen.minimumHeight(),
-        # )
-        screen2.show()
+        mirnyGUI = MirnyGUI(self, self.core, self.mirny_chs, self.almazny)
+        mirnyGUI.show()
 
-        screen3 = DeltaElektronikaGUI(self, self.core, self.fastino)
-        screen3.show()
+        if False:
+            fastinoGUI = FastinoGUI(self, self.core, self.fastino)
+            fastinoGUI.show()
+        else:
+            deltaGUI = DeltaElektronikaGUI(self, self.core, self.fastino)
+            deltaGUI.show()
 
         app.exec_()
 
