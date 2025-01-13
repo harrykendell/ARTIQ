@@ -28,7 +28,17 @@ ARTIQ="artiq_session -d=\"-s=$SERVER_ADDRESS\" -d=\"-p=ndscan.dashboard_plugin\"
 
 # check if we are running on the artiq server or not
 IP_ADDRESSES=$(hostname -I 2>/dev/null);
-if [[$IP_ADDRESSES == *"$SERVER_ADDRESS"*]]; then
+# Loop through each IP address in the list
+found=0
+for ip in $IP_ADDRESSES; do
+    if [[ "$ip" == "$SERVER_ADDRESS" ]]; then
+        found=1
+        break
+    fi
+done
+
+# Run the ARTIQ dashboard with the target IP if found
+if [[ $found -eq 1 ]]; then
     echo -e "${GREEN}Running on the ARTIQ server${NC}"
     nix shell --command bash -c "$FIX ; $TLPM ; $ARTIQ"
 else
