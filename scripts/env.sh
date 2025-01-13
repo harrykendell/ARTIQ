@@ -6,10 +6,10 @@ GREEN='\033[0;32m'
 NC='\033[0m' # No Color
 pip list | sort >start_pip_list.txt
 # Windfreak
-pip install windfreak==0.3.0
+pip install windfreak
 
 # pco
-pip install pco==2.3.0
+pip install pco
 
 # Booster
 pip install -e "git+https://github.com/quartiq/booster.git@a1f83b63180511ecd68f88a04621624941d17a41#subdirectory=py/&egg=booster"
