@@ -5,11 +5,11 @@ Simple example of how to retrieve image data from pco.Camera.
 from artiq.experiment import *
 import time
 import logging
+import matplotlib.pyplot as plt
 import pco
-import pco.sdk
 
 logger = logging.getLogger()
-logger.setLevel(logging.WARNING)
+logger.setLevel(logging.INFO)
 logger.addHandler(pco.stream_handler)
 
 triggers = [
@@ -53,6 +53,7 @@ def main():
             # cam.sdk.force_trigger()
 
         print(cam.images())
+        plt.imshow(cam.images()[0])
 
         print("done")
 
