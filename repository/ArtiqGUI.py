@@ -43,56 +43,72 @@ Devices:
     - Wavemeter
 
 """
-
-from sipyco.sync_struct import Subscriber
-from sipyco.asyncio_tools import SignalHandler
+from sipyco.pc_rpc import AsyncioClient
+from sipyco.sync_struct import Subscriber, process_mod
+from sipyco.asyncio_tools import atexit_register_coroutine, atexit
 import asyncio
-
-from PyQt6.QtCore import QObject, QThread
-
+from qasync import QEventLoop
+from artiq.dashboard import datasets, schedule
+from artiq.gui.models import ModelSubscriber
 from utils.boosterTelemetry import BoosterTelemetry
 
-datasets = dict()
-port = 3250
-server = "137.222.69.28"
+from PyQt5.QtWidgets import QApplication, QLabel
+from PyQt5.QtGui import QIcon
 
 
 class Client:
     # Holds the connection to everything we want to monitor
     # Artiq, Booster, DLCPro, etc
 
-    def __init__(self):
+    def __init__(self, loop: QEventLoop):
+        self.server = "137.222.69.28"
+        self.port_control = 3251
+        self.port_notify = 3250
+        self.loop = loop
         self.booster_init()
         self.artiq_init()
 
     def artiq_init(self):
-        self.datasets = dict()
+        # create connections to master
+        rpc_clients = dict()
+        for target in "schedule", "dataset_db":
+            client = AsyncioClient()
+            self.loop.run_until_complete(client.connect_rpc(
+                self.server, self.port_control, target))
+            atexit.register(client.close_rpc)
+            rpc_clients[target] = client
 
-        def init_d(x):
-            self.datasets.clear()
-            self.datasets.update(x)
-            return self.datasets
+        def create_dict(x):
+            d = dict()
+            d.update(x)
+            print(d)
+            return d
+        
+        def modify_d(x):
+            print("New database mod:\n", x)
+            return
+        
+        def modify_s(x):
+            print("New schedule:\n", x)
+            return
+        
+        sub_clients = dict()
+        for notifier_name, modify in (("datasets", modify_d),("schedule", modify_s)):
+            subscriber = Subscriber(notifier_name, target_builder=create_dict, notify_cb=modify, disconnect_cb=None)
+            self.loop.run_until_complete(subscriber.connect(
+                self.server, self.port_notify))
+            atexit_register_coroutine(subscriber.close, loop=self.loop)
+            sub_clients[notifier_name] = subscriber
 
-        subscriber = Subscriber(
-            "datasets", init_d, lambda mod: self.artiq_callback(self.datasets)
-        )
-        _run_subscriber(server, port, subscriber)
 
-    def artiq_callback(self, data):
-        datasets.update(data)
-        print("\nnew Artiq data:\n", data)
+    def data_callback(self, model: datasets.Model):
+        print("New model:\n", model.backing_store)
 
     def booster_init(self):
         self.booster = BoosterTelemetry(self.booster_callback)
         self.booster_state = dict()
         self.booster_callbacks = [[]] * 8
-
         self.booster.start()
-
-        # # start the booster in the background
-        # self.booster_thread = QThread()
-        # self.booster.moveToThread(self.booster_thread)
-        # self.booster_thread.start()
 
     def booster_callback(self, ch, data):
         self.booster_state[ch] = data
@@ -104,34 +120,25 @@ class Client:
         self.booster_callbacks[ch].append(cb)
 
 
-def _run_subscriber(host, port, subscriber):
-    loop = asyncio.new_event_loop()
+def main():
+    app = QApplication(["Test GUI"])
+
+    loop = QEventLoop(app)
+    # loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    try:
-        signal_handler = SignalHandler()
-        signal_handler.setup()
-        try:
-            loop.run_until_complete(subscriber.connect(host, port))
-            try:
-                _, pending = loop.run_until_complete(
-                    asyncio.wait(
-                        [
-                            loop.create_task(signal_handler.wait_terminate()),
-                            subscriber.receive_task,
-                        ],
-                        return_when=asyncio.FIRST_COMPLETED,
-                    )
-                )
-                for task in pending:
-                    task.cancel()
-            finally:
-                loop.run_until_complete(subscriber.close())
-        finally:
-            signal_handler.teardown()
-    finally:
-        loop.close()
+    atexit.register(loop.close)
+
+    client = Client(loop)
+    # Set a nice icon
+    app.setWindowIcon(QIcon("/usr/share/icons/elementary-xfce/apps/128/do.png"))
+    app.setStyle("Fusion")
+    app.setApplicationName("ARTIQ GUI")
+
+    screen = QLabel("Hello, World!")
+    screen.show()
+
+    app.exec()
 
 
 if __name__ == "__main__":
-    client = Client()
-    print("done")
+    main()
