@@ -30,7 +30,7 @@ pip install -e "git+https://github.com/OxfordIonTrapGroup/oxart-devices.git#egg=
 pip install -e "git+https://github.com/m-labs/artiq.git@release-8#egg=artiq"
 
 # artiq-comtools
-pip install -e "git+https://github.com/m-labs/artiq-comtools.git"
+pip install -e "git+https://github.com/m-labs/artiq-comtools.git#egg=artiq-comtools"
 
 # ndscan
 pip install -e "git+https://github.com/OxfordIonTrapGroup/ndscan.git#egg=ndscan"
