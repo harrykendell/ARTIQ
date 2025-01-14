@@ -3,6 +3,7 @@ We steal some of the functionality from artiq_client into a gui
 This is designed to be used alongside the dashboard
 
     - Monitor device state via datasets
+        + The Idle kernel keeps reading out values into datasets e.g. sampler values
         + BoosterTelemetry subscription
         + DLCPro???
 
@@ -55,6 +56,8 @@ from utils.boosterTelemetry import BoosterTelemetry
 from PyQt5.QtWidgets import QApplication, QLabel
 from PyQt5.QtGui import QIcon
 
+import logging
+
 
 class Client:
     # Holds the connection to everything we want to monitor
@@ -81,15 +84,14 @@ class Client:
         def create_dict(x):
             d = dict()
             d.update(x)
-            print(d)
             return d
         
-        def modify_d(x):
-            print("New database mod:\n", x)
+        def modify_d(mod):
+            logging.info(f"New database mod:\n{mod}")
             return
         
-        def modify_s(x):
-            print("New schedule:\n", x)
+        def modify_s(mod):
+            logging.info(f"New schedule mod:\n{mod}")
             return
         
         sub_clients = dict()
@@ -100,19 +102,16 @@ class Client:
             atexit_register_coroutine(subscriber.close, loop=self.loop)
             sub_clients[notifier_name] = subscriber
 
-
-    def data_callback(self, model: datasets.Model):
-        print("New model:\n", model.backing_store)
-
     def booster_init(self):
         self.booster = BoosterTelemetry(self.booster_callback)
         self.booster_state = dict()
         self.booster_callbacks = [[]] * 8
         self.booster.start()
+        self.booster.set_telem_period(1)
 
     def booster_callback(self, ch, data):
+        logging.debug(f"\nnew Booster data:\n{data}")
         self.booster_state[ch] = data
-        print("\nnew Booster data:\n", data)
         for cb in self.booster_callbacks[ch]:
             cb(data)
 
@@ -141,4 +140,6 @@ def main():
 
 
 if __name__ == "__main__":
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)
     main()
