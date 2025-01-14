@@ -11,6 +11,9 @@ pip install windfreak
 # pco
 pip install pco
 
+# aiomqtt
+pip install aiomqtt
+
 # Booster
 pip install -e "git+https://github.com/quartiq/booster.git@a1f83b63180511ecd68f88a04621624941d17a41#subdirectory=py/&egg=booster"
 
