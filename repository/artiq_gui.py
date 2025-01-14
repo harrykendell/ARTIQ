@@ -472,6 +472,7 @@ class SUServoGUI(QWidget):
         self.setGeometry(self.x(), self.y(), self.minimumWidth(), self.minimumHeight())
         self.manager = SUServoManager(experiment, core, suservo, suservo_chs, shutters)
         self.booster = BoosterTelemetry(self.update_booster)
+        self.booster.set_telem_period(1)
         self.ch = [
             SingleChannelSUServo(self.manager, self.booster, i) for i in range(8)
         ]
