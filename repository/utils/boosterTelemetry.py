@@ -6,7 +6,7 @@ class TelemetryWorker(QObject):
 
     async def listen(self):
         # we want to listen to updates of channel[0-7]/[state,input power, output power]
-        async with aiomqtt.Client("192.168.0.100") as client:
+        async with aiomqtt.Client("137.222.69.28") as client:
             await client.subscribe("dt/sinara/booster/fc-0f-e7-23-77-30/telemetry/#")
             client._on_message = self.handle_message
             async for message in client.messages:
