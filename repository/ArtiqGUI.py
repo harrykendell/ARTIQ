@@ -52,16 +52,29 @@ class Client:
         atexit.register(self.loop.close)
 
         self.booster_db = dict()
-        self.booster_init()
 
-        self.rpc_clients = dict()
-        self.rpc_init()
+        self.rpc_clients: dict[AsyncioClient] = dict()
+        self.sub_clients: dict[Subscriber] = dict()
 
-        self.sub_clients = dict()
         self.schedule_db = dict()
-        self.schedule_init()
         self.datatset_db = dict()
+
+    # manage connections with context manager
+    def __enter__(self):
+        self.booster_init()
+        self.rpc_init()
+        self.schedule_init()
         self.dataset_init()
+
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        for client in self.rpc_clients.values():
+            client: AsyncioClient
+            client.close_rpc()
+        for client in self.sub_clients.values():
+            client: Subscriber
+            client.close()
 
     def rpc_init(self):
         # create connections to master
@@ -70,7 +83,6 @@ class Client:
             self.loop.run_until_complete(
                 client.connect_rpc(self.server, self.port_control, target)
             )
-            atexit.register(client.close_rpc)
             self.rpc_clients[target] = client
 
     def dataset_init(self):
@@ -107,7 +119,6 @@ class Client:
             disconnect_cb=None,
         )
         self.loop.run_until_complete(subscriber.connect(self.server, self.port_notify))
-        atexit_register_coroutine(subscriber.close, loop=self.loop)
         self.sub_clients["datasets"] = subscriber
 
     def schedule_init(self):
@@ -178,7 +189,6 @@ class UI(QWidget):
         self.setWindowTitle("ARTIQ GUI")
         self.setGeometry(100, 100, 800, 600)
 
-        self.client = client
         self.inutUI()
 
         self.register_callbacks()
@@ -226,6 +236,7 @@ class UI(QWidget):
         self.client.register_schedule_callback(self.update_schedule)
         self.client.register_booster_callback("*", self.update_booster)
 
+
 def main():
     app = QApplication(["Test GUI"])
     # Set a nice icon
@@ -233,11 +244,12 @@ def main():
     app.setStyle("Fusion")
     app.setApplicationName("ARTIQ GUI")
 
-    client = Client(app)
-    ui = UI(client)
-    ui.show()
+    with Client(app) as client:
 
-    sys.exit(app.exec())
+        ui = UI(client)
+        ui.show()
+
+        sys.exit(app.exec())
 
 
 if __name__ == "__main__":
