@@ -722,7 +722,7 @@ class DeltaElektronikaGUI(QWidget):
             SingleChannelFastino(
                 self.manager,
                 i,
-                ["Ch 0 (X+)", "Ch 1 (X-)", "Ch 2 (Y)", "Ch 3 (Z)"][i],
+                ["Ch 0 (X1)", "Ch 1 (X2)", "Ch 2 (Y)", "Ch 3 (Z)"][i],
                 getter=self.manager.get_current,
                 setter=self.manager.set_current,
                 min=0.0,
