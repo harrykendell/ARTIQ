@@ -123,7 +123,8 @@
         format = "wheel";
         src = pkgs.python3Packages.fetchPypi {
           inherit pname version format;
-          python = "py3";
+          python = "py3"; # they only release for py3 not py2.py3
+          dist= "py3"; # they only release for py3 not py2.py3
           platform = "manylinux2014_x86_64";
           sha256 = "3mFhw1spvuo2+GDyv09NASetnFa3MLRh2OwJTHy3X0M=";
         };
