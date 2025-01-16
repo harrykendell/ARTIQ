@@ -43,6 +43,7 @@ done
 # Run the ARTIQ dashboard with the target IP if found
 if [[ $found -eq 1 ]]; then
     echo -e "${GREEN}Running on the ARTIQ server${NC}"
+    nix-collect-garbage --delete-older-than 7d
     nix shell --command bash -c "$FIX ; $TLPM ; $ARTIQ"
 else
     echo -e "${RED}Not running on the ARTIQ server${NC}"
