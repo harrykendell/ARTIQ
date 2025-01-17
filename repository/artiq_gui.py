@@ -425,6 +425,8 @@ class SingleChannelMirny(QWidget):
             default=self.manager.en_outs[channel],
             turn_on=lambda: self.manager.enable(channel),
             turn_off=lambda: self.manager.disable(channel),
+            on_text="Mirny",
+            off_text="Mirny",
         )
         top.addWidget(self.dds_button)
 
