@@ -62,7 +62,7 @@ class SwitchCircle(QWidget):
         self.color = value
         self.update()
 
-class SwitchControl(QCheckBox):
+class Switch(QCheckBox):
 
     def __init__(
         self,
@@ -142,7 +142,7 @@ if __name__ == "__main__":
 
     layout = QVBoxLayout()
 
-    switch = SwitchControl()
+    switch = Switch()
     layout.addWidget(switch)
 
     window.setLayout(layout)
