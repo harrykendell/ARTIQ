@@ -18,83 +18,55 @@ widgets can register to be updated for specific datasets
 
 import sys, logging
 
+from PyQt5.QtWidgets import QApplication, QLabel, QVBoxLayout, QWidget
+from PyQt5 import QtCore
+
 # Data subscriptions
 from sipyco.pc_rpc import AsyncioClient
 from sipyco.sync_struct import Subscriber
-from sipyco.asyncio_tools import atexit_register_coroutine, atexit
 import asyncio
 from qasync import QEventLoop
-from utils.boosterTelemetry import BoosterTelemetry
+import aiomqtt
 
 # GUI
 from PyQt5.QtWidgets import QApplication, QLabel, QWidget, QVBoxLayout, QTextEdit
-from PyQt5.QtGui import QIcon
-from artiq.gui.scientific_spinbox import ScientificSpinBox
+from gui.ScientificSpin import ScientificSpin
 
 
-class Client:
-    # Holds the connection to everything we want to monitor
-    # Artiq, Booster, DLCPro, etc
-
-    def __init__(
-        self,
-        app: QApplication,
-        server="137.222.69.28",
-        port_control=3251,
-        port_notify=3250,
-    ):
+class GUIClient:
+    def __init__(self, server="137.222.69.28", port_control=3251, port_notify=3250):
         self.server = server
         self.port_control = port_control
         self.port_notify = port_notify
 
-        self.loop = QEventLoop(app)
-        asyncio.set_event_loop(self.loop)
-        atexit.register(self.loop.close)
+        self.rpc_clients: dict[AsyncioClient] = {}
+        self.subscribers: dict[Subscriber] = {}
+        self.booster = None
 
         self.booster_db = dict()
-
-        self.rpc_clients: dict[AsyncioClient] = dict()
-        self.sub_clients: dict[Subscriber] = dict()
-
         self.schedule_db = dict()
-        self.datatset_db = dict()
+        self.dataset_db = dict()
 
-    # manage connections with context manager
-    def __enter__(self):
-        self.booster_init()
-        self.rpc_init()
-        self.schedule_init()
-        self.dataset_init()
+        self.booster_callbacks = [[] for _ in range(8)]
+        self.dataset_callbacks = {}
+        self.schedule_callbacks = []
 
-        return self
+    async def connect(self):
+        """Initialize connections."""
+        # Connect RPC clients
+        tasks = [
+            self.connect_rpc("dataset_db"),
+            self.connect_rpc("schedule"),
+        ]
 
-    def __exit__(self, exc_type, exc_value, traceback):
-        for client in self.rpc_clients.values():
-            client: AsyncioClient
-            client.close_rpc()
-        for client in self.sub_clients.values():
-            client: Subscriber
-            client.close()
+        # Connect subscribers
+        def _dataset_create(data):
+            logging.debug(f"New dataset:\n{data}")
+            self.dataset_db = data
+            return self.dataset_db
 
-    def rpc_init(self):
-        # create connections to master
-        for target in "schedule", "dataset_db":
-            client = AsyncioClient()
-            self.loop.run_until_complete(
-                client.connect_rpc(self.server, self.port_control, target)
-            )
-            self.rpc_clients[target] = client
-
-    def dataset_init(self):
-        self.dataset_callbacks = dict()
-
-        def create_d(data):
-            self.datatset_db = data
-            logger.debug(f"New dataset:\n{self.datatset_db}")
-            return self.datatset_db
-
-        def modify_d(mod):
-
+        def _dataset_update(mod):
+            logging.debug(f"New dataset mod {mod}")
             if mod["action"] != "setitem":
                 if mod["action"] == "init":
                     for key in self.dataset_callbacks.keys():
@@ -102,75 +74,99 @@ class Client:
                 else:
                     logging.error(f"We cannot handle {mod['action']} on datasets")
                 return
-
-            logging.debug(f"New dataset mod")
-            # we want to trigger on the key or a subpath of the key
-            # i.e. if we have a key "foo" we want to trigger on mod["key"] = "foo"/"foo.bar" but not "foobar"
-            # also * should trigger on everything
-            for key in self.dataset_callbacks.keys():
-                if key == mod["key"] or mod["key"].startswith(key + ".") or key == "*":
-                    [cb() for cb in self.dataset_callbacks[key]]
-            return
-
-        subscriber = Subscriber(
-            "datasets",
-            target_builder=create_d,
-            notify_cb=modify_d,
-            disconnect_cb=None,
+        tasks.append(
+            self.connect_subscriber(
+                "datasets",
+                _dataset_create,
+                _dataset_update,
+            )
         )
-        self.loop.run_until_complete(subscriber.connect(self.server, self.port_notify))
-        self.sub_clients["datasets"] = subscriber
 
-    def schedule_init(self):
-        self.schedule_callbacks = []
-
-        def create_s(data):
+        def _schedule_create(data):
+            logging.debug(f"New schedule:\n{data}")
             self.schedule_db = data
             return self.schedule_db
 
-        def modify_s(mod):
-            logging.debug(f"New schedule mod")
-            [cb() for cb in self.schedule_callbacks]
+        def _schedule_update(mod):
+            logging.debug(f"New schedule mod {mod}\n we have callbacks")
+            for cb in self.schedule_callbacks:
+                cb()
             return
-
-        subscriber = Subscriber(
-            "schedule",
-            target_builder=create_s,
-            notify_cb=modify_s,
-            disconnect_cb=None,
+        tasks.append(
+            self.connect_subscriber(
+                "schedule",
+                _schedule_create,
+                _schedule_update,
+            )
         )
-        self.loop.run_until_complete(subscriber.connect(self.server, self.port_notify))
-        atexit_register_coroutine(subscriber.close, loop=self.loop)
-        self.sub_clients["schedule"] = subscriber
 
-    # register to be called when new data is available
-    # cb()
-    def register_dataset_callback(self, key, cb):
-        if key not in self.dataset_callbacks:
-            self.dataset_callbacks[key] = []
-        self.dataset_callbacks[key].append(cb)
-        cb()
+        # Connect booster via MQTT
+        tasks.append(self.connect_booster())
 
-    # register to be called when new data is available
-    # cb()
-    def register_schedule_callback(self, cb):
-        self.schedule_callbacks.append(cb)
-        cb()
+        logging.info("Connecting to services...")
+        await asyncio.gather(*tasks)
 
-    def booster_init(self):
-        def booster_callback(ch, data):
-            logging.debug(f"\nnew Booster data ({ch}):\n{data}")
+    async def connect_rpc(self, target):
+        client = AsyncioClient()
+        try:
+            await asyncio.wait_for(
+                client.connect_rpc(self.server, self.port_control, target), 5
+            )
+        except asyncio.TimeoutError:
+            logging.error(f"Failed to connect to RPC: {target}")
+            return
+        self.rpc_clients[target] = client
+        logging.info(f"Connected to RPC: {target}")
+
+    async def connect_subscriber(self, target, target_builder, callback, disconnect = None):
+        subscriber = Subscriber(target, target_builder, callback, disconnect)
+        try:
+            await asyncio.wait_for(subscriber.connect(self.server, self.port_notify), 5)
+        except asyncio.TimeoutError:
+            logging.error(f"Failed to connect to Sub: {target}")
+            return
+        self.subscribers[target] = subscriber
+        logging.info(f"Connected to Sub: {target}")
+
+    async def connect_booster(self):
+        """Initialize MQTT connection for booster telemetry."""
+
+        # Define the callback for handling incoming MQTT messages
+        def handle_booster_message(message):
+            """Handle the incoming telemetry message."""
+            logging.debug(f"New Booster message: {message.payload.decode()}")
+            ch = int(message.topic.value[-1])
+            data = message.payload.decode()
             self.booster_db[ch] = data
+
+            # Call any registered callback for this channel
             for cb in self.booster_callbacks[ch]:
+                logging.debug(f"Calling booster callback {cb} with {data}")
                 cb()
 
-        self.booster = BoosterTelemetry(booster_callback)
-        self.booster_callbacks = [[]] * 8
-        self.booster.start()
-        self.booster.set_telem_period(5)
+        # MQTT connection and subscription
+        try:
+            async with aiomqtt.Client(self.server) as client:
+                # Subscribe to booster telemetry channels 0-7
+                await asyncio.wait_for(
+                    client.subscribe(
+                        "dt/sinara/booster/fc-0f-e7-23-77-30/telemetry/#"
+                    ),
+                    5,
+                )
 
-    # register to be called when new data is available
-    # cb()
+                client._on_message = (
+                    handle_booster_message  # Assign callback for messages
+                )
+                async for message in client.messages:
+                    handle_booster_message(
+                        message
+                    )  # Pass each incoming message to the handler
+        except aiomqtt.exceptions.MqttError or asyncio.TimeoutError as e:
+            logging.error(f"Failed to connect to Booster")
+            return
+        logging.info("Connected to Booster")
+
     def register_booster_callback(self, ch, cb):
         if ch == "*":
             [self.booster_callbacks[i].append(cb) for i in range(8)]
@@ -179,9 +175,27 @@ class Client:
         else:
             logging.error(f"Invalid booster channel {ch}")
 
+    def register_dataset_callback(self, key, cb):
+        if key not in self.dataset_callbacks:
+            self.dataset_callbacks[key] = []
+        self.dataset_callbacks[key].append(cb)
+        cb()
 
-class UI(QWidget):
-    def __init__(self, client: Client):
+    def register_schedule_callback(self, cb):
+        self.schedule_callbacks.append(cb)
+        cb()
+
+    async def disconnect(self):
+        """Disconnect all connections."""
+        for client in self.rpc_clients.values():
+            await client.close_rpc()
+        for subscriber in self.subscribers.values():
+            await subscriber.close()
+        logging.info("Disconnected from all connections.")
+
+
+class MainWindow(QWidget):
+    def __init__(self, client: GUIClient):
         super().__init__()
 
         self.client = client
@@ -196,7 +210,7 @@ class UI(QWidget):
     def inutUI(self):
         layout = QVBoxLayout()
 
-        self.spinbox = ScientificSpinBox()
+        self.spinbox = ScientificSpin()
         layout.addWidget(self.spinbox)
 
         self.dataset_label = QLabel("Dataset:")
@@ -223,7 +237,7 @@ class UI(QWidget):
         self.setLayout(layout)
 
     def update_dataset(self):
-        self.dataset_text.setText(str(self.client.datatset_db))
+        self.dataset_text.setText(str(self.client.dataset_db))
 
     def update_schedule(self):
         self.schedule_text.setText(str(self.client.schedule_db))
@@ -238,21 +252,25 @@ class UI(QWidget):
 
 
 def main():
-    app = QApplication(["Test GUI"])
-    # Set a nice icon
-    app.setWindowIcon(QIcon("/usr/share/icons/elementary-xfce/apps/128/do.png"))
-    app.setStyle("Fusion")
-    app.setApplicationName("ARTIQ GUI")
+    logging.basicConfig(level=logging.INFO)
 
-    with Client(app) as client:
+    app = QApplication(sys.argv)
+    loop = QEventLoop(app)
+    asyncio.set_event_loop(loop)
 
-        ui = UI(client)
-        ui.show()
+    server = "137.222.69.28"
 
-        sys.exit(app.exec())
+    client = GUIClient(server)
+    main_window = MainWindow(client)
+
+    app.aboutToQuit.connect(lambda: loop.create_task(client.disconnect()))
+
+    # Start connections
+    loop.create_task(client.connect())
+
+    main_window.show()
+    loop.run_forever()
 
 
 if __name__ == "__main__":
-    logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
     main()
