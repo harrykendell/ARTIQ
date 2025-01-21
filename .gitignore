@@ -166,11 +166,9 @@ cython_debug/
 *.pyon
 *.elf
 *.DS_Store
-dataset_db.mdb
 dataset_db.mdb-lock
 results
 
 flake.lock
 src/
-artiq_kasli/
 crate config/bu2402001_*
