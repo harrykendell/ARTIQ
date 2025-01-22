@@ -1,11 +1,12 @@
 from artiq.experiment import *
-from artiq.language import us, ms, MHz, dB, delay, TInt64
+from artiq.language import us, ms, MHz, dB, delay
 
 from artiq.coredevice.core import Core, rtio_get_counter, at_mu
 from artiq.coredevice.almazny import AlmaznyChannel
 from artiq.coredevice.adf5356 import ADF5356
 from artiq.coredevice.mirny import Mirny
 
+from numpy import int32
 
 class MirnyManager:  # {{{
     """
@@ -40,7 +41,7 @@ class MirnyManager:  # {{{
         defaults = [
             [1] + [0] * 3,
             [3.0] + [31.5] * 3,
-            [3285e6]  + [4000]* 3,
+            [3285e6] + [4000] * 3,
             [0] * 4,
         ]
         units = [
@@ -81,19 +82,19 @@ class MirnyManager:  # {{{
         delay(50 * ms)
 
     @kernel
-    def set_almazny(self, ch, state=True):
+    def set_almazny(self, ch: int32, state: int32 = 1):
         self.experiment.mutate_dataset(self.name + ".en_almazny", ch, state)
-        self.en_almazny[ch] = 0 if not state else 1
+        self.en_almazny[ch] = state
         self.core.break_realtime()
-        self.almazny[ch].set(self.atts[ch], state, state)
+        self.almazny[ch].set(self.atts[ch] * dB, state, bool(state))
 
     @kernel
     def enable_almazny(self, ch):
-        self.set_almazny(ch, True)
+        self.set_almazny(ch, 1)
 
     @kernel
     def disable_almazny(self, ch):
-        self.set_almazny(ch, False)
+        self.set_almazny(ch, 0)
 
     @kernel
     def enable(self, ch):
@@ -103,30 +104,30 @@ class MirnyManager:  # {{{
         self.channels[ch].sw.on()
 
     @kernel
-    def disable(self, ch):
+    def disable(self, ch: int32):
         """Disable a given channel"""
         self._mutate_and_set_int("en_outs", self.en_outs, ch, 0)
         self.core.break_realtime()
         self.channels[ch].sw.off()
 
     @kernel
-    def set_att(self, ch, att):
+    def set_att(self, ch: int32, att: float):
         self._mutate_and_set_float("atts", self.atts, ch, att)
         self.core.break_realtime()
-        # # set Att for Mirny channel ch
+        # set Att for Mirny channel ch
         self.channels[ch].set_att(att * dB)
-        # # set Att for Almazny channel ch
-        self.almazny[ch].set(att * dB, self.en_almazny[ch], bool(self.en_almazny[ch]))
+        # set Att for Almazny channel ch
+        self.set_almazny(ch, self.en_almazny[ch])
 
     @kernel
-    def set_freq(self, ch, freq):
+    def set_freq(self, ch: int32, freq: float):
         self._mutate_and_set_float("freqs", self.freqs, ch, freq * MHz)
         # 53.125 MHz <= f <= 6800 MHz
         if freq < 53.125:
             raise ValueError("Frequency too low")
         if freq > 6800.0:
             raise ValueError("Frequency too high")
-        
+
         # self.core.break_realtime() but faster
         at_mu(rtio_get_counter() + 1000)
         self.channels[ch].set_frequency(freq * MHz)
@@ -160,6 +161,4 @@ class MirnyManager:  # {{{
         # Initialize Almazny
         self.core.break_realtime()
         for ch in range(4):
-            self.almazny[ch].set(
-                self.atts[ch] * dB, self.en_almazny[ch], bool(self.en_almazny[ch])
-            )
+            self.set_almazny(ch, self.en_almazny[ch])
