@@ -288,6 +288,8 @@ for i in range(3):
 
 # Aliases
 aliases = {
+    # photodiode on 3DMOT - given we don't enable servoing for the locking arm
+    "MOT_photodiode": "suservo_ch0",
     # 780 MOT
     "suservo_aom_LOCK": "suservo_ch0",
     "suservo_aom_MOT": "suservo_ch1",
@@ -295,8 +297,8 @@ aliases = {
     "suservo_aom_PUMP": "suservo_ch3",
     "mirny_eom_repump": "mirny_ch0",
     "almazny_eom_repump": "almazny_ch0",
-    "shutter_aom_2DMOT": "ttl0",
-    "shutter_aom_3DMOT": "ttl1",
+    "shutter_2DMOT": "ttl0",
+    "shutter_3DMOT": "ttl1",
     # 852 Lattice
     "suservo_aom_LATX": "suservo_ch4",
     "suservo_aom_LATY": "suservo_ch5",
@@ -304,6 +306,5 @@ aliases = {
     "suservo_aom_CDT1": "suservo_ch6",
     "suservo_aom_CDT2": "suservo_ch7",
 }
-
 
 device_db |= aliases
