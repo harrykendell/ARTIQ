@@ -5,6 +5,7 @@ from artiq.coredevice.core import Core
 from artiq.coredevice.suservo import SUServo, Channel as SUServoChannel, COEFF_WIDTH
 from artiq.coredevice.ttl import TTLInOut
 
+import logging
 
 class SUServoManager:  # {{{
     """
@@ -97,7 +98,7 @@ class SUServoManager:  # {{{
         """
         self.suservo.set_config(0)
         delay(10 * us)
-        v = self.channels[ch].get_adc(0)
+        v = self.suservo.get_adc(0)
         self.suservo.set_config(self.enabled)
         delay(10 * us)
         return v
