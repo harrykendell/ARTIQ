@@ -469,10 +469,10 @@ class SingleChannelMirny(QWidget):
 
 
 class SUServoGUI(QWidget):
-    def __init__(self, experiment, core, suservo, suservo_chs, shutters):
+    def __init__(self, manager):
         super().__init__()
+        self.manager = manager
         self.setGeometry(self.x(), self.y(), self.minimumWidth(), self.minimumHeight())
-        self.manager = SUServoManager(experiment, core, suservo, suservo_chs, shutters)
         self.booster = BoosterTelemetry(self.update_booster)
         self.booster.set_telem_period(1)
         self.ch = [
@@ -542,9 +542,9 @@ class SUServoGUI(QWidget):
 
 class MirnyGUI(QWidget):
 
-    def __init__(self, experiment, core, mirny_chs, almazny):
+    def __init__(self, manager):
         super().__init__()
-        self.manager = MirnyManager(experiment, core, mirny_chs, almazny)
+        self.manager = manager
         self.ch = [SingleChannelMirny(self.manager, i) for i in range(4)]
 
         self.setWindowTitle("Mirny GUI")
@@ -684,9 +684,9 @@ class SingleChannelFastino(QWidget):
 
 
 class FastinoGUI(QWidget):
-    def __init__(self, experiment, core, fastino):
+    def __init__(self, manager):
         super().__init__()
-        self.manager = FastinoManager(experiment, core, fastino)
+        self.manager = manager
 
         self.setWindowTitle("Fastino GUI")
         layout = QVBoxLayout()
@@ -710,9 +710,9 @@ class FastinoGUI(QWidget):
 
 
 class DeltaElektronikaGUI(QWidget):
-    def __init__(self, experiment, core, fastino):
+    def __init__(self, manager):
         super().__init__()
-        self.manager = DeltaElektronikaManager(experiment, core, fastino)
+        self.manager = manager
 
         self.setWindowTitle("Delta Elektronika GUI")
         layout = QVBoxLayout()
@@ -748,41 +748,57 @@ class ArtiqGUIExperiment(EnvExperiment):
         self.suservo = self.get_device("suservo")
         self.suservo_chs = [self.get_device(f"suservo_ch{i}") for i in range(8)]
         self.shutters = [
-            self.get_device("shutter_aom_2DMOT"),
-            self.get_device("shutter_aom_3DMOT"),
+            self.get_device("shutter_2DMOT"),
+            self.get_device("shutter_3DMOT"),
         ]
+        self.suservoManager: SUServoManager
 
         self.mirny_chs = [self.get_device(f"mirny_ch{i}") for i in range(4)]
         self.almazny = [self.get_device(f"almazny_ch{i}") for i in range(4)]
+        self.mirnyManager: MirnyManager
 
         self.fastino = self.get_device("fastino")
+        self.useFastino = False
+        self.fastinoManager: FastinoManager
+        self.deltaElektronikaManager: DeltaElektronikaManager
 
     def run(self):
-        self.init_kernel()
+        # Startups run methods
+
+        # SUServo
+        self.suservoManager = SUServoManager(
+            self, self.core, self.suservo, self.suservo_chs, self.shutters
+        )
+
+        # Mirny
+        self.mirnyManager = MirnyManager(self, self.core, self.mirny_chs, self.almazny)
+
+        # Fastino
+        if self.useFastino:
+            self.fastinoManager = FastinoManager(self, self.core, self.fastino)
+        else:
+            self.deltaElektronikaManager = DeltaElektronikaManager(
+                self, self.core, self.fastino
+            )
+
+        # now ours
         app = QApplication(sys.argv)
         # Set a nice icon
         app.setWindowIcon(QIcon("/usr/share/icons/elementary-xfce/apps/128/do.png"))
         app.setStyle("Fusion")
         app.setApplicationName("ARTIQ GUI")
 
-        suservoGUI = SUServoGUI(
-            self, self.core, self.suservo, self.suservo_chs, self.shutters
-        )
+        suservoGUI = SUServoGUI(self.suservoManager)
         suservoGUI.show()
 
-        mirnyGUI = MirnyGUI(self, self.core, self.mirny_chs, self.almazny)
+        mirnyGUI = MirnyGUI(self.mirnyManager)
         mirnyGUI.show()
 
-        if False:
-            fastinoGUI = FastinoGUI(self, self.core, self.fastino)
+        if self.useFastino:
+            fastinoGUI = FastinoGUI(self.fastinoManager)
             fastinoGUI.show()
         else:
-            deltaGUI = DeltaElektronikaGUI(self, self.core, self.fastino)
+            deltaGUI = DeltaElektronikaGUI(self.deltaElektronikaManager)
             deltaGUI.show()
 
         app.exec_()
-
-    @kernel
-    def init_kernel(self):
-        """Initialize core"""
-        self.core.reset()
