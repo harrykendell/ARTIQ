@@ -29,6 +29,7 @@ class SUServoedBeam:
     suservo_device: str
     shutter_device: Optional[str] = None
     shutter_delay: float = 0.0
+    initial_amplitude: float = 1.0
     setpoint: float = 0.0
     "A setpoint in volts which should be attainable under all circumstances. If this power cannot be reached, the experiment has permission to misbehave"
     servo_enabled: bool = False
@@ -39,20 +40,3 @@ class SUServoedBeam:
     Relevant only when servoing beams with very low amplitudes, this number should
     be added to all setpoints before setting them.
     """
-
-
-@dataclass
-class UrukuledBeam:
-    """
-    A simple class that holds information about a beam to be controlled via an Urukul channel.
-
-    Includes ability to change the amplitude as well as attenuation, avoiding global setting of attenuation.
-    """
-
-    name: str
-    frequency: float
-    attenuation: float
-    urukul_device: str
-    amplitude: float = 1.0
-    shutter_device: Optional[str] = None
-    shutter_delay: Optional[float] = 0.0
