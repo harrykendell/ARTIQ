@@ -14,7 +14,7 @@ from artiq.experiment import portable
 from ndscan.experiment import Fragment
 
 from repository.utils import get_local_devices
-from repository.utils.models import SUServoedBeam
+from repository.models import SUServoedBeam
 
 
 logger = logging.getLogger(__name__)

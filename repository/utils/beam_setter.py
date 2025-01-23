@@ -13,7 +13,7 @@ from artiq.experiment import portable
 from ndscan.experiment import Fragment
 
 from get_local_devices import get_local_devices
-from models import SUServoedBeam
+from repository.models import SUServoedBeam
 
 DELAY_BETWEEN_RTIO_EVENTS = 4e-9
 

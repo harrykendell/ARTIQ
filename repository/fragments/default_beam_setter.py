@@ -15,7 +15,7 @@ from ndscan.experiment.parameters import FloatParamHandle
 
 from repository.utils.dummy_devices import *
 from repository.fragments.suservo import LibSetSUServoStatic
-from repository.utils.models import SUServoedBeam
+from repository.models import SUServoedBeam
 
 
 logger = logging.getLogger(__name__)
