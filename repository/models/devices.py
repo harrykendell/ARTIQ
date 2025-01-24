@@ -4,8 +4,8 @@ from artiq.language.units import MHz
 EOMS = {
     EOM(
         name="repump_eom",
-        frequency=3285,
-        attenuation=3.0,
+        frequency=3285 * MHz,
+        attenuation=3.0 * dB,
         mirny_ch="mirny_eom_repump",
         almazny_ch="almazny_eom_repump",
     )
@@ -56,48 +56,48 @@ SUSERVOED_BEAMS = {
         name="Locking",
         suservo_device="suservo_aom_LOCK",
         frequency=198 * MHz,
-        attenuation=16.0,
+        attenuation=16.0 * dB,
     ),
     SUServoedBeam(
         name="MOT",
         suservo_device="suservo_aom_MOT",
         frequency=198 * MHz,
-        attenuation=15.5,
+        attenuation=15.5 * dB,
     ),
     SUServoedBeam(
         name="IMG",
         suservo_device="suservo_aom_IMG",
         frequency=219 * MHz,
-        attenuation=20.0,
+        attenuation=20.0 * dB,
     ),
     SUServoedBeam(
         name="PUMP",
         suservo_device="suservo_aom_PUMP",
         frequency=86 * MHz,
-        attenuation=20.0,
+        attenuation=20.0 * dB,
     ),
     SUServoedBeam(
         name="LATX",
         suservo_device="suservo_aom_LATX",
         frequency=200 * MHz,
-        attenuation=20.0,
+        attenuation=20.0 * dB,
     ),
     SUServoedBeam(
         name="LATY",
         suservo_device="suservo_aom_LATY",
         frequency=200 * MHz,
-        attenuation=20.0,
+        attenuation=20.0 * dB,
     ),
     SUServoedBeam(
         name="CDT1",
         suservo_device="suservo_aom_CDT1",
         frequency=110 * MHz,
-        attenuation=20.0,
+        attenuation=20.0 * dB,
     ),
     SUServoedBeam(
         name="CDT2",
         suservo_device="suservo_aom_CDT2",
         frequency=110 * MHz,
-        attenuation=20.0,
+        attenuation=20.0 * dB,
     ),
 }
