@@ -7,17 +7,8 @@ from artiq.language.core import delay, now_mu
 from artiq.language.units import us
 from artiq.coredevice.ttl import TTLOut, TTLInOut
 from artiq.coredevice.core import Core
-from artiq.coredevice.suservo import SUServo, Channel as SUServoChannel
 
-
-import sys, logging
-
-sys.path.append(
-    __file__.split("repository")[0] + "repository"
-)  # link to repository root
-from utils.SUServoManager import SUServoManager
-from utils.MirnyManager import MirnyManager
-from utils.FastinoManager import FastinoManager, DeltaElektronikaManager
+import logging
 
 
 class Startup(EnvExperiment):

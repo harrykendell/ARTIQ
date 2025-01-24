@@ -27,10 +27,10 @@ from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QDoubleValidator, QIntValidator, QIcon
 
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
-from utils.SUServoManager import SUServoManager
-from utils.boosterTelemetry import BoosterTelemetry
-from utils.MirnyManager import MirnyManager
-from utils.FastinoManager import FastinoManager, DeltaElektronikaManager
+from managers.SUServoManager import SUServoManager
+from managers.boosterTelemetry import BoosterTelemetry
+from managers.MirnyManager import MirnyManager
+from managers.FastinoManager import FastinoManager, DeltaElektronikaManager
 
 from artiq.experiment import *
 from artiq.language import MHz, ms

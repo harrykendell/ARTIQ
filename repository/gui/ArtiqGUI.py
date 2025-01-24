@@ -30,7 +30,7 @@ import aiomqtt
 
 # GUI
 from PyQt5.QtWidgets import QApplication, QLabel, QWidget, QVBoxLayout, QTextEdit
-from repository.gui.ScientificSpin import ScientificSpin
+from repository.gui.components.ScientificSpin import ScientificSpin
 
 
 class GUIClient:
