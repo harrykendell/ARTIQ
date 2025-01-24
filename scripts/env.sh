@@ -11,6 +11,9 @@ pip install windfreak
 # pco
 pip install pco
 
+# toptica laser
+pip install toptica-lasersdk
+
 # aiomqtt
 pip install aiomqtt
 

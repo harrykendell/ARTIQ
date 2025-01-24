@@ -286,6 +286,32 @@ for i in range(3):
         }
     )
 
+# Toptica Lasers
+device_db.update(
+    {
+        "toptica_780": {
+            "type": "local",
+            "module": "toptica_wrapper",
+            "class": "TopticaDLCPro",
+            "arguments": {
+                "ip": "192.168.0.4",
+                "laser": "laser2",
+                "simulation": False,
+            },
+        },
+        "toptica_852": {
+            "type": "local",
+            "module": "toptica_wrapper",
+            "class": "TopticaDLCPro",
+            "arguments": {
+                "ip": "192.168.0.4",
+                "laser": "laser1",
+                "simulation": False,
+            },
+        },
+    }
+)
+
 # Aliases
 aliases = {
     # photodiode on 3DMOT - given we don't enable servoing for the locking arm
