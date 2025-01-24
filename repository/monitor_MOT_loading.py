@@ -52,6 +52,7 @@ class MOTPhotodiodeMeasurement(Fragment):
 
         You must pass an array of floats with size <num_points> to `data`.
         """
+        self.core.break_realtime()
         self.shutter_3DMOT.off()
         delay_mu(initial_delay_mu)
         self.shutter_3DMOT.on()
@@ -154,7 +155,7 @@ class MeasureMOTWithPDFrag(ExpFragment):
 
         self.ccb.issue(
             "create_applet",
-            "MOD Photodiode",
+            "MOT Photodiode Voltage",
             f"${{artiq_applet}}plot_xy {self.name}",
         )
 
