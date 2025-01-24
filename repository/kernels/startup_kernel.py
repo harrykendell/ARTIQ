@@ -36,10 +36,6 @@ class Startup(EnvExperiment):
             self.__dict__["ttl" + str(i + 4)] for i in range(12)
         ]  # TTLInOut
 
-        logging.warning(
-            "\n\nI should really set the state to the config values somehow, while updating the dataset\n\n"
-        )
-
     @kernel
     def run(self):
         self.core.reset()
