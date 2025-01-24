@@ -206,6 +206,7 @@
             ps.matplotlib
             ps.pyqt5
             ps.pydantic
+            ps.ifaddr
 
             windfreak
             booster

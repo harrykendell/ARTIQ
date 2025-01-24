@@ -52,4 +52,5 @@ class CheckTopticaFrag(ExpFragment):
 
         logging.info(out)
 
-CheckToptica = make_fragment_scan_exp(CheckTopticaFrag)
+Check780 = make_fragment_scan_exp(CheckTopticaFrag, "toptica_780")
+Check780 = make_fragment_scan_exp(CheckTopticaFrag, "toptica_852")
