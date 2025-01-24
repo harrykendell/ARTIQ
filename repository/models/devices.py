@@ -1,5 +1,5 @@
 from repository.models import SUServoedBeam, EOM, VDrivenSupply, Shutter
-from artiq.language.units import MHz
+from artiq.language.units import MHz, dB
 
 EOMS = {
     EOM(
