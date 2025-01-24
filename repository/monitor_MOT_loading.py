@@ -109,6 +109,8 @@ class MeasureMOTWithPDFrag(ExpFragment):
         self.setattr_result("photodiode_mean_voltage", FloatChannel)
         self.photodiode_mean_voltage: FloatChannel
 
+        logger.warning("We should offer the option to switch the voltge supply instead")
+
     @kernel
     def run_once(self):
         num_points = self.num_trace_points.get()
