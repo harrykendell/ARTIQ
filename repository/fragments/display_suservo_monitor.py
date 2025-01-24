@@ -12,7 +12,6 @@ from artiq.experiment import (
     TArray,
     TFloat,
 )
-from artiq.language.core import now_mu, delay_mu
 from ndscan.experiment import ExpFragment, FloatParam, ResultChannel
 from ndscan.experiment.entry_point import make_fragment_scan_exp
 from ndscan.experiment.parameters import FloatParamHandle
@@ -20,9 +19,7 @@ from repository.fragments.default_beam_setter import (
     SetBeamsToDefaults,
     make_set_beams_to_default,
 )
-
-from repository.lib import constants
-from repository.utils.wait_for_enter import is_enter_pressed
+from repository.models.devices import SUSERVOED_BEAMS
 from repository.fragments.read_adc import ReadSUServoADC
 
 logger = logging.getLogger(__name__)
@@ -45,7 +42,7 @@ class SingleSUServoReadingFrag(ExpFragment):
         )
         self.waittime: FloatParamHandle
 
-        beam_info_names = list(constants.SUSERVOED_BEAMS.keys())
+        beam_info_names = list(SUSERVOED_BEAMS.keys())
         self.setattr_argument(
             "beam_info_name",
             EnumerationValue(
@@ -69,7 +66,7 @@ class SingleSUServoReadingFrag(ExpFragment):
 
         # %% devices
 
-        self.beam_info = constants.SUSERVOED_BEAMS[
+        self.beam_info = SUSERVOED_BEAMS[
             self.beam_info_name or beam_info_names[0]
         ]
 
@@ -171,7 +168,7 @@ class AllSUServoReadingFrag(ExpFragment):
 
         from copy import deepcopy
 
-        self.suservo_beam_infos = deepcopy(list(constants.SUSERVOED_BEAMS.values()))
+        self.suservo_beam_infos = deepcopy(list(SUSERVOED_BEAMS.values()))
 
         if not self.enable_servoing:
             for info in self.suservo_beam_infos:

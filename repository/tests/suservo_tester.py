@@ -12,7 +12,6 @@ from artiq.master.worker_db import DeviceManager
 from artiq.coredevice.suservo import SUServo, Channel
 from artiq.coredevice.core import Core
 
-from utils.surpress_missing_imports import *
 
 
 def chunker(seq, size):

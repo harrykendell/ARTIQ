@@ -1,6 +1,5 @@
 from artiq.experiment import *
 
-from utils.surpress_missing_imports import *
 from utils.wait_for_enter import is_enter_pressed
 
 

@@ -9,7 +9,6 @@ from artiq.experiment import *
 from artiq.master.databases import DeviceDB
 from artiq.master.worker_db import DeviceManager
 
-from utils.surpress_missing_imports import *
 from utils.wait_for_enter import is_enter_pressed
 
 from artiq.coredevice.core import Core

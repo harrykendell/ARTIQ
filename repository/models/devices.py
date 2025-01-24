@@ -1,6 +1,6 @@
 from repository.models import SUServoedBeam, EOM, VDrivenSupply, Shutter
 
-EOMS = {
+EOMS = [
     EOM(
         name="repump_eom",
         frequency=3285.0,
@@ -8,9 +8,11 @@ EOMS = {
         mirny_ch="mirny_eom_repump",
         almazny_ch="almazny_eom_repump",
     )
-}
+]
+# Convert to dict for ease of use
+EOMS = {eom.name: eom for eom in EOMS}
 
-VDRIVEN_SUPPLIES = {
+VDRIVEN_SUPPLIES = [
     VDrivenSupply(
         name="X1",
         fastino="fastino",
@@ -35,9 +37,11 @@ VDRIVEN_SUPPLIES = {
         ch=3,
         gain=2.0,
     ),
-}
+]
+# Convert to dict for ease of use
+VDRIVEN_SUPPLIES = {supply.name: supply for supply in VDRIVEN_SUPPLIES}
 
-SHUTTERS = {
+SHUTTERS = [
     Shutter(
         name="MOT2D",
         ttl="shutter_2DMOT",
@@ -48,14 +52,16 @@ SHUTTERS = {
         ttl="shutter_3DMOT",
         delay=0.0,
     ),
-}
+]
+# Convert to dict for ease of use
+SHUTTERS = {beam.name: beam for beam in SHUTTERS}
 
-SUSERVOED_BEAMS = {
+SUSERVOED_BEAMS = [
     SUServoedBeam(
         name="Locking",
-        suservo_device="suservo_aom_LOCK",
         frequency=198.0,
         attenuation=16.0,
+        suservo_device="suservo_aom_LOCK",
     ),
     SUServoedBeam(
         name="MOT",
@@ -99,4 +105,6 @@ SUSERVOED_BEAMS = {
         frequency=110.0,
         attenuation=20.0,
     ),
-}
+]
+# Convert to dict for ease of use
+SUSERVOED_BEAMS = {beam.name: beam for beam in SUSERVOED_BEAMS}

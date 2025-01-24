@@ -10,7 +10,7 @@ from ndscan.experiment.parameters import BoolParamHandle
 from ndscan.experiment.parameters import FloatParamHandle
 from ndscan.experiment.parameters import IntParamHandle
 
-from suservo import LibSetSUServoStatic
+from repository.fragments.suservo import LibSetSUServoStatic
 from get_local_devices import get_local_devices
 
 
