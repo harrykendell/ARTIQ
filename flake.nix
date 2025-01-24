@@ -132,11 +132,12 @@
 
       # Toptica Lasers
       toptica = pkgs.python3Packages.buildPythonPackage rec {
-        pname = "toptica-lasersdk";
+        pname = "toptica_lasersdk";
         version = "3.2.0";
         doCheck = false;
         src = pkgs.python3Packages.fetchPypi {
           inherit pname version;
+          sha256 = "UNazng4Za3CZeG7eDq0b+l7gmESEXIU8WMLWGGysmBg=";
         };
         };
       
@@ -209,6 +210,7 @@
             windfreak
             booster
             pco
+            toptica
 
             oxart-devices
             ndscan
