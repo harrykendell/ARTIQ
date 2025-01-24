@@ -24,8 +24,8 @@ class VDrivenSupply:
 
     name: str  # friendly name to access by
 
-    fastino: float
-    ch: float
+    fastino: str
+    ch: int
 
     gain: float  # The Current gain in Amps/Volt
     enabled: bool = False
