@@ -8,20 +8,29 @@ from submodules.topticadlcpro.toptica_wrapper.driver import TopticaDLCPro
 
 import logging
 
+
 class CheckTopticaFrag(ExpFragment):
     """
-    LogTopticaLaser
+    CheckTopticaFrag
 
     Logs the voltage, current, temperature of a Toptica DLCPro laser
     """
 
-    def build_fragment(self, laser_name: str) -> None:
-        self.laser_name = laser_name
+    def build_fragment(self) -> None:
 
         self.setattr_device("core")
         self.core: Core
 
-        self.dlcpro: TopticaDLCPro = self.get_device(laser_name)
+        self.setattr_argument(
+            "laser_name",
+            EnumerationValue(
+                {"toptica_780", "toptica_852"},
+                default="toptica_780",
+            ),
+        )
+        self.laser_name: str
+
+        self.dlcpro: TopticaDLCPro = self.get_device(self.laser_name)
 
     def host_setup(self):
         self.dlcpro.get_dlcpro().open()
@@ -52,5 +61,5 @@ class CheckTopticaFrag(ExpFragment):
 
         logging.info(out)
 
-Check780 = make_fragment_scan_exp(CheckTopticaFrag, "toptica_780")
-Check780 = make_fragment_scan_exp(CheckTopticaFrag, "toptica_852")
+
+CheckLaser = make_fragment_scan_exp(CheckTopticaFrag)
