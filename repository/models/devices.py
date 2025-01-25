@@ -43,14 +43,14 @@ VDRIVEN_SUPPLIES = [
         ch=7,
         gain=0.0,
         # TODO: Actually set me up
-    )
+    ),
     VDrivenSupply(
         name="Dispenser",
         fastino="fastino",
         ch=6,
         gain=0.0
         # TODO: Actually set me up
-    )
+    ),
 ]
 # Convert to dict for ease of use
 VDRIVEN_SUPPLIES = {supply.name: supply for supply in VDRIVEN_SUPPLIES}
