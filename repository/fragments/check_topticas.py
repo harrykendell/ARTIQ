@@ -4,6 +4,7 @@ from artiq.coredevice.core import Core
 from ndscan.experiment import *
 from toptica.lasersdk.dlcpro.v3_2_0 import Laser
 
+from repository.utils.get_local_devices import get_local_devices
 from submodules.topticadlcpro.toptica_wrapper.driver import TopticaDLCPro
 
 import logging
@@ -24,7 +25,7 @@ class CheckTopticaFrag(ExpFragment):
         self.setattr_argument(
             "laser_name",
             EnumerationValue(
-                {"toptica_780", "toptica_852"},
+                get_local_devices(self, TopticaDLCPro),
                 default="toptica_780",
             ),
         )
