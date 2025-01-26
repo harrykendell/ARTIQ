@@ -17,7 +17,7 @@ from artiq.experiment import HasEnvironment
 @dataclass
 class VDrivenSupply:
     """
-    A simple class that holds information about a Current supply driven from the fastino
+    A simple class that holds information about a current supply driven from the fastino
 
     """
 
@@ -27,6 +27,7 @@ class VDrivenSupply:
     ch: int
 
     gain: float  # The Current gain in Amps/Volt
+    current_limit: float
     enabled: bool = False
 
     def from_dataset(hasEnv: HasEnvironment, name: str):

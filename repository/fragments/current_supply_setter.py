@@ -73,7 +73,9 @@ class SetAnalogCurrentSupplies(Fragment):
 
     @portable
     def _single_current_to_volts(self, current: TFloat, current_supply_idx: TInt32):
-        return current / self.current_configs[current_supply_idx].gain
+        lim = self.current_configs[current_supply_idx].current_limit
+        gain = self.current_configs[current_supply_idx].gain
+        return min(lim, current / gain)
 
     @portable
     def _currents_to_volts(self, currents: TList(TFloat), voltages_out: TList(TFloat)):
