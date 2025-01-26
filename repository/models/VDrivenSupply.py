@@ -17,8 +17,7 @@ from artiq.experiment import HasEnvironment
 @dataclass
 class VDrivenSupply:
     """
-    A simple class that holds information about a beam to be controlled via a
-    SUServo.
+    A simple class that holds information about a Current supply driven from the fastino
 
     """
 

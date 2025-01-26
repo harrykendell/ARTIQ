@@ -17,8 +17,7 @@ from pydantic.dataclasses import dataclass
 @dataclass
 class Shutter:
     """
-    A simple class that holds information about a beam to be controlled via a
-    SUServo.
+    A simple class that holds information about a Shutter driven by a TTL signal
 
     """
 

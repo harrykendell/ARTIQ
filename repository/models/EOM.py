@@ -18,8 +18,7 @@ from pydantic.dataclasses import dataclass
 @dataclass
 class EOM:
     """
-    A simple class that holds information about a beam to be controlled via a
-    SUServo.
+    A simple class that holds information about an EOM driven by a mirny/almazny
 
     """
 
