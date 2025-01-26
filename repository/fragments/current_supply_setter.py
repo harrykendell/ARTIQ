@@ -23,25 +23,30 @@ class SetAnalogCurrentSupplies(Fragment):
     The supplies must all be controlled by the same fastino
     """
 
-    def build_fragment(self, current_configs: List[VDrivenSupply]):
+    def build_fragment(self, current_configs: VDrivenSupply | List[VDrivenSupply]):
         self.setattr_device("core")
         self.core: Core
 
-        self.current_configs = current_configs
+        # make sure we have a list of Supplies
+        if not isinstance(current_configs, list):
+            self.current_configs = [current_configs]
+        else:
+            self.current_configs = current_configs
+        self.current_configs: list[VDrivenSupply]
 
         assert all(
-            [c.fastino == current_configs[0].fastino for c in current_configs]
+            [c.fastino == self.current_configs[0].fastino for c in self.current_configs]
         ), "All current drivers must use the same Fastino"
 
         self.fastino = self.get_device(self.current_configs[0].fastino)
         self.fastino: Fastino
 
-        self.fastino_channels = [c.ch for c in current_configs]
+        self.fastino_channels = [c.ch for c in self.current_configs]
 
         # %% Kernel variables
         self.first_run = True
         self.debug_enabled = logger.isEnabledFor(logging.DEBUG)
-        self.num_supplies = len(current_configs)
+        self.num_supplies = len(self.current_configs)
 
         # %% Kernel invariants
         kernel_invariants = getattr(self, "kernel_invariants", set())
@@ -82,6 +87,24 @@ class SetAnalogCurrentSupplies(Fragment):
             voltages_out[i] = self._single_current_to_volts(currents[i], i)
 
     @kernel
+    def set_current(self, current: TFloat):
+        """
+        Set the current  in amps in the case we only have a single supply.
+        """
+
+        voltage = self._single_current_to_volts(current, 0)
+
+        if self.debug_enabled:
+            logger.info(
+                "Setting current = %s with voltage = %s on channel %s",
+                current,
+                voltage,
+                self.fastino_channels[0],
+            )
+
+        self.fastino.set_dac(self.fastino_channels[0], voltage)
+
+    @kernel
     def set_currents(self, currents: TList(TFloat)):
         """
         Set currents in amps.
@@ -90,7 +113,6 @@ class SetAnalogCurrentSupplies(Fragment):
         1.5us + 808ns * len(currents) on a Kasli 1.x as SPI events are written
         into the past.
         """
-
         voltages = [0.0] * len(self.current_configs)
 
         self._currents_to_volts(currents, voltages)
