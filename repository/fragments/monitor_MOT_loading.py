@@ -2,9 +2,8 @@ import logging
 import numpy as np
 
 from artiq.coredevice.core import Core
-from artiq.coredevice.ttl import TTLInOut
 from artiq.experiment import TFloat, TInt32, TInt64, TList
-from artiq.experiment import kernel, host_only, rpc, delay_mu
+from artiq.experiment import kernel, rpc, delay_mu
 from artiq.language.units import ms
 from ndscan.experiment import (
     Fragment,
@@ -13,11 +12,18 @@ from ndscan.experiment import (
     OpaqueChannel,
     FloatParam,
     IntParam,
+    BoolParam,
 )
-from ndscan.experiment.parameters import FloatParamHandle, IntParamHandle
+from ndscan.experiment.parameters import (
+    FloatParamHandle,
+    IntParamHandle,
+    BoolParamHandle,
+)
 from ndscan.experiment.entry_point import make_fragment_scan_exp
 
 from repository.fragments.read_adc import ReadSUServoADC
+from repository.fragments.current_supply_setter import SetAnalogCurrentSupplies
+from repository.models.devices import VDRIVEN_SUPPLIES
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +33,20 @@ class MOTPhotodiodeMeasurement(Fragment):
         self.setattr_device("core")
         self.core: Core
 
-        self.shutter_3DMOT: TTLInOut = self.get_device("shutter_3DMOT")
+        self.setattr_param(
+            "current",
+            FloatParam,
+            "The current of the X1 coil when the MOT is active",
+            default=1.0,
+            min=0.0,
+            max=2.0,
+        )
+        self.current: FloatParamHandle
+
+        self.setattr_fragment(
+            "coil_setter", SetAnalogCurrentSupplies, VDRIVEN_SUPPLIES["X1"]
+        )
+        self.coil_setter: SetAnalogCurrentSupplies
 
         photodiode_suservo_channel = "MOT_photodiode"
 
@@ -53,9 +72,9 @@ class MOTPhotodiodeMeasurement(Fragment):
         You must pass an array of floats with size <num_points> to `data`.
         """
         self.core.break_realtime()
-        self.shutter_3DMOT.off()
+        self.coil_setter.set_currents(0.0)
         delay_mu(initial_delay_mu)
-        self.shutter_3DMOT.on()
+        self.coil_setter.set_currents(self.current.get())
 
         for i in range(num_points):
             data[i] = self.adc_reader.read_adc()
@@ -100,14 +119,19 @@ class MeasureMOTWithPDFrag(ExpFragment):
         )
         self.num_trace_points: IntParamHandle
 
+        self.setattr_param(
+            "zero_measurement",
+            BoolParam,
+            description="Remove the zero time amplitude from the values",
+            default=False,
+        )
+        self.zero_measurement: BoolParamHandle
+
         self.setattr_fragment("mot_measurer", MOTPhotodiodeMeasurement)
         self.mot_measurer: MOTPhotodiodeMeasurement
 
         self.setattr_result("photodiode_voltage", OpaqueChannel)
         self.photodiode_voltage: OpaqueChannel
-
-        self.setattr_result("photodiode_mean_voltage", FloatChannel)
-        self.photodiode_mean_voltage: FloatChannel
 
         logger.warning("We should offer the option to switch the voltge supply instead")
 
@@ -127,11 +151,9 @@ class MeasureMOTWithPDFrag(ExpFragment):
         )
 
         self.photodiode_voltage.push(np.array(trace_data))
-        mean_voltage = 0.0
-        for i in range(len(trace_data)):
-            mean_voltage += trace_data[i]
-        mean_voltage /= len(trace_data)
-        self.photodiode_mean_voltage.push(mean_voltage)
+
+        if self.zero_measurement:
+            trace_data -= [trace_data[0]] * num_points
 
         self.update_data(trace_data)
 
