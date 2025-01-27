@@ -33,7 +33,6 @@ def main():
     )
     dev = TopticaDLCPro(
         ip=args.ip_address,
-        laser=args.laser,
     )
     dev.open()
     logging.info("Established connection.")
