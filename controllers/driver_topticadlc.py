@@ -58,6 +58,7 @@ class TopticaDLCPro:
             for method in dir(obj):
                 if not method.startswith("__"):
                     if callable(getattr(obj, method)):
+                        print("Setting ", f"{prefix}_{method}")
                         setattr(
                             self,
                             f"{prefix}_{method}",
