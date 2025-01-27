@@ -49,6 +49,15 @@ class TopticaDLCPro:
         logger.debug("Opening connection to %s", self.ip)
         self.get_dlcpro().open()
 
+        try:
+            self.laser1 = self.get_laser("laser1")
+        except:
+            self.laser1 = None
+        try:
+            self.laser2 = self.get_laser("laser2")
+        except:
+            self.laser2 = None
+
     def close(self):
         logger.debug("Closing connection to %s", self.ip)
         self.get_dlcpro().close()
@@ -100,7 +109,7 @@ class TopticaDLCPro:
             return pro.falc4
         else:
             raise ValueError("Invalid FALC setting")
-        
+
     def ping(self):
         """Check if the DLC Pro is reachable"""
         return self.get_dlcpro().system_label.get()
