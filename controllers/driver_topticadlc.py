@@ -45,18 +45,28 @@ class TopticaDLCPro:
         self.ip = ip
         self._dlcpro = None
 
-        # add all methods of the Laser class to this class for laser1 and laser2
-        # i.e. self._dlcpro.laser1.enabled.get() can be accessed as self.laser1_enabled.get()
-        for laser in ["laser1", "laser2"]:
-            for method in dir(Laser):
+        self.bring_methods_into_namespace()
+
+    def bring_methods_into_namespace(self):
+        # to work in RPCs we need all member variables to be accessible directly on this class as methods
+        # lets just keep hunting down the chain for methods and append them all as a method on this class
+        # i.e. self.a.b.c() becomes self.a_b_c()
+        def hunt_down(obj, prefix):
+            for method in dir(obj):
                 if not method.startswith("__"):
-                    setattr(
-                        self,
-                        f"{laser}_{method}",
-                        lambda method=method, laser=laser: getattr(
-                            self.get_laser(laser), method
-                        ),
-                    )
+                    if callable(getattr(obj, method)):
+                        setattr(
+                            self,
+                            f"{prefix}_{method}",
+                            lambda method=method, obj=obj, prefix=prefix: getattr(
+                                obj, method
+                            ),
+                        )
+                    else:
+                        hunt_down(getattr(obj, method), f"{prefix}_{method}")
+        hunt_down(self.get_dlcpro(), "dlcpro")
+        hunt_down(self.get_laser("laser1"), "laser1")
+        hunt_down(self.get_laser("laser2"), "laser2")
 
     def open(self):
         logger.debug("Opening connection to %s", self.ip)
