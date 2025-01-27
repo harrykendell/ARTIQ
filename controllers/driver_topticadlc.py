@@ -64,15 +64,6 @@ class TopticaDLCPro:
             self._dlcpro = DLCpro(NetworkConnection(self.ip))
 
         return self._dlcpro
-
-    # forward attributes from the laser objects
-    def __getatribute__(self, name):
-        if name.startswith("laser1_"):
-            return self.get_laser("laser1").__getattribute__(name[7:])()
-        elif name.startswith("laser2_"):
-            return self.get_laser("laser2").__getattribute__(name[7:])()
-        else:
-            return super.__getattribute__(name)
         
     def get_laser(self, laser=None) -> Laser:
         """Access the laser driver

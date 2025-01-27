@@ -5,6 +5,7 @@ import logging
 
 import sipyco.common_args as sca
 from sipyco.pc_rpc import simple_server_loop
+from sipyco.remote_exec import simple_rexec_server_loop
 
 from driver_topticadlc import TopticaDLCPro
 
@@ -39,7 +40,7 @@ def main():
 
     try:
         logging.info("Starting server at port {}...".format(args.port))
-        simple_server_loop(
+        simple_rexec_server_loop(
             {"TopticaDLCPro": dev}, sca.bind_address_from_args(args), args.port
         )
     finally:
