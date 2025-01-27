@@ -42,7 +42,7 @@ def main():
     try:
         logging.info("Starting server at port {}...".format(args.port))
         simple_server_loop(
-            {"TopticaDLCPro": dev, "laser1": laser1, "laser2": laser},
+            {"TopticaDLCPro": dev, "laser1": laser1, "laser2": laser2},
             sca.bind_address_from_args(args),
             args.port,
         )
