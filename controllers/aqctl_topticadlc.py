@@ -6,7 +6,7 @@ import logging
 import sipyco.common_args as sca
 from sipyco.pc_rpc import simple_server_loop
 
-from submodules.topticadlcpro.toptica_wrapper.driver import TopticaDLCPro
+from driver_topticadlc import TopticaDLCPro
 
 
 def get_argparser():
