@@ -2,6 +2,7 @@ from toptica.lasersdk.dlcpro.v3_2_0 import DLCpro
 from toptica.lasersdk.dlcpro.v3_2_0 import Laser, DigifalcBoard
 from toptica.lasersdk.dlcpro.v3_2_0 import NetworkConnection
 import logging
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +54,7 @@ class TopticaDLCPro:
         # i.e. self.a.b.c() becomes self.a_b_c()
         def hunt_down(obj, prefix):
             print("Hunting down ", obj, prefix)
+            time.sleep(0.1)
             for method in dir(obj):
                 if not method.startswith("__"):
                     if callable(getattr(obj, method)):
@@ -65,9 +67,9 @@ class TopticaDLCPro:
                         )
                     else:
                         hunt_down(getattr(obj, method), f"{prefix}_{method}")
-        hunt_down(self.get_dlcpro(), "dlcpro")
-        hunt_down(self.get_laser("laser1"), "laser1")
-        hunt_down(self.get_laser("laser2"), "laser2")
+        hunt_down(DLCpro, "dlcpro")
+        hunt_down(Laser, "laser1")
+        hunt_down(Laser, "laser2")
 
     def open(self):
         logger.debug("Opening connection to %s", self.ip)
