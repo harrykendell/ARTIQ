@@ -313,7 +313,7 @@ device_db.update(
             "type": "controller",
             "host": server_addr,
             "port": 3272,
-            "command": "python controllers.aqctl_topticadlc.py -ip 192.168.0.4",
+            "command": "python controllers/aqctl_topticadlc.py -ip 192.168.0.4",
         },
     }
 )
