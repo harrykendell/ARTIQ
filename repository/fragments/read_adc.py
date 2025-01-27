@@ -5,12 +5,12 @@ from artiq.coredevice.core import Core
 from artiq.coredevice.sampler import Sampler
 from artiq.coredevice.suservo import Channel as SUServoChannel
 from artiq.coredevice.suservo import SUServo
-from artiq.experiment import StringValue
+from artiq.experiment import EnumerationValue
 from artiq.experiment import kernel
 from ndscan.experiment import Fragment
 from ndscan.experiment.parameters import IntParam
 from ndscan.experiment.parameters import IntParamHandle
-from repository.utils import get_local_devices
+from repository.utils.get_local_devices import get_local_devices
 
 logger = logging.getLogger(__name__)
 
@@ -72,10 +72,12 @@ class ReadSamplerADC(ReadADC):
         if sampler_channel is not None:
             self.sampler_device: Sampler = sampler_device
         else:
-            first_sampler_in_devicedb = get_local_devices(self, Sampler)[0]
+            samplers = get_local_devices(self, Sampler)
+            if not samplers:
+                samplers = ["NO SAMPLERS AVAILABLE"]
             self.setattr_argument(
                 "sampler_device_name",
-                StringValue(default=first_sampler_in_devicedb),
+                EnumerationValue(samplers),
                 tooltip="Sampler device to read",
             )
             self.sampler_device_name: str
