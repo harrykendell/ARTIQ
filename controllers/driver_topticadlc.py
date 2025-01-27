@@ -49,15 +49,6 @@ class TopticaDLCPro:
         logger.debug("Opening connection to %s", self.ip)
         self.get_dlcpro().open()
 
-        try:
-            self.laser1 = self.get_laser("laser1")
-        except:
-            self.laser1 = None
-        try:
-            self.laser2 = self.get_laser("laser2")
-        except:
-            self.laser2 = None
-
     def close(self):
         logger.debug("Closing connection to %s", self.ip)
         self.get_dlcpro().close()
@@ -74,6 +65,15 @@ class TopticaDLCPro:
 
         return self._dlcpro
 
+    # forward attributes from the laser objects
+    def __getatribute__(self, name):
+        if name.startswith("laser1_"):
+            return self.get_laser("laser1").__getattribute__(name[7:])()
+        elif name.startswith("laser2_"):
+            return self.get_laser("laser2").__getattribute__(name[7:])()
+        else:
+            return super.__getattribute__(name)
+        
     def get_laser(self, laser=None) -> Laser:
         """Access the laser driver
 
