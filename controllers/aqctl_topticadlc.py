@@ -41,8 +41,9 @@ def main():
     try:
         logging.info("Starting server at port {}...".format(args.port))
         simple_rexec_server_loop(
-            {"TopticaDLCPro": dev}, sca.bind_address_from_args(args), args.port
+            "TopticaDLCPro",dev, sca.bind_address_from_args(args), args.port
         )
+
     finally:
         dev.close()
 
