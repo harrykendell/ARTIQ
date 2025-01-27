@@ -7,8 +7,6 @@ from toptica.lasersdk.dlcpro.v3_2_0 import Laser
 from repository.utils.get_local_devices import get_local_devices
 from submodules.topticadlcpro.toptica_wrapper.driver import TopticaDLCPro
 
-import logging
-
 
 class CheckTopticaFrag(ExpFragment):
     """
@@ -25,8 +23,11 @@ class CheckTopticaFrag(ExpFragment):
         self.setattr_argument(
             "laser_name",
             EnumerationValue(
-                get_local_devices(self, TopticaDLCPro),
-                default="toptica_780",
+                get_local_devices(
+                    self,
+                    TopticaDLCPro,
+                    "submodules.topticadlcpro.toptica_wrapper.driver",
+                )
             ),
         )
         self.laser_name: str
@@ -44,9 +45,9 @@ class CheckTopticaFrag(ExpFragment):
 
         super().host_cleanup()
 
-    def check_state(self):
-
-        out = {}
+    def run_once(self):
+        print("Running CheckTopticaFrag")
+        out = dict()
 
         try:
             out["voltage_setpoint"] = self.laser.dl.pc.voltage_set.get()
@@ -60,7 +61,7 @@ class CheckTopticaFrag(ExpFragment):
             # The connection to the controller failed
             out["status"] = "ERROR"
 
-        logging.info(out)
+        print(out)
 
 
 CheckLaser = make_fragment_scan_exp(CheckTopticaFrag)

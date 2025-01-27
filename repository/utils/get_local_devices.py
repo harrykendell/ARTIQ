@@ -4,7 +4,7 @@ from typing import Type
 from artiq.experiment import HasEnvironment
 
 
-def get_local_devices(hasEnv: HasEnvironment, classType: Type) -> List[str]:
+def get_local_devices(hasEnv: HasEnvironment, classType: Type, module_name = None) -> List[str]:
     """Get all possible local devices of the passed type, including aliases
 
     Example usage::
@@ -21,7 +21,8 @@ def get_local_devices(hasEnv: HasEnvironment, classType: Type) -> List[str]:
     """
 
     class_name = classType.__name__
-    module_name = classType.__module__
+    if module_name == None:
+        module_name = classType.__module__
 
     raw_channels = [
         k

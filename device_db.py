@@ -291,7 +291,7 @@ device_db.update(
     {
         "toptica_780": {
             "type": "local",
-            "module": "toptica_wrapper",
+            "module": "submodules.topticadlcpro.toptica_wrapper.driver",
             "class": "TopticaDLCPro",
             "arguments": {
                 "ip": "192.168.0.4",
@@ -301,7 +301,7 @@ device_db.update(
         },
         "toptica_852": {
             "type": "local",
-            "module": "toptica_wrapper",
+            "module": "submodules.topticadlcpro.toptica_wrapper.driver",
             "class": "TopticaDLCPro",
             "arguments": {
                 "ip": "192.168.0.4",
