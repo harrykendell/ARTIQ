@@ -12,7 +12,7 @@ from artiq.experiment import TBool
 from artiq.experiment import TFloat
 from artiq.experiment import kernel
 from artiq.experiment import now_mu
-from repository.utils import get_local_devices
+from repository.utils.get_local_devices import get_local_devices
 
 logger = logging.getLogger(__name__)
 

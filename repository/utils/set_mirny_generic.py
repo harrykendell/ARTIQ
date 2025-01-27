@@ -9,7 +9,7 @@ from ndscan.experiment import ExpFragment
 from ndscan.experiment.entry_point import make_fragment_scan_exp
 from ndscan.experiment.parameters import BoolParam
 from ndscan.experiment.parameters import FloatParam
-from repository.utils import get_local_devices
+from repository.utils.get_local_devices import get_local_devices
 
 logger = logging.getLogger(__name__)
 
