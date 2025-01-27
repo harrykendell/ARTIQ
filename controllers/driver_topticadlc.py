@@ -52,6 +52,7 @@ class TopticaDLCPro:
         # lets just keep hunting down the chain for methods and append them all as a method on this class
         # i.e. self.a.b.c() becomes self.a_b_c()
         def hunt_down(obj, prefix):
+            print("Hunting down ", obj, prefix)
             for method in dir(obj):
                 if not method.startswith("__"):
                     if callable(getattr(obj, method)):
