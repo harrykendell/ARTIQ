@@ -37,14 +37,18 @@ class MOTPhotodiodeMeasurement(Fragment):
             "current",
             FloatParam,
             "The current of the X1 coil when the MOT is active",
-            default=1.0,
+            default=1.25,
             min=0.0,
             max=2.0,
+            unit="A",
         )
         self.current: FloatParamHandle
 
         self.setattr_fragment(
-            "coil_setter", SetAnalogCurrentSupplies, VDRIVEN_SUPPLIES["X1"]
+            "coil_setter",
+            SetAnalogCurrentSupplies,
+            [VDRIVEN_SUPPLIES["X1"]],
+            init=False,
         )
         self.coil_setter: SetAnalogCurrentSupplies
 
@@ -72,9 +76,9 @@ class MOTPhotodiodeMeasurement(Fragment):
         You must pass an array of floats with size <num_points> to `data`.
         """
         self.core.break_realtime()
-        self.coil_setter.set_currents(0.0)
+        self.coil_setter.set_currents([0.0])
         delay_mu(initial_delay_mu)
-        self.coil_setter.set_currents(self.current.get())
+        self.coil_setter.set_currents([self.current.get()])
 
         for i in range(num_points):
             data[i] = self.adc_reader.read_adc()
@@ -123,12 +127,14 @@ class MeasureMOTWithPDFrag(ExpFragment):
             "zero_measurement",
             BoolParam,
             description="Remove the zero time amplitude from the values",
-            default=False,
+            default=True,
         )
         self.zero_measurement: BoolParamHandle
 
         self.setattr_fragment("mot_measurer", MOTPhotodiodeMeasurement)
         self.mot_measurer: MOTPhotodiodeMeasurement
+
+        self.setattr_param_rebind("current", self.mot_measurer)
 
         self.setattr_result("photodiode_voltage", OpaqueChannel)
         self.photodiode_voltage: OpaqueChannel
@@ -150,8 +156,9 @@ class MeasureMOTWithPDFrag(ExpFragment):
 
         self.photodiode_voltage.push(np.array(trace_data))
 
-        if self.zero_measurement:
-            trace_data -= [trace_data[0]] * num_points
+        if self.zero_measurement.get():
+            for i in range(num_points):
+                trace_data[i] -= trace_data[0]
 
         self.update_data(trace_data)
 

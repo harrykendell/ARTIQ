@@ -23,15 +23,11 @@ class SetAnalogCurrentSupplies(Fragment):
     The supplies must all be controlled by the same fastino
     """
 
-    def build_fragment(self, current_configs: VDrivenSupply | List[VDrivenSupply]):
+    def build_fragment(self, current_configs: List[VDrivenSupply], init: bool = True):
         self.setattr_device("core")
         self.core: Core
 
-        # make sure we have a list of Supplies
-        if not isinstance(current_configs, list):
-            self.current_configs = [current_configs]
-        else:
-            self.current_configs = current_configs
+        self.current_configs = current_configs
         self.current_configs: list[VDrivenSupply]
 
         assert all(
@@ -44,7 +40,7 @@ class SetAnalogCurrentSupplies(Fragment):
         self.fastino_channels = [c.ch for c in self.current_configs]
 
         # %% Kernel variables
-        self.first_run = True
+        self.first_run = init
         self.debug_enabled = logger.isEnabledFor(logging.DEBUG)
         self.num_supplies = len(self.current_configs)
 
@@ -89,24 +85,6 @@ class SetAnalogCurrentSupplies(Fragment):
             voltages_out[i] = self._single_current_to_volts(currents[i], i)
 
     @kernel
-    def set_current(self, current: TFloat):
-        """
-        Set the current  in amps in the case we only have a single supply.
-        """
-
-        voltage = self._single_current_to_volts(current, 0)
-
-        if self.debug_enabled:
-            logger.info(
-                "Setting current = %s with voltage = %s on channel %s",
-                current,
-                voltage,
-                self.fastino_channels[0],
-            )
-
-        self.fastino.set_dac(self.fastino_channels[0], voltage)
-
-    @kernel
     def set_currents(self, currents: TList(TFloat)):
         """
         Set currents in amps.
@@ -119,15 +97,16 @@ class SetAnalogCurrentSupplies(Fragment):
 
         self._currents_to_volts(currents, voltages)
 
-        if self.debug_enabled:
-            logger.info(
+        if False:
+            logger.debug(
                 "Setting currents = %s with voltages = %s on channels %s",
                 currents,
                 voltages,
                 self.fastino_channels,
             )
 
-        self.fastino.set_group(self.fastino_channels, voltages)
+        for idx in range(len(self.fastino_channels)):
+            self.fastino.set_dac(self.fastino_channels[idx], voltages[idx])
 
     @kernel
     def set_currents_ramping(

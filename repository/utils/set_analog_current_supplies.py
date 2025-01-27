@@ -41,7 +41,9 @@ class SetAnalogCurrentSupplyExp(ExpFragment):
         else:
             current_config = list(VDRIVEN_SUPPLIES.values())[0]
 
-        self.setattr_fragment("setter", SetAnalogCurrentSupplies, [current_config])
+        self.setattr_fragment(
+            "setter", SetAnalogCurrentSupplies, [current_config], init=False
+        )
         self.setter: SetAnalogCurrentSupplies
 
         self.setattr_param(
