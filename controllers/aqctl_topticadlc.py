@@ -35,12 +35,16 @@ def main():
         ip=args.ip_address,
     )
     dev.open()
+    laser1 = dev.get_laser("laser1")
+    laser2 = dev.get_laser("laser2")
     logging.info("Established connection.")
 
     try:
         logging.info("Starting server at port {}...".format(args.port))
         simple_server_loop(
-            {"TopticaDLCPro": dev}, sca.bind_address_from_args(args), args.port
+            {"TopticaDLCPro": dev, "laser1": laser1, "laser2": laser},
+            sca.bind_address_from_args(args),
+            args.port,
         )
     finally:
         dev.close()
