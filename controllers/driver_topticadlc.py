@@ -45,6 +45,19 @@ class TopticaDLCPro:
         self.ip = ip
         self._dlcpro = None
 
+        # add all methods of the Laser class to this class for laser1 and laser2
+        # i.e. self._dlcpro.laser1.enabled.get() can be accessed as self.laser1_enabled.get()
+        for laser in ["laser1", "laser2"]:
+            for method in dir(Laser):
+                if not method.startswith("__"):
+                    setattr(
+                        self,
+                        f"{laser}_{method}",
+                        lambda method=method, laser=laser: getattr(
+                            self.get_laser(laser), method
+                        ),
+                    )
+
     def open(self):
         logger.debug("Opening connection to %s", self.ip)
         self.get_dlcpro().open()
@@ -64,7 +77,7 @@ class TopticaDLCPro:
             self._dlcpro = DLCpro(NetworkConnection(self.ip))
 
         return self._dlcpro
-        
+
     def get_laser(self, laser=None) -> Laser:
         """Access the laser driver
 
