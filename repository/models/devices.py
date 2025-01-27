@@ -55,6 +55,7 @@ VDRIVEN_SUPPLIES = [
         fastino="fastino",
         ch=6,
         gain=0.0,
+        current_limit=3.0,
         # TODO: Actually set me up
     ),
 ]
