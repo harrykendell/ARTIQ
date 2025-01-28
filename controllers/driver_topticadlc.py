@@ -29,7 +29,7 @@ class TopticaDLCPro:
         driver.close()
     """
 
-    def __init__(self, *args, ip, laser=None, falc=None, simulation=False):
+    def __init__(self, *args, ip, laser=None, falc=None, simulation=False, rpc=False):
         if simulation:
             raise ValueError("Simulation mode is not supported for the Toptica SDK")
 
@@ -46,43 +46,48 @@ class TopticaDLCPro:
         self.ip = ip
         self._dlcpro = None
 
-        self.bring_methods_into_namespace()
+        if rpc:
+            self.open()
+            self.bring_methods_into_namespace()
 
     def bring_methods_into_namespace(self):
         # to work in RPCs we need all member variables to be accessible directly on this class as methods
         # so we hunt down the chain.
 
-        """ find all callables on the object
-                - if its not a property add it to our class
-                - if it is a property, check the type hint and if its a *Decop* type, add the .get and if available .set
-                - otherwise recurse
+        """find all callables on the object
+        - if its not a property add it to our class
+        - if it is a property, check the type hint and if its a *Decop* type, add the .get and if available .set
+        - otherwise recurse
         """
+        from typing import get_type_hints
 
-        def hunt_down(obj, prefix):
-            print("Hunting down ", obj, prefix)
+        def hunt_down(obj, path):
+
             for name in dir(obj):
-                if name.startswith("__"):
+                # skip private and special methods
+                if name.startswith("_"):
                     continue
-                attr = getattr(obj, name)
-                if callable(attr):
-                    if not isinstance(attr, property):
-                        setattr(self, f"{prefix}_{name}", attr)
-                        print(f"Added {prefix}_{name}")
-                    else:
-                        print(f"Checking {name} for Decop type")
-                        # check if its a Decop type
-                        if "Decop" in type(attr).__name__:
-                            print(f"Found Decop type {name}")
-                            if hasattr(attr, "get"):
-                                setattr(self, f"{prefix}_{name}_get", attr.get)
-                                print(f"Added {prefix}_{name}_get")
-                            if hasattr(attr, "set"):
-                                setattr(self, f"{prefix}_{name}_set", attr.set)
-                                print(f"Added {prefix}_{name}_set")
 
-        hunt_down(DLCpro, "dlcpro")
-        hunt_down(Laser, "laser1")
-        hunt_down(Laser, "laser2")
+                attr = getattr(obj, name)
+
+                # if its a Decop add its get/set and stop
+                if "Mutable" in str(attr):
+                    setattr(
+                        self, f"{path}{name}_set", getattr(obj, name).set
+                    )
+                if "Decop" in str(attr):
+                    setattr(self, f"{path}{name}", getattr(obj, name).get)
+                    continue
+
+                if "bound method" in str(attr):
+                    setattr(self, f"{path}{name}", getattr(obj, name))
+                    continue
+
+                hunt_down(attr, f"{path}{name}_")
+
+        hunt_down(self._dlcpro, "")
+
+        print("methods added to namespace")
 
     def open(self):
         logger.debug("Opening connection to %s", self.ip)
