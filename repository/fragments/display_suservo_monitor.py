@@ -30,13 +30,16 @@ class SingleSUServoReadingFrag(ExpFragment):
         self.setattr_device("core")
         self.core: Core
 
+        self.setattr_device("ccb")
+        self.setattr_device("scheduler")
+
         self.setattr_param(
             "waittime",
             FloatParam,
             description="Time between measurements",
-            default=0.1,
-            min=0,
-            max=1000,
+            default=0.,
+            min=0.05,
+            max=10,
             unit="s",
             step=0.01,
         )
@@ -77,10 +80,6 @@ class SingleSUServoReadingFrag(ExpFragment):
             self.beam_info.suservo_device
         )
 
-        # Define result channels as outputs
-        self.setattr_result("voltage")
-        self.voltage: ResultChannel
-
         # Get beam setter fragment
         self.setattr_fragment(
             "beam_default_setter",
@@ -103,7 +102,19 @@ class SingleSUServoReadingFrag(ExpFragment):
         self.sampler_channel_number = self.suservo_channel_device.servo_channel
         self.suservo_profile_number = self.suservo_channel_device.servo_channel
 
-        return super().host_setup()
+        super().host_setup()
+        self.name = f"SUServo{self.beam_info_name}"
+        self.set_dataset(
+            self.name,
+            [],
+            broadcast=True,
+        )
+
+        self.ccb.issue(
+            "create_applet",
+            self.name,
+            f"${{artiq_applet}}plot_xy {self.name}",
+        )
 
     @kernel
     def device_setup(self) -> None:
@@ -122,9 +133,21 @@ class SingleSUServoReadingFrag(ExpFragment):
         delay(self.waittime.get())
 
         self.core.break_realtime()
-        v = self.adc_reader.read_adc() - self.beam_info.photodiode_offset
+        while True:
+            for i in range(1000):
+                v = self.adc_reader.read_adc() - self.beam_info.photodiode_offset
+                delay(self.waittime.get())
+                self.update_data(v)
+            self.reset_data()
 
-        self.voltage.push(v)
+    @rpc
+    def update_data(self, data):
+        self.name = f"SUServo{self.beam_info_name}"
+        self.append_to_dataset(self.name, data)
+
+    @rpc
+    def reset_data(self):
+        self.set_dataset(self.name, [], broadcast=True)
 
 
 class AllSUServoReadingFrag(ExpFragment):
