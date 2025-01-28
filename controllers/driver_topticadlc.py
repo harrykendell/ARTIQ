@@ -69,6 +69,7 @@ class TopticaDLCPro:
                         setattr(self, f"{prefix}_{name}", attr)
                         print(f"Added {prefix}_{name}")
                     else:
+                        print(f"Checking {name} for Decop type")
                         # check if its a Decop type
                         if "Decop" in type(attr).__name__:
                             print(f"Found Decop type {name}")
