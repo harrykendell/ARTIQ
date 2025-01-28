@@ -72,9 +72,7 @@ class TopticaDLCPro:
 
                 # if its a Decop add its get/set and stop
                 if "Mutable" in str(attr):
-                    setattr(
-                        self, f"{path}{name}_set", getattr(obj, name).set
-                    )
+                    setattr(self, f"{path}{name}_set", getattr(obj, name).set)
                 if "Decop" in str(attr):
                     setattr(self, f"{path}{name}", getattr(obj, name).get)
                     continue
@@ -147,7 +145,8 @@ class TopticaDLCPro:
 
     def ping(self):
         """Check if the DLC Pro is reachable"""
-        return self.get_dlcpro().system_label.get()
+        self.get_dlcpro().system_label.get()
+        return True
 
     # Pass on __enter__ and __exit__ so that users can use `with TopticaDLCPro`
     # to start a network connection
