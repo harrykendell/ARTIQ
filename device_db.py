@@ -291,7 +291,7 @@ device_db.update(
     {
         "toptica_780": {
             "type": "local",
-            "module": "submodules.topticadlcpro.toptica_wrapper.driver",
+            "module": "controllers.driver_topticadlc",
             "class": "TopticaDLCPro",
             "arguments": {
                 "ip": "192.168.0.4",
@@ -301,13 +301,20 @@ device_db.update(
         },
         "toptica_852": {
             "type": "local",
-            "module": "submodules.topticadlcpro.toptica_wrapper.driver",
+            "module": "controllers.driver_topticadlc",
             "class": "TopticaDLCPro",
             "arguments": {
                 "ip": "192.168.0.4",
                 "laser": "laser1",
                 "simulation": False,
             },
+        },
+        "topticaDLC": {
+            "type": "controller",
+            "host": server_addr,
+            "port": 3272,
+            "command": "python controllers/aqctl_topticadlc.py -ip 192.168.0.4 -p {port} --bind {bind} "
+            + core_addr,
         },
     }
 )
