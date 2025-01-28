@@ -87,7 +87,7 @@ SUSERVOED_BEAMS = [
     SUServoedBeam(
         name="MOT",
         suservo_device="suservo_aom_MOT",
-        frequency=198.0 * MHz,
+        frequency=193.0 * MHz,
         attenuation=15.5 * dB,
     ),
     SUServoedBeam(
