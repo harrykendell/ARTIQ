@@ -50,24 +50,35 @@ class TopticaDLCPro:
 
     def bring_methods_into_namespace(self):
         # to work in RPCs we need all member variables to be accessible directly on this class as methods
-        # lets just keep hunting down the chain for methods and append them all as a method on this class
-        # i.e. self.a.b.c() becomes self.a_b_c()
+        # so we hunt down the chain.
+
+        """ find all callables on the object
+                - if its not a property add it to our class
+                - if it is a property, check the type hint and if its a *Decop* type, add the .get and if available .set
+                - otherwise recurse
+        """
+
         def hunt_down(obj, prefix):
             print("Hunting down ", obj, prefix)
-            time.sleep(0.1)
-            for method in dir(obj):
-                if not method.startswith("__"):
-                    if callable(getattr(obj, method)):
-                        print("Setting ", f"{prefix}_{method}")
-                        setattr(
-                            self,
-                            f"{prefix}_{method}",
-                            lambda method=method, obj=obj, prefix=prefix: getattr(
-                                obj, method
-                            ),
-                        )
+            for name in dir(obj):
+                if name.startswith("__"):
+                    continue
+                attr = getattr(obj, name)
+                if callable(attr):
+                    if not isinstance(attr, property):
+                        setattr(self, f"{prefix}_{name}", attr)
+                        print(f"Added {prefix}_{name}")
                     else:
-                        hunt_down(getattr(obj, method), f"{prefix}_{method}")
+                        # check if its a Decop type
+                        if "Decop" in type(attr).__name__:
+                            print(f"Found Decop type {name}")
+                            if hasattr(attr, "get"):
+                                setattr(self, f"{prefix}_{name}_get", attr.get)
+                                print(f"Added {prefix}_{name}_get")
+                            if hasattr(attr, "set"):
+                                setattr(self, f"{prefix}_{name}_set", attr.set)
+                                print(f"Added {prefix}_{name}_set")
+
         hunt_down(DLCpro, "dlcpro")
         hunt_down(Laser, "laser1")
         hunt_down(Laser, "laser2")
