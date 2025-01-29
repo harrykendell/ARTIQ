@@ -46,7 +46,7 @@ VDRIVEN_SUPPLIES = [
         name="GreenTA",
         fastino="fastino",
         ch=7,
-        gain=0.0,
+        gain=0.4, # 4A max * V / 10V -> 0.4 A/V
         current_limit=2.0,
         # TODO: Actually set me up
     ),
