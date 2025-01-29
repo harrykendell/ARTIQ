@@ -27,7 +27,7 @@ class SUServoedBeam:
     frequency: float
     attenuation: float
 
-    suservo_device: str
+    suservo_device: str # the name of the suservo channel
 
     """
     TODO:
