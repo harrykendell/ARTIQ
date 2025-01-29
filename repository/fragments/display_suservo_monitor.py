@@ -37,7 +37,7 @@ class SingleSUServoReadingFrag(ExpFragment):
             "waittime",
             FloatParam,
             description="Time between measurements",
-            default=0.,
+            default=0.0,
             min=0.05,
             max=10,
             unit="s",
@@ -69,9 +69,7 @@ class SingleSUServoReadingFrag(ExpFragment):
 
         # %% devices
 
-        self.beam_info = SUSERVOED_BEAMS[
-            self.beam_info_name or beam_info_names[0]
-        ]
+        self.beam_info = SUSERVOED_BEAMS[self.beam_info_name or beam_info_names[0]]
 
         if not self.enable_servoing:
             self.beam_info.servo_enabled = False
@@ -84,7 +82,7 @@ class SingleSUServoReadingFrag(ExpFragment):
         self.setattr_fragment(
             "beam_default_setter",
             make_set_beams_to_default(
-                [self.beam_info],
+                SUSERVOED_BEAMS,
                 name="BeamSettings",
             ),
         )
