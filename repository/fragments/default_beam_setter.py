@@ -53,7 +53,8 @@ def make_set_beams_to_default(
     TODO: Idea: I could speed up compilation times by sharing the same class
     definitions where possible, though this might be hard to detect.
     """
-
+    if not isinstance(suservo_beam_infos, list):
+        suservo_beam_infos = list(suservo_beam_infos.values())
     class SetBeamsToDefaultsCustomised(SetBeamsToDefaults):
         default_suservo_beam_infos = suservo_beam_infos
         automatic_setup = use_automatic_setup
