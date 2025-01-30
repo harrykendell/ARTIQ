@@ -26,6 +26,7 @@ triggers = [
 BINNING = 1
 FULL_ROI = (1, 1, 1392 // BINNING, 1040 // BINNING)
 WHOLE_CELL_ROI = (620, 475, 750, 650)
+MOT_ROI = (670, 560, 720, 600)
 """
 For the pixelfly:
     "serial": 19701804,
@@ -48,7 +49,7 @@ def init_cam(cam: pco.Camera):
     cam.configuration = {
         "timestamp": "binary",
         "trigger": triggers[0],
-        "exposure time": 100_00e-6,
+        "exposure time": 10_00e-6,
         "binning": (BINNING, BINNING),
     }
 
@@ -100,14 +101,14 @@ class CameraWidget(QWidget):
         status = self.cam.rec.get_status()
 
         # sequence mode
-        if settings["recorder type"]==0x0001:
+        if settings["recorder type"] == 0x0001:
             self.cam.wait_for_new_image()
 
         # hardware trigger fifo mode
-        if settings["recorder type"]==0x0003:
+        if settings["recorder type"] == 0x0003:
             if status["dwProcImgCount"] == 0:
                 return
-        img,meta = self.cam.image(roi=(670, 540, 720, 580))
+        img, meta = self.cam.image(roi=MOT_ROI)
         self.im.setImage(
             img,
             autoHistogramRange=self.first,
@@ -122,8 +123,9 @@ class CameraWidget(QWidget):
         self.first = False
 
     def start_recording(self):
-        self.cam.record(10, mode='fifo')
+        self.cam.record(10, mode="fifo")
         # self.cam.record(10, mode="fifo")
+
 
 def main_gui():
     app = QApplication([])
