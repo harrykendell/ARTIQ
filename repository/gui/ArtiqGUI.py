@@ -50,10 +50,12 @@ class GUIClient:
         self.booster_db = dict()
         self.schedule_db = dict()
         self.dataset_db = dict()
+        self.dlcpro_db = dict()
 
         self.booster_callbacks = [[] for _ in range(8)]
         self.dataset_callbacks = {}
         self.schedule_callbacks = []
+        self.dlcpro_callbacks = []
 
     async def connect(self):
         """Initialize connections."""
@@ -89,7 +91,7 @@ class GUIClient:
             return self.schedule_db
 
         def _schedule_update(mod):
-            logging.debug(f"New schedule mod {mod}\n we have callbacks")
+            logging.debug(f"New schedule mod {mod}")
             for cb in self.schedule_callbacks:
                 cb()
             return
@@ -108,8 +110,9 @@ class GUIClient:
             return self.dlcpro_db
 
         def _dlcpro_update(mod):
-            logging.debug(f"New DLCPro mod {mod}")
-            logging.warning(f"DLCPro update not implemented, mod: {mod}")
+            logging.warning(f"New DLCPro mod {mod}")
+            for cb in self.dlcpro_callbacks:
+                cb()
             return
 
         tasks.append(
@@ -117,7 +120,7 @@ class GUIClient:
                 "DLCProState",
                 _dlcpro_create,
                 _dlcpro_update,
-                port=3275 - 1,
+                port=3275,
             )
         )
 
@@ -221,6 +224,10 @@ class GUIClient:
         self.schedule_callbacks.append(cb)
         cb()
 
+    def register_dlcpro_callback(self, cb):
+        self.dlcpro_callbacks.append(cb)
+        cb()
+
     async def disconnect(self):
         """Disconnect all connections."""
         for client in self.rpc_clients.values():
@@ -270,6 +277,13 @@ class MainWindow(QWidget):
         layout.addWidget(self.booster_text)
         self.update_booster()
 
+        self.dlcpro_label = QLabel("DLCPro:")
+        self.dlcpro_text = QTextEdit()
+        self.dlcpro_text.setReadOnly(True)
+        layout.addWidget(self.dlcpro_label)
+        layout.addWidget(self.dlcpro_text)
+        self.update_dlcpro()
+
         self.setLayout(layout)
 
     def update_dataset(self):
@@ -281,10 +295,14 @@ class MainWindow(QWidget):
     def update_booster(self):
         self.booster_text.setText(str(self.client.booster_db))
 
+    def update_dlcpro(self):
+        self.dlcpro_text.setText(str(self.client.dlcpro_db))
+
     def register_callbacks(self):
         self.client.register_dataset_callback("*", self.update_dataset)
         self.client.register_schedule_callback(self.update_schedule)
         self.client.register_booster_callback("*", self.update_booster)
+        self.client.register_dlcpro_callback(self.update_dlcpro)
 
 
 def main():
