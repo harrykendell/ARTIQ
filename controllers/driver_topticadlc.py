@@ -2,10 +2,8 @@ from toptica.lasersdk.dlcpro.v3_2_0 import DLCpro
 from toptica.lasersdk.dlcpro.v3_2_0 import Laser, DigifalcBoard
 from toptica.lasersdk.dlcpro.v3_2_0 import NetworkConnection
 import logging
-import time
 
 logger = logging.getLogger(__name__)
-
 
 class TopticaDLCPro:
     """

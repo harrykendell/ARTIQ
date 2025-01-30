@@ -30,6 +30,10 @@ import aiomqtt
 
 # GUI
 from PyQt5.QtWidgets import QApplication, QLabel, QWidget, QVBoxLayout, QTextEdit
+
+# include the artiq path by slicing our current path to the root
+sys.path.append(__file__.split("artiq")[0] + "artiq")
+
 from repository.gui.components.ScientificSpin import ScientificSpin
 
 
@@ -46,10 +50,12 @@ class GUIClient:
         self.booster_db = dict()
         self.schedule_db = dict()
         self.dataset_db = dict()
+        self.dlcpro_db = dict()
 
         self.booster_callbacks = [[] for _ in range(8)]
         self.dataset_callbacks = {}
         self.schedule_callbacks = []
+        self.dlcpro_callbacks = []
 
     async def connect(self):
         """Initialize connections."""
@@ -67,13 +73,10 @@ class GUIClient:
 
         def _dataset_update(mod):
             logging.debug(f"New dataset mod {mod}")
-            if mod["action"] != "setitem":
-                if mod["action"] == "init":
-                    for key in self.dataset_callbacks.keys():
-                        [cb() for cb in self.dataset_callbacks[key]]
-                else:
-                    logging.error(f"We cannot handle {mod['action']} on datasets")
-                return
+            for key in self.dataset_callbacks.keys():
+                [cb() for cb in self.dataset_callbacks[key]]
+            return
+
         tasks.append(
             self.connect_subscriber(
                 "datasets",
@@ -88,15 +91,36 @@ class GUIClient:
             return self.schedule_db
 
         def _schedule_update(mod):
-            logging.debug(f"New schedule mod {mod}\n we have callbacks")
+            logging.debug(f"New schedule mod {mod}")
             for cb in self.schedule_callbacks:
                 cb()
             return
+
         tasks.append(
             self.connect_subscriber(
                 "schedule",
                 _schedule_create,
                 _schedule_update,
+            )
+        )
+
+        def _dlcpro_create(data):
+            logging.debug(f"New DLCPro:\n{data}")
+            self.dlcpro_db = data
+            return self.dlcpro_db
+
+        def _dlcpro_update(mod):
+            logging.warning(f"New DLCPro mod {mod}")
+            for cb in self.dlcpro_callbacks:
+                cb()
+            return
+
+        tasks.append(
+            self.connect_subscriber(
+                "DLCProState",
+                _dlcpro_create,
+                _dlcpro_update,
+                port=3271,
             )
         )
 
@@ -106,27 +130,44 @@ class GUIClient:
         logging.info("Connecting to services...")
         await asyncio.gather(*tasks)
 
-    async def connect_rpc(self, target):
+    async def connect_rpc(self, target, server=None, port=None):
+        server = self.server if server is None else server
+        port = self.port_control if port is None else port
         client = AsyncioClient()
         try:
             await asyncio.wait_for(
-                client.connect_rpc(self.server, self.port_control, target), 5
+                client.connect_rpc(
+                    server,
+                    port,
+                    target,
+                ),
+                5,
             )
         except asyncio.TimeoutError:
-            logging.error(f"Failed to connect to RPC: {target}")
+            logging.error(f"Failed to connect to RPC: {target} at {server}:{port}")
             return
         self.rpc_clients[target] = client
-        logging.info(f"Connected to RPC: {target}")
+        logging.info(f"Connected to RPC: {target} at {server}:{port}")
 
-    async def connect_subscriber(self, target, target_builder, callback, disconnect = None):
+    async def connect_subscriber(
+        self, target, target_builder, callback, disconnect=None, server=None, port=None
+    ):
+        server = self.server if server is None else server
+        port = self.port_notify if port is None else port
         subscriber = Subscriber(target, target_builder, callback, disconnect)
         try:
-            await asyncio.wait_for(subscriber.connect(self.server, self.port_notify), 5)
+            await asyncio.wait_for(
+                subscriber.connect(
+                    server,
+                    port,
+                ),
+                5,
+            )
         except asyncio.TimeoutError:
-            logging.error(f"Failed to connect to Sub: {target}")
+            logging.error(f"Failed to connect to Sub: {target} at {server}:{port}")
             return
         self.subscribers[target] = subscriber
-        logging.info(f"Connected to Sub: {target}")
+        logging.info(f"Connected to Sub: {target} at {server}:{port}")
 
     async def connect_booster(self):
         """Initialize MQTT connection for booster telemetry."""
@@ -149,9 +190,7 @@ class GUIClient:
             async with aiomqtt.Client(self.server) as client:
                 # Subscribe to booster telemetry channels 0-7
                 await asyncio.wait_for(
-                    client.subscribe(
-                        "dt/sinara/booster/fc-0f-e7-23-77-30/telemetry/#"
-                    ),
+                    client.subscribe("dt/sinara/booster/fc-0f-e7-23-77-30/telemetry/#"),
                     5,
                 )
 
@@ -183,6 +222,10 @@ class GUIClient:
 
     def register_schedule_callback(self, cb):
         self.schedule_callbacks.append(cb)
+        cb()
+
+    def register_dlcpro_callback(self, cb):
+        self.dlcpro_callbacks.append(cb)
         cb()
 
     async def disconnect(self):
@@ -234,6 +277,13 @@ class MainWindow(QWidget):
         layout.addWidget(self.booster_text)
         self.update_booster()
 
+        self.dlcpro_label = QLabel("DLCPro:")
+        self.dlcpro_text = QTextEdit()
+        self.dlcpro_text.setReadOnly(True)
+        layout.addWidget(self.dlcpro_label)
+        layout.addWidget(self.dlcpro_text)
+        self.update_dlcpro()
+
         self.setLayout(layout)
 
     def update_dataset(self):
@@ -245,10 +295,14 @@ class MainWindow(QWidget):
     def update_booster(self):
         self.booster_text.setText(str(self.client.booster_db))
 
+    def update_dlcpro(self):
+        self.dlcpro_text.setText(str(self.client.dlcpro_db))
+
     def register_callbacks(self):
         self.client.register_dataset_callback("*", self.update_dataset)
         self.client.register_schedule_callback(self.update_schedule)
         self.client.register_booster_callback("*", self.update_booster)
+        self.client.register_dlcpro_callback(self.update_dlcpro)
 
 
 def main():
