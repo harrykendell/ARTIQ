@@ -74,7 +74,7 @@ sudo netstat -nlp | grep ':3258'
 echo -e "${GREEN}PTB Drivers out-of-tree :3259${NC}"
 sudo netstat -nlp | grep ':3259'
 
-echo -e "${GREEN}HUT2 out-of-tree :3271${NC}"
+echo -e "${GREEN}TOPTICA Laser Publisher out-of-tree :3271${NC}"
 sudo netstat -nlp | grep ':3271'
 
 echo -e "${GREEN}TOPTICA Laser SDK out-of-tree :3272${NC}"
