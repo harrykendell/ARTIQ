@@ -120,7 +120,7 @@ class GUIClient:
                 "DLCProState",
                 _dlcpro_create,
                 _dlcpro_update,
-                port=3275,
+                port=3271,
             )
         )
 
