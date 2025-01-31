@@ -77,7 +77,7 @@ def main():
     )
 
     def callback(subscription: Subscription, time: Timestamp, value: SubscriptionValue):
-        logging.warning(f"Callback: {subscription.name} = {value.get()}")
+        logging.debug(f"Callback: {subscription.name} = {value.get()}")
         notifier[subscription.name] = value.get()
 
     dev._dlcpro.emission_button_enabled.subscribe(callback)
