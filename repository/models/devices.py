@@ -28,7 +28,7 @@ VDRIVEN_SUPPLIES = [
         ch=1,
         gain=2.0,
         current_limit=3.0,
-        default_current=0.95,
+        default_current=1.0,
     ),
     VDrivenSupply(
         name="Y",
@@ -49,7 +49,7 @@ VDRIVEN_SUPPLIES = [
     VDrivenSupply(
         name="GreenTA",
         fastino="fastino",
-        ch=7,
+        ch=6,
         gain=0.4,  # 4A max * V / 10V -> 0.4 A/V
         current_limit=2.0,
         default_current=1.450,
@@ -58,7 +58,7 @@ VDRIVEN_SUPPLIES = [
     VDrivenSupply(
         name="Dispenser",
         fastino="fastino",
-        ch=6,
+        ch=7,
         gain=0.0,
         current_limit=3.0,
         default_current=2.70,
@@ -94,7 +94,9 @@ SUSERVOED_BEAMS = [
         name="MOT",
         suservo_device="suservo_aom_MOT",
         frequency=193.0 * MHz,
-        attenuation=16 * dB,
+        attenuation=16.0 * dB,
+        shutter_device="shutter_3DMOT",
+        shutter_delay=35.0 * ms,
     ),
     SUServoedBeam(
         name="IMG",
