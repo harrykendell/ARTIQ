@@ -20,6 +20,7 @@ VDRIVEN_SUPPLIES = [
         ch=0,
         gain=2.0,
         current_limit=3.0,
+        default_current=0.95,
     ),
     VDrivenSupply(
         name="X2",
@@ -27,6 +28,7 @@ VDRIVEN_SUPPLIES = [
         ch=1,
         gain=2.0,
         current_limit=3.0,
+        default_current=0.95,
     ),
     VDrivenSupply(
         name="Y",
@@ -34,6 +36,7 @@ VDRIVEN_SUPPLIES = [
         ch=2,
         gain=2.0,
         current_limit=3.0,
+        default_current=0.0,
     ),
     VDrivenSupply(
         name="Z",
@@ -41,6 +44,7 @@ VDRIVEN_SUPPLIES = [
         ch=3,
         gain=2.0,
         current_limit=3.0,
+        default_current=0.03,
     ),
     VDrivenSupply(
         name="GreenTA",
@@ -48,6 +52,7 @@ VDRIVEN_SUPPLIES = [
         ch=7,
         gain=0.4,  # 4A max * V / 10V -> 0.4 A/V
         current_limit=2.0,
+        default_current=1.450,
         # TODO: Actually set me up
     ),
     VDrivenSupply(
@@ -56,6 +61,7 @@ VDRIVEN_SUPPLIES = [
         ch=6,
         gain=0.0,
         current_limit=3.0,
+        default_current=2.70,
         # TODO: Actually set me up
     ),
 ]

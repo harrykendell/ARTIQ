@@ -30,6 +30,8 @@ class VDrivenSupply:
     current_limit: float
     enabled: bool = False
 
+    default_current: float = None
+
     def from_dataset(hasEnv: HasEnvironment, name: str):
         # initialise the class with the data from the dataset
         try:
