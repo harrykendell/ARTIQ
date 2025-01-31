@@ -4,7 +4,7 @@ import numpy as np
 from artiq.coredevice.core import Core
 from artiq.experiment import TFloat, TInt32, TInt64, TList
 from artiq.experiment import kernel, rpc, delay_mu
-from artiq.language.units import ms
+from artiq.language.units import ms, s
 from ndscan.experiment import (
     Fragment,
     ExpFragment,
@@ -20,6 +20,7 @@ from ndscan.experiment.parameters import (
     BoolParamHandle,
 )
 from ndscan.experiment.entry_point import make_fragment_scan_exp
+from submodules.oitg.oitg.fitting import exponential_decay
 
 from repository.fragments.read_adc import ReadSUServoADC
 from repository.fragments.current_supply_setter import SetAnalogCurrentSupplies
@@ -37,7 +38,7 @@ class MOTPhotodiodeMeasurement(Fragment):
             "current",
             FloatParam,
             "The current of the X1 coil when the MOT is active",
-            default=1.25,
+            default=VDRIVEN_SUPPLIES["X1"].default_current,
             min=0.0,
             max=2.0,
             unit="A",
@@ -53,7 +54,6 @@ class MOTPhotodiodeMeasurement(Fragment):
         self.coil_setter: SetAnalogCurrentSupplies
 
         photodiode_suservo_channel = "MOT_photodiode"
-
         # Load the ADC utility subfragment
         self.setattr_fragment(
             "adc_reader",
@@ -76,7 +76,7 @@ class MOTPhotodiodeMeasurement(Fragment):
         You must pass an array of floats with size <num_points> to `data`.
         """
         self.core.break_realtime()
-        self.coil_setter.set_currents([0.0])
+        self.coil_setter.turn_off()
         delay_mu(initial_delay_mu)
         self.coil_setter.set_currents([self.current.get()])
 
@@ -104,15 +104,15 @@ class MeasureMOTWithPDFrag(ExpFragment):
         )
 
         self.setattr_param(
-            "delay_between_trace_points",
+            "total_loading_time",
             FloatParam,
-            description="Delay between points in the photodiode trace",
-            default=1 * ms,
-            unit="ms",
+            description="Total time to load the MOT",
+            default=1 * s,
+            unit="s",
             min=1 * ms,
-            step=1,
+            step=0.001,
         )
-        self.delay_between_trace_points: FloatParamHandle
+        self.total_loading_time: FloatParamHandle
 
         self.setattr_param(
             "num_trace_points",
@@ -148,7 +148,7 @@ class MeasureMOTWithPDFrag(ExpFragment):
         self.mot_measurer.measure_MOT_fluorescence(
             num_points=num_points,
             delay_between_points_mu=self.core.seconds_to_mu(
-                self.delay_between_trace_points.get()
+                self.total_loading_time.get() / num_points
             ),
             initial_delay_mu=self.core.seconds_to_mu(self.initial_delay.get()),
             data=trace_data,
@@ -156,36 +156,39 @@ class MeasureMOTWithPDFrag(ExpFragment):
 
         self.photodiode_voltage.push(np.array(trace_data))
 
-        if self.zero_measurement.get():
-            for i in range(num_points):
-                trace_data[i] -= trace_data[0]
-
         self.update_data(trace_data)
 
     def host_setup(self) -> None:
         super().host_setup()
-        self.name = f"MOT_loading.{self.scheduler.rid}"
-        self.set_dataset(
-            self.name,
-            0.0,
-            broadcast=True,
-        )
 
-    @rpc
+    @rpc(flags={"async"})
     def update_data(self, data):
         self.name = f"MOT_loading.{self.scheduler.rid}"
-        self.set_dataset(
-            self.name,
+        data = np.asarray(data)
+
+        xs = np.linspace(0, self.total_loading_time.get(), self.num_trace_points.get())
+
+        if self.zero_measurement.get():
+            data -= data[0]
+
+        fit_results, fit_errs, fit_xs, fit_ys = exponential_decay.fit(
+            xs,
             data,
-            broadcast=True,
-            persist=True,
-            archive=True,
+            evaluate_function=True,
+            evaluate_n=self.num_trace_points.get(),
         )
+
+        for name, value in zip(("time", "voltage", "fit"), (fit_xs, data, fit_ys)):
+            self.set_dataset(
+                f"{self.name}.{name}",
+                value,
+                broadcast=True,
+            )
 
         self.ccb.issue(
             "create_applet",
             "MOT Photodiode Voltage",
-            f"${{artiq_applet}}plot_xy {self.name}",
+            f"${{artiq_applet}}plot_xy {self.name}.voltage --title 'tau = {fit_results['tau']: .3f}' --x {self.name}.time --fit {self.name}.fit",
         )
 
 
