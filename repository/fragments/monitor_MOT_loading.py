@@ -171,12 +171,18 @@ class MeasureMOTWithPDFrag(ExpFragment):
         if self.zero_measurement.get():
             data -= data[0]
 
-        fit_results, fit_errs, fit_xs, fit_ys = exponential_decay.fit(
-            xs,
-            data,
-            evaluate_function=True,
-            evaluate_n=self.num_trace_points.get(),
-        )
+        try:
+            fit_results, fit_errs, fit_xs, fit_ys = exponential_decay.fit(
+                xs,
+                data,
+                evaluate_function=True,
+                evaluate_n=self.num_trace_points.get(),
+            )
+        except Exception as e:
+            logger.error(f"Error fitting MOT photodiode data: {e}")
+            fit_results = {"tau": np.nan}
+            fit_xs = xs
+            fit_ys = np.zeros_like(data)
 
         for name, value in zip(("time", "voltage", "fit"), (fit_xs, data, fit_ys)):
             self.set_dataset(
