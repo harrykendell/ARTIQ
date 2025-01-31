@@ -26,7 +26,7 @@ triggers = [
 BINNING = 1
 FULL_ROI = (1, 1, 1392 // BINNING, 1040 // BINNING)
 WHOLE_CELL_ROI = (620, 475, 750, 650)
-MOT_ROI = (670, 560, 720, 600)
+MOT_ROI = (650, 540, 740, 620)
 """
 For the pixelfly:
     "serial": 19701804,
@@ -49,7 +49,7 @@ def init_cam(cam: pco.Camera):
     cam.configuration = {
         "timestamp": "binary",
         "trigger": triggers[0],
-        "exposure time": 10_00e-6,
+        "exposure time": 5_00e-6,
         "binning": (BINNING, BINNING),
     }
 
