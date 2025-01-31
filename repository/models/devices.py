@@ -46,7 +46,7 @@ VDRIVEN_SUPPLIES = [
         name="GreenTA",
         fastino="fastino",
         ch=7,
-        gain=0.4, # 4A max * V / 10V -> 0.4 A/V
+        gain=0.4,  # 4A max * V / 10V -> 0.4 A/V
         current_limit=2.0,
         # TODO: Actually set me up
     ),
@@ -88,7 +88,7 @@ SUSERVOED_BEAMS = [
         name="MOT",
         suservo_device="suservo_aom_MOT",
         frequency=193.0 * MHz,
-        attenuation=15.5 * dB,
+        attenuation=16 * dB,
     ),
     SUServoedBeam(
         name="IMG",
