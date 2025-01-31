@@ -108,9 +108,11 @@ class SetAnalogCurrentSupplies(Fragment):
         for idx in range(len(self.fastino_channels)):
             self.fastino.set_dac(self.fastino_channels[idx], voltages[idx])
 
+    @kernel
     def set_defaults(self):
         self.set_currents([dev.default_current for dev in self.current_configs])
 
+    @kernel
     def turn_off(self):
         self.set_currents([0.0] * len(self.current_configs))
 
