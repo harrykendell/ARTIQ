@@ -75,10 +75,10 @@ class MOTPhotodiodeMeasurement(Fragment):
 
         You must pass an array of floats with size <num_points> to `data`.
         """
-        self.core.break_realtime()
         self.coil_setter.turn_off()
-        delay_mu(initial_delay_mu)
+        delay_mu(2 * initial_delay_mu)
         self.coil_setter.set_currents([self.current.get()])
+        delay_mu(-initial_delay_mu)
 
         for i in range(num_points):
             data[i] = self.adc_reader.read_adc()
@@ -145,6 +145,7 @@ class MeasureMOTWithPDFrag(ExpFragment):
 
         trace_data = [0.0] * num_points
 
+        self.core.break_realtime()
         self.mot_measurer.measure_MOT_fluorescence(
             num_points=num_points,
             delay_between_points_mu=self.core.seconds_to_mu(
