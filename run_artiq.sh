@@ -42,7 +42,7 @@ done
 if [[ $found -eq 1 ]]; then
     echo -e "${GREEN}Running on the ARTIQ server${NC}"
     # Be good citizens and clean up old aqctls on exit
-    trap 'pkill -9 -f aqctl; exit' EXIT
+    trap 'sleep 1; pkill -9 -f aqctl; exit' EXIT
     nix shell --command bash -c "$FIX ; $TLPM ; $ARTIQ"
 else
     echo -e "${RED}Not running on the ARTIQ server${NC}"
