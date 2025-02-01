@@ -229,24 +229,18 @@ class PIDControl(QWidget):
 
         layout = QVBoxLayout()
 
-        # Enable button
         top = QHBoxLayout()
-        # Sampler channel 0-7 (picker)
-        sampler_label = QLabel("Sampler")
-        top.addWidget(sampler_label)
-        self.sampler = QComboBox()
-        self.sampler.addItems([str(i) for i in range(8)])
-        self.sampler.setCurrentIndex(self.manager.sampler_chs[ch])
-        self.sampler.currentIndexChanged.connect(lambda: self.set())
-        top.addWidget(self.sampler)
         # Setpoint -1 to 1 linedit
-        setpoint_label = QLabel("Setpoint")
+        setpoint_label = QLabel("Offset (V)")
         top.addWidget(setpoint_label)
         self.setpoint = QLineEdit()
-        self.setpoint.setText(str(self.manager.ys[ch]))
-        self.setpoint.setValidator(QDoubleValidator(-1.00, 1.00, 3))
-        self.setpoint.editingFinished.connect(lambda: self.set())
+        self.setpoint.setText(str(self.manager.offsets[ch]))
+        self.setpoint.setValidator(QDoubleValidator(-10.00, 10.00, 10))
+        self.setpoint.editingFinished.connect(
+            lambda: self.manager.set_offset(ch, float(self.setpoint.text()))
+        )
         top.addWidget(self.setpoint)
+
         # Gain
         gain_label = QLabel("Gain")
         top.addWidget(gain_label)
@@ -310,7 +304,7 @@ class PIDControl(QWidget):
     def set(self):
         self.manager.set_iir(
             self.ch,
-            int(self.sampler.currentIndex()),
+            self.ch,
             float(self.P.text()),
             float(self.I.text()),
             float(self.Gl.text()),
