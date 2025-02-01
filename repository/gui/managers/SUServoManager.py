@@ -50,14 +50,14 @@ class SUServoManager:  # {{{
         defaults = [
             1,
             [0] * 8,
-            [16.0] * 2 + [20.0] * 6,
+            [16.5] * 8,
             [204e6, 193e6, 219e6, 86e6, 200e6, 200e6, 110e6, 110e6],
             [0] * 8,
             [1.0] * 8,
             [0] * 8,
+            [-0.1] * 8,
             [0.0] * 8,
-            [-0.005] * 8,
-            [-10.0] * 8,
+            [-10000.0] * 8,
             [0.0] * 8,
             [0] * 2,
         ]
@@ -167,7 +167,7 @@ class SUServoManager:  # {{{
     def set_dds(self, ch: np.int32, freq, offset):
         offset = -offset * (10.0 ** (self.gains[ch] - 1))
         self._mutate_and_set_float("freqs", self.freqs, ch, freq)
-        self._mutate_and_set_float("offsets", ch, offset)
+        self._mutate_and_set_float("offsets", self.offsets, ch, offset)
 
         self.core.break_realtime()
 
@@ -188,14 +188,15 @@ class SUServoManager:  # {{{
         )
 
     @kernel
+    def set_offset(self, ch: np.int32, v):
+        self.set_dds(ch, self.freqs[ch], v)
+
+    @kernel
     def set_y(self, ch: np.int32, y):
         self._mutate_and_set_float("ys", self.ys, ch, y)
 
-        if self.en_iirs[ch] == 1:
-            print("Cannot set y when IIR is enabled")
-        else:
-            self.core.break_realtime()
-            self.channels[ch].set_y(profile=ch, y=y)
+        self.core.break_realtime()
+        self.channels[ch].set_y(profile=ch, y=y)
 
     @kernel
     def set_iir(self, ch: np.int32, adc, P, I, Gl):
@@ -303,16 +304,16 @@ class SUServoManager:  # {{{
             )
 
             delay(200 * us)
-            # PI loop params
-            self.channels[ch].set_iir(
-                profile=ch,
-                adc=ch,
-                kp=self.Ps[ch],
-                ki=self.Is[ch],
-                g=self.Gls[ch],
-            )
-            delay(20 * us)
-            self.channels[ch].set_y(profile=ch, y=self.ys[ch])
+            # # PI loop params
+            # self.channels[ch].set_iir(
+            #     profile=ch,
+            #     adc=ch,
+            #     kp=self.Ps[ch],
+            #     ki=self.Is[ch],
+            #     g=self.Gls[ch],
+            # )
+            # delay(20 * us)
+            # self.channels[ch].set_y(profile=ch, y=self.ys[ch])
 
         for ch in range(8):
             # set attenuation on all 4 channels - we set all from the dataset then overwrite the one we want
