@@ -199,7 +199,6 @@ class SUServoManager:  # {{{
 
     @kernel
     def set_iir(self, ch: np.int32, adc, P, I, Gl):
-        self._mutate_and_set_int("sampler_chs", self.sampler_chs, ch, adc)
         self._mutate_and_set_float("Ps", self.Ps, ch, P)
         self._mutate_and_set_float("Is", self.Is, ch, I)
         self._mutate_and_set_float("Gls", self.Gls, ch, Gl)
