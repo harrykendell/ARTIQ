@@ -40,14 +40,14 @@ class SetSUServoTune(ExpFragment):
             "kp",
             FloatParam,
             description="Proportional gain of the IIR filter",
-            default=-1.0,
+            default=-0.005,
         )
 
         self.setattr_param(
             "ki",
             FloatParam,
             description="Integral gain of the IIR filter",
-            default=0.0,
+            default=-10.0,
             min=0,
             max=1,
         )
