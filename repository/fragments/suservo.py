@@ -15,9 +15,6 @@ from ndscan.experiment import Fragment
 from numpy import int64
 
 
-logger = logging.getLogger(__name__)
-
-
 class LibSetSUServoStatic(Fragment):
     """
     Set a static SUServo output
@@ -56,7 +53,7 @@ class LibSetSUServoStatic(Fragment):
         self.channel = channel
 
         # Kernel variables
-        self.debug_enabled = logger.isEnabledFor(logging.DEBUG)
+        self.debug_enabled = logging.getLogger().getEffectiveLevel() >= logging.DEBUG
         self.first_run = True
 
         # %% Kernel invariants
@@ -100,7 +97,7 @@ class LibSetSUServoStatic(Fragment):
         # Initiate the suservo itself (i.e. all four channels)
         if self.first_run and not self.mark_suservo_initiated(self.suservo.channel):
             if self.debug_enabled:
-                logger.info(
+                logging.info(
                     "Initiating suservo %s = artiq channel 0x%x",
                     self.channel,
                     self.suservo.channel,
@@ -112,7 +109,7 @@ class LibSetSUServoStatic(Fragment):
 
         else:
             if self.debug_enabled:
-                logger.info(
+                logging.info(
                     "Skipping suservo %s  - already initiated",
                     self.channel,
                 )
@@ -121,7 +118,7 @@ class LibSetSUServoStatic(Fragment):
             self.first_run = False
 
             if self.debug_enabled:
-                logger.info(
+                logging.info(
                     "Initiating suservo %s with default IIR and PGIA settings",
                     self.channel,
                 )
@@ -155,11 +152,36 @@ class LibSetSUServoStatic(Fragment):
         cpld.set_att(attenuator_channel, attenuation)
 
     @kernel
+    def set_all_attenuations(self, attenuation: TFloat):
+        """
+        Set all channels on the same DDS as this channel to the same, given
+        attenuation
+
+        This is annoyingly required because there is no way of getting
+        information out from the SUServo gateware about the current settings, so
+        they have to be reset on each run.
+        """
+        logging.warning("Setting the attenuator for all channels")
+
+        self.core.break_realtime()
+        cpld = self.suservo_channel.dds.cpld  # type: CPLD
+        cpld.get_att_mu()
+        attenuation_mu = cpld.att_to_mu(attenuation)
+        att_reg = (
+            attenuation_mu
+            | (attenuation_mu << 1 * 8)
+            | (attenuation_mu << 2 * 8)
+            | (attenuation_mu << 3 * 8)
+        )
+        self.core.break_realtime()
+        cpld.set_all_att_mu(att_reg)
+
+    @kernel
     def set_suservo(
         self,
         freq: TFloat,
         amplitude: TFloat,
-        attenuation: TFloat = 30.0,
+        attenuation: TFloat = 16.5,
         rf_switch_state: TBool = True,
         setpoint_v: TFloat = 0.0,
         enable_iir: TBool = False,
@@ -172,14 +194,14 @@ class LibSetSUServoStatic(Fragment):
         Args:
             freq (TFloat): Frequency in Hz
             amplitude (TFloat): Amplitude from 0 to 1 when 1 is 100% output.
-            attenuation (TFloat, optional): Attenuation on the variable attenuator. Defaults to 30.0.
+            attenuation (TFloat, optional): Attenuation on the variable attenuator. Defaults to 16.5.
             rf_switch_state (TBool, optional): State of the RF switch. Defaults to on.
             setpoint_v (TFloat, optional): SUServo setpoint. Only relevant if enable_IRR=True. Defaults to 0.0.
             enable_iir (TBool, optional): Enable the servo loop. Defaults to False.
         """
 
         if self.debug_enabled:
-            logger.info(
+            logging.info(
                 "Setting channel %s to %f MHz, amp = %f, att = %f, rf_switch_state=%s, setpoint_v=%s, enable_iir=%s, suservo_profile=%s",
                 self.channel,
                 1e-6 * freq,
@@ -227,7 +249,7 @@ class LibSetSUServoStatic(Fragment):
             new_offset (TFloat): The new offset in volts_
         """
         if self.debug_enabled:
-            logger.info(
+            logging.info(
                 "Setting setpoint for %s: %s", self.suservo_channel, new_setpoint
             )
             self.core.break_realtime()
@@ -255,7 +277,7 @@ class LibSetSUServoStatic(Fragment):
         details. Note that gains should usually be negative.
         """
         if self.debug_enabled:
-            logger.info(
+            logging.info(
                 "Setting iir params for %s: profile= %s, sampler_channel=%s, kp=%s, ki=%s, gain_limit=%s, delay=%s",
                 self.suservo_channel,
                 self.suservo_profile,
@@ -270,3 +292,8 @@ class LibSetSUServoStatic(Fragment):
         self.suservo_channel.set_iir(
             self.suservo_profile, self.sampler_channel, kp, ki, gain_limit, delay
         )
+
+    @kernel
+    def set_y(self, amplitude: TFloat):
+        """Set the amplitude of the channel"""
+        self.suservo_channel.set_y(profile=self.suservo_profile, y=amplitude)
