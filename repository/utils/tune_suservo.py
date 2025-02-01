@@ -113,7 +113,7 @@ class TuneSUServo(EnvExperiment):
         self.suservo.init()
         self.suservo.set_config(enable=1)
 
-        self.set_all_attenuations(30.0)
+        self.set_all_attenuations(self.attenuation)
         self.set_this_attenuation(self.attenuation)
 
         self.set_dds_params(
@@ -162,6 +162,8 @@ class TuneSUServo(EnvExperiment):
         logger.warning(
             "Setting the attenuator for all channels on Urukul %s",
             self.suservo_channel.dds,
+            "to %s dB",
+            attenuation,
         )
 
         self.core.break_realtime()

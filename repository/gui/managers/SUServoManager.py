@@ -7,6 +7,7 @@ from artiq.coredevice.ttl import TTLInOut
 
 import logging
 
+
 class SUServoManager:  # {{{
     """
     Manages a single SUServo device with 8 channels
@@ -51,7 +52,7 @@ class SUServoManager:  # {{{
             1,
             [0] * 8,
             [16.0] * 2 + [20.0] * 6,
-            [204e6,193e6,219e6,86e6,200e6,200e6,110e6,110e6],
+            [204e6, 193e6, 219e6, 86e6, 200e6, 200e6, 110e6, 110e6],
             [0] * 8,
             [1.0] * 8,
             [0] * 8,
@@ -208,7 +209,7 @@ class SUServoManager:  # {{{
             self.channels[ch].set_y(profile=ch, y=y)
 
     @kernel
-    def set_iir(self, ch, adc, P, I, Gl):
+    def set_iir(self, ch: int, adc, P, I, Gl):
         self._mutate_and_set_int("sampler_chs", self.sampler_chs, ch, adc)
         self._mutate_and_set_float("Ps", self.Ps, ch, P)
         self._mutate_and_set_float("Is", self.Is, ch, I)
@@ -257,6 +258,8 @@ class SUServoManager:  # {{{
         self.core.reset()
         self.core.break_realtime()
         self.suservo.set_config(enable=0)
+        self.suservo.init()
+        self.core.break_realtime()
 
         # shutters
         for shutter in range(len(self.shutters)):

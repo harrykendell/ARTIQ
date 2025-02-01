@@ -13,6 +13,8 @@ from ndscan.experiment.parameters import IntParamHandle
 from repository.fragments.suservo import LibSetSUServoStatic
 from get_local_devices import get_local_devices
 
+import logging
+
 
 class SetSUServoStatic(ExpFragment):
     """
@@ -103,6 +105,11 @@ class SetSUServoStatic(ExpFragment):
 
         self.setattr_fragment("LibSetSUServoStatic", LibSetSUServoStatic, self.channel)
         self.LibSetSUServoStatic: LibSetSUServoStatic
+
+    @kernel
+    def host_setup(self):
+        logging.warning("Clobbering the attenuator for all channels on this cpld")
+        return super().host_setup()
 
     @kernel
     def run_once(self):
