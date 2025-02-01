@@ -16,8 +16,6 @@ from repository.utils.get_local_devices import get_local_devices
 
 logger = logging.getLogger(__name__)
 
-PROFILE_NUM = 0
-
 DATASET_KEY_T = "suservo_tuning_t"
 DATASET_KEY_V = "suservo_tuning_v"
 DATASET_KEY_V_ERR_HACK = "suservo_tuning_v_err_hack"
@@ -120,11 +118,16 @@ class TuneSUServo(EnvExperiment):
             self.frequency, self.amplitude, False, setpoint_v=self.setpoint
         )
         self.suservo_channel.set_iir(
-            PROFILE_NUM, self.adc_channel, self.kp, self.ki, self.gain_limit, self.delay
+            self.adc_channel,
+            self.adc_channel,
+            self.kp,
+            self.ki,
+            self.gain_limit,
+            self.delay,
         )
 
         self.suservo_channel.set(
-            en_out=1, en_iir=(1 if self.enable_iir else 0), profile=PROFILE_NUM
+            en_out=1, en_iir=(1 if self.enable_iir else 0), profile=self.adc_channel
         )
 
         t_start_mu = now_mu()
@@ -159,12 +162,7 @@ class TuneSUServo(EnvExperiment):
         information out from the SUServo gateware about the current settings, so
         they have to be reset on each run.
         """
-        logger.warning(
-            "Setting the attenuator for all channels on Urukul %s",
-            self.suservo_channel.dds,
-            "to %s dB",
-            attenuation,
-        )
+        logger.warning("Setting the attenuator for all channels")
 
         self.core.break_realtime()
         cpld = self.suservo_channel.dds.cpld  # type: CPLD
@@ -197,9 +195,9 @@ class TuneSUServo(EnvExperiment):
         # Setpoints are stored in units of full scale, where 1.0 -> +10V, -1.0 -> -10V
         setpoint = -1.0 * setpoint_v / 10.0
         # Configure profile 0 to have the requested amplitude and frequency
-        self.suservo_channel.set_y(profile=0, y=amplitude)
+        self.suservo_channel.set_y(profile=self.adc_channel, y=amplitude)
         self.suservo_channel.set_dds(
-            profile=PROFILE_NUM,
+            profile=self.adc_channel,
             offset=setpoint,
             frequency=frequency,
             phase=0.0,
@@ -207,5 +205,5 @@ class TuneSUServo(EnvExperiment):
 
         # Enable profile 0 and the suservo more widely
         self.suservo_channel.set(
-            en_out=(1 if rf_switch_state else 0), en_iir=0, profile=PROFILE_NUM
+            en_out=(1 if rf_switch_state else 0), en_iir=0, profile=self.adc_channel
         )
