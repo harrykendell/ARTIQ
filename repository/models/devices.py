@@ -97,6 +97,7 @@ SUSERVOED_BEAMS = [
         attenuation=16.0 * dB,
         shutter_device="shutter_3DMOT",
         shutter_delay=35.0 * ms,
+        setpoint=2.0,
     ),
     SUServoedBeam(
         name="IMG",

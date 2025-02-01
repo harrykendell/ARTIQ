@@ -8,10 +8,9 @@ from ndscan.experiment import IntParam
 from ndscan.experiment.entry_point import make_fragment_scan_exp
 from ndscan.experiment.parameters import BoolParamHandle
 from ndscan.experiment.parameters import FloatParamHandle
-from ndscan.experiment.parameters import IntParamHandle
 
 from repository.fragments.suservo import LibSetSUServoStatic
-from get_local_devices import get_local_devices
+from repository.models.devices import SUSERVOED_BEAMS, SUServoedBeam
 
 import logging
 
@@ -27,11 +26,21 @@ class SetSUServoStatic(ExpFragment):
     def build_fragment(self):
         self.setattr_device("core")
 
+        suservo_channels = list(SUSERVOED_BEAMS.keys())
+        default: SUServoedBeam = SUSERVOED_BEAMS[suservo_channels[0]]
+
+        if not suservo_channels:
+            raise ValueError("No suservo channels found in device_db")
+        self.setattr_argument(
+            "channel",
+            EnumerationValue(suservo_channels, default=default.name),
+        )
+
         self.setattr_param(
             "frequency",
             FloatParam,
             description="Static frequency of the SUServo channel",
-            default=100e6,
+            default=default.frequency,
             min=0,
             max=400e6,  # from AD9910 specs
             unit="MHz",
@@ -42,7 +51,7 @@ class SetSUServoStatic(ExpFragment):
             "amplitude",
             FloatParam,
             description="Amplitude of AD9910 output, from 0 to 1",
-            default=1.0,
+            default=default.initial_amplitude,
             min=0,
             max=1,
         )
@@ -50,7 +59,7 @@ class SetSUServoStatic(ExpFragment):
             "attenuation",
             FloatParam,
             description="Attenuation on Urukul's variable attenuator",
-            default=30,
+            default=default.attenuation,
             unit="dB",
             min=0,
             max=31.5,
@@ -59,19 +68,10 @@ class SetSUServoStatic(ExpFragment):
             "setpoint_v",
             FloatParam,
             description="Setpoint",
-            default=0.0,
+            default=default.setpoint,
             unit="V",
             min=0,
             max=10.0,
-        )
-
-        self.setattr_param(
-            "pgia_setting",
-            IntParam,
-            description="PGA setting (0,1,2,3 == 1x,10x,100x,1000x)",
-            default=0,
-            min=0,
-            max=3,
         )
 
         self.setattr_param(
@@ -84,7 +84,7 @@ class SetSUServoStatic(ExpFragment):
             "enable_iir",
             BoolParam,
             description="Enable the servo",
-            default=True,
+            default=default.servo_enabled,
         )
 
         self.amplitude: FloatParamHandle
@@ -93,26 +93,17 @@ class SetSUServoStatic(ExpFragment):
         self.setpoint_v: FloatParamHandle
         self.rf_switch: BoolParamHandle
         self.enable_iir: BoolParamHandle
-        self.pgia_setting: IntParamHandle
-
-        suservo_channels = get_local_devices(self, SUServoChannel)
-        if not suservo_channels:
-            raise ValueError("No suservo channels found in device_db")
-        self.setattr_argument(
-            "channel",
-            EnumerationValue(suservo_channels, default=suservo_channels[0]),
-        )
 
         self.setattr_fragment("LibSetSUServoStatic", LibSetSUServoStatic, self.channel)
         self.LibSetSUServoStatic: LibSetSUServoStatic
 
     @kernel
-    def host_setup(self):
-        logging.warning("Clobbering the attenuator for all channels on this cpld")
-        return super().host_setup()
-
-    @kernel
     def run_once(self):
+        logging.warning("clobbering attenuations")
+        self.core.break_realtime()
+
+        self.LibSetSUServoStatic.set_all_attenuations(self.attenuation.get())
+
         self.LibSetSUServoStatic.set_suservo(
             self.frequency.get(),
             self.amplitude.get(),
@@ -121,8 +112,6 @@ class SetSUServoStatic(ExpFragment):
             self.setpoint_v.get(),
             self.enable_iir.get(),
         )
-
-        self.LibSetSUServoStatic.set_pgia_gain_mu(self.pgia_setting.get())
 
 
 SetSUServoStaticExp = make_fragment_scan_exp(SetSUServoStatic)
