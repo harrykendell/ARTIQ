@@ -205,7 +205,7 @@ class SUServoManager:  # {{{
             print("Cannot set y when IIR is enabled")
         else:
             self.core.break_realtime()
-            self.channels[ch].set_y(profile=0, y=y)
+            self.channels[ch].set_y(profile=ch, y=y)
 
     @kernel
     def set_iir(self, ch, adc, P, I, Gl):
@@ -216,7 +216,7 @@ class SUServoManager:  # {{{
 
         self.core.break_realtime()
 
-        self.channels[ch].set_iir(profile=0, adc=adc, kp=P, ki=I, g=Gl)
+        self.channels[ch].set_iir(profile=ch, adc=adc, kp=P, ki=I, g=Gl)
 
     @kernel
     def enable_iir(self, ch):
