@@ -28,6 +28,8 @@ import asyncio
 from qasync import QEventLoop
 import aiomqtt
 
+from artiq.master.scheduler import Scheduler
+
 # GUI
 from PyQt5.QtWidgets import QApplication, QLabel, QWidget, QVBoxLayout, QTextEdit
 
@@ -45,90 +47,61 @@ class GUIClient:
 
         self.rpc_clients: dict[AsyncioClient] = {}
         self.subscribers: dict[Subscriber] = {}
-        self.booster = None
 
-        self.booster_db = dict()
-        self.schedule_db = dict()
-        self.dataset_db = dict()
-        self.dlcpro_db = dict()
-
-        self.booster_callbacks = [[] for _ in range(8)]
-        self.dataset_callbacks = {}
-        self.schedule_callbacks = []
-        self.dlcpro_callbacks = []
+        for subscriber in ["dataset", "explist", "schedule", "dlcpro", "booster"]:
+            self.__dict__[f"{subscriber}"] = dict()
+            self.__dict__[f"{subscriber}_callbacks"] = []
 
     async def connect(self):
         """Initialize connections."""
+        loop = asyncio.get_event_loop()
+
         # Connect RPC clients
-        tasks = [
-            self.connect_rpc("dataset_db"),
-            self.connect_rpc("schedule"),
-        ]
+        for target in ["dataset_db", "schedule"]:
+            loop.create_task(self.connect_rpc(target))
 
         # Connect subscribers
-        def _dataset_create(data):
-            logging.debug(f"New dataset:\n{data}")
-            self.dataset_db = data
-            return self.dataset_db
+        for name, db, callbacks, port in [
+            ("datasets", self.dataset, self.dataset_callbacks, self.port_notify),
+            ("explist", self.explist, self.explist_callbacks, self.port_notify),
+            ("schedule", self.schedule, self.schedule_callbacks, self.port_notify),
+            ("DLCProState", self.dlcpro, self.dlcpro_callbacks, 3271),
+        ]:
+            loop.create_task(self.connect_subscriber(name, db, callbacks, port))
 
-        def _dataset_update(mod):
-            logging.debug(f"New dataset mod {mod}")
-            for key in self.dataset_callbacks.keys():
-                [cb() for cb in self.dataset_callbacks[key]]
-            return
-
-        tasks.append(
-            self.connect_subscriber(
-                "datasets",
-                _dataset_create,
-                _dataset_update,
-            )
-        )
-
-        def _schedule_create(data):
-            logging.debug(f"New schedule:\n{data}")
-            self.schedule_db = data
-            return self.schedule_db
-
-        def _schedule_update(mod):
-            logging.debug(f"New schedule mod {mod}")
-            for cb in self.schedule_callbacks:
-                cb()
-            return
-
-        tasks.append(
-            self.connect_subscriber(
-                "schedule",
-                _schedule_create,
-                _schedule_update,
-            )
-        )
-
-        def _dlcpro_create(data):
-            logging.debug(f"New DLCPro:\n{data}")
-            self.dlcpro_db = data
-            return self.dlcpro_db
-
-        def _dlcpro_update(mod):
-            logging.warning(f"New DLCPro mod {mod}")
-            for cb in self.dlcpro_callbacks:
-                cb()
-            return
-
-        tasks.append(
-            self.connect_subscriber(
-                "DLCProState",
-                _dlcpro_create,
-                _dlcpro_update,
-                port=3271,
-            )
-        )
-
-        # Connect booster via MQTT
-        tasks.append(self.connect_booster())
+        loop.create_task(self.connect_booster())
 
         logging.info("Connecting to services...")
-        await asyncio.gather(*tasks)
+
+    async def connect_subscriber(self, name, db, callbacks, port=None, server=None):
+        port = self.port_notify if port is None else port
+        server = self.server if server is None else server
+
+        def _create(data):
+            logging.debug(f"New {name}")
+            db.update(data)
+            return db
+
+        def _update(mod):
+            logging.debug(f"New {name} mod")
+            for cb in callbacks:
+                cb()
+            return
+
+        subscriber = Subscriber(name, _create, _update, None)
+        try:
+            await asyncio.wait_for(
+                subscriber.connect(
+                    server,
+                    port,
+                ),
+                5,
+            )
+        except asyncio.TimeoutError:
+            logging.error(f"Failed to connect to Sub: {name} at {server}:{port}")
+            return
+        self.subscribers[name] = subscriber
+        logging.info(f"Connected to Sub: {name} at {server}:{port}")
 
     async def connect_rpc(self, target, server=None, port=None):
         server = self.server if server is None else server
@@ -149,26 +122,6 @@ class GUIClient:
         self.rpc_clients[target] = client
         logging.info(f"Connected to RPC: {target} at {server}:{port}")
 
-    async def connect_subscriber(
-        self, target, target_builder, callback, disconnect=None, server=None, port=None
-    ):
-        server = self.server if server is None else server
-        port = self.port_notify if port is None else port
-        subscriber = Subscriber(target, target_builder, callback, disconnect)
-        try:
-            await asyncio.wait_for(
-                subscriber.connect(
-                    server,
-                    port,
-                ),
-                5,
-            )
-        except asyncio.TimeoutError:
-            logging.error(f"Failed to connect to Sub: {target} at {server}:{port}")
-            return
-        self.subscribers[target] = subscriber
-        logging.info(f"Connected to Sub: {target} at {server}:{port}")
-
     async def connect_booster(self):
         """Initialize MQTT connection for booster telemetry."""
 
@@ -178,10 +131,10 @@ class GUIClient:
             logging.debug(f"New Booster message: {message.payload.decode()}")
             ch = int(message.topic.value[-1])
             data = message.payload.decode()
-            self.booster_db[ch] = data
+            self.booster[ch] = data
 
             # Call any registered callback for this channel
-            for cb in self.booster_callbacks[ch]:
+            for cb in self.booster_callbacks:
                 logging.debug(f"Calling booster callback {cb} with {data}")
                 cb()
 
@@ -206,27 +159,33 @@ class GUIClient:
             return
         logging.info("Connected to Booster")
 
-    def register_booster_callback(self, ch, cb):
-        if ch == "*":
-            [self.booster_callbacks[i].append(cb) for i in range(8)]
-        elif ch in range(8):
-            self.booster_callbacks[ch].append(cb)
-        else:
-            logging.error(f"Invalid booster channel {ch}")
-
-    def register_dataset_callback(self, key, cb):
-        if key not in self.dataset_callbacks:
-            self.dataset_callbacks[key] = []
-        self.dataset_callbacks[key].append(cb)
+    def register_callback(self, target, cb):
+        # register a callback for booster, dataset, dlcpro, schedule, or
+        self.__dict__[f"{target}_callbacks"].append(cb)
         cb()
 
-    def register_schedule_callback(self, cb):
-        self.schedule_callbacks.append(cb)
-        cb()
-
-    def register_dlcpro_callback(self, cb):
-        self.dlcpro_callbacks.append(cb)
-        cb()
+    async def _submit_by_content(self, content, exp_class_name, title):
+        scheduler: Scheduler = self.rpc_clients["schedule"]
+        expid = {
+            "log_level": logging.WARNING,
+            "content": content,
+            "class_name": exp_class_name,
+            "arguments": {},
+        }
+        scheduling = {
+            "pipeline_name": "main",
+            "priority": 0,
+            "due_date": None,
+            "flush": False,
+        }
+        rid = await scheduler.submit(
+            scheduling["pipeline_name"],
+            expid,
+            scheduling["priority"],
+            scheduling["due_date"],
+            scheduling["flush"],
+        )
+        logging.info("Submitted '%s', RID is %d", title, rid)
 
     async def disconnect(self):
         """Disconnect all connections."""
@@ -256,54 +215,48 @@ class MainWindow(QWidget):
         self.spinbox = ScientificSpin()
         layout.addWidget(self.spinbox)
 
-        self.dataset_label = QLabel("Dataset:")
-        self.dataset_text = QTextEdit()
-        self.dataset_text.setReadOnly(True)
-        layout.addWidget(self.dataset_label)
-        layout.addWidget(self.dataset_text)
-        self.update_dataset()
-
-        self.schedule_label = QLabel("Schedule:")
-        self.schedule_text = QTextEdit()
-        self.schedule_text.setReadOnly(True)
-        layout.addWidget(self.schedule_label)
-        layout.addWidget(self.schedule_text)
-        self.update_schedule()
-
-        self.booster_label = QLabel("Booster:")
-        self.booster_text = QTextEdit()
-        self.booster_text.setReadOnly(True)
-        layout.addWidget(self.booster_label)
-        layout.addWidget(self.booster_text)
-        self.update_booster()
-
-        self.dlcpro_label = QLabel("DLCPro:")
-        self.dlcpro_text = QTextEdit()
-        self.dlcpro_text.setReadOnly(True)
-        layout.addWidget(self.dlcpro_label)
-        layout.addWidget(self.dlcpro_text)
-        self.update_dlcpro()
-
+        for name, fn in [
+            ("dataset", self.update_dataset),
+            ("explist", self.update_explist),
+            ("schedule", self.update_schedule),
+            ("dlcpro", self.update_dlcpro),
+            ("booster", self.update_booster),
+        ]:
+            label = QLabel(f"{name}::")
+            self.__dict__[f"{name}_text"] = QTextEdit()
+            self.__dict__[f"{name}_text"].setReadOnly(True)
+            layout.addWidget(label)
+            layout.addWidget(self.__dict__[f"{name}_text"])
+            fn()
         self.setLayout(layout)
 
     def update_dataset(self):
-        self.dataset_text.setText(str(self.client.dataset_db))
+        text = ""
+        for key, value in self.client.dataset.items():
+            text += f"{key}\n\t{value}\n"
+        self.dataset_text.setText(text)
+
+    def update_explist(self):
+        text = ""
+        for key in self.client.explist.keys():
+            text += f"{key}\n"
+        self.explist_text.setText(text)
 
     def update_schedule(self):
-        self.schedule_text.setText(str(self.client.schedule_db))
-
-    def update_booster(self):
-        self.booster_text.setText(str(self.client.booster_db))
+        text = ""
+        for key, value in self.client.schedule.items():
+            text += f"<b>{value['status']}</b>\t{value['expid']['class_name']}\n"
+        self.schedule_text.setText(text)
 
     def update_dlcpro(self):
-        self.dlcpro_text.setText(str(self.client.dlcpro_db))
+        self.dlcpro_text.setText(str(self.client.dlcpro))
+
+    def update_booster(self):
+        self.booster_text.setText(str(self.client.booster))
 
     def register_callbacks(self):
-        self.client.register_dataset_callback("*", self.update_dataset)
-        self.client.register_schedule_callback(self.update_schedule)
-        self.client.register_booster_callback("*", self.update_booster)
-        self.client.register_dlcpro_callback(self.update_dlcpro)
-
+        for target in ["dataset", "explist", "schedule", "dlcpro", "booster"]:
+            self.client.register_callback(target, getattr(self, f"update_{target}"))
 
 def main():
     logging.basicConfig(level=logging.INFO)
