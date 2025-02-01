@@ -48,8 +48,12 @@ class Startup(EnvExperiment):
         for ttlo in self.ttlOut:
             ttlo.output()
             delay(100 * us)
+            ttlo.off()
+            delay(100 * us)
         for ttl in self.ttl:
             ttl.output()
+            delay(100 * us)
+            ttl.off()
             delay(100 * us)
 
         self.core.wait_until_mu(now_mu())
