@@ -114,22 +114,22 @@ class LibSetSUServoStatic(Fragment):
                     self.channel,
                 )
 
-        if self.first_run:
-            self.first_run = False
+        # if self.first_run:
+        #     self.first_run = False
 
-            if self.debug_enabled:
-                logging.info(
-                    "Initiating suservo %s with default IIR and PGIA settings",
-                    self.channel,
-                )
+        #     if self.debug_enabled:
+        #         logging.info(
+        #             "Initiating suservo %s with default IIR and PGIA settings",
+        #             self.channel,
+        #         )
 
-            # Set default IIR settings
-            self.core.break_realtime()
-            self.set_iir_params()
+        #     # Set default IIR settings
+        #     self.core.break_realtime()
+        #     self.set_iir_params()
 
-            # Set the PGIA to 1x - there's no way to read it, so we have to have
-            # a deterministic initialisation
-            self.set_pgia_gain_mu(0)
+        #     # Set the PGIA to 1x - there's no way to read it, so we have to have
+        #     # a deterministic initialisation
+        #     self.set_pgia_gain_mu(0)
 
     @kernel
     def setpoint_to_offset(self, setpoint_v: TFloat) -> TFloat:
