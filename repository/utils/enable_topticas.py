@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 class SetTopticaState(EnvExperiment):
     """
-    Enable or disable the current for the Toptica lasers
+    Switch Toptica lasers
     """
 
     def build(self) -> None:

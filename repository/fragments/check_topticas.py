@@ -10,9 +10,7 @@ from submodules.topticadlcpro.toptica_wrapper.driver import TopticaDLCPro
 
 class CheckTopticaFrag(ExpFragment):
     """
-    CheckTopticaFrag
-
-    Logs the voltage, current, temperature of a Toptica DLCPro laser
+    Log the voltage, current, temperature of a Toptica DLCPro laser
     """
 
     def build_fragment(self) -> None:

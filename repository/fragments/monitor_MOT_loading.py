@@ -86,6 +86,10 @@ class MOTPhotodiodeMeasurement(Fragment):
 
 
 class MeasureMOTWithPDFrag(ExpFragment):
+    """
+    Plot the loading rate of the MOT by measuring the photodiode signal.
+    """
+
     def build_fragment(self):
         self.setattr_device("core")
         self.core: Core
