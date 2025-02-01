@@ -17,7 +17,6 @@ if [ "$SCRIPT_DIR" != "$(pwd)" ]; then
     cd $SCRIPT_DIR
 fi
 
-
 #  PyQt5 fix
 FIX=". ./scripts/nix-fix-pyqt.sh"
 
@@ -28,9 +27,8 @@ TLPM="(python ./ThorlabsPM/ThorlabsPM.py &)"
 SERVER_ADDRESS=137.222.69.28
 ARTIQ="artiq_session -d=\"-s=$SERVER_ADDRESS\" -d=\"-p=ndscan.dashboard_plugin\" -m=\"--bind=$SERVER_ADDRESS\" -c=\"--bind=$SERVER_ADDRESS\" -c=\"-s=$SERVER_ADDRESS\""
 
-
 # check if we are running on the artiq server or not
-IP_ADDRESSES=$(hostname -I 2>/dev/null);
+IP_ADDRESSES=$(hostname -I 2>/dev/null)
 # Loop through each IP address in the list
 found=0
 for ip in $IP_ADDRESSES; do
@@ -43,6 +41,8 @@ done
 # Run the ARTIQ dashboard with the target IP if found
 if [[ $found -eq 1 ]]; then
     echo -e "${GREEN}Running on the ARTIQ server${NC}"
+    # Be good citizens and clean up old aqctls on exit
+    trap 'pkill -9 -f aqctl; exit' EXIT
     nix shell --command bash -c "$FIX ; $TLPM ; $ARTIQ"
 else
     echo -e "${RED}Not running on the ARTIQ server${NC}"
