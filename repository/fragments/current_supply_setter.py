@@ -150,13 +150,52 @@ class SetAnalogCurrentSupplies(Fragment):
                 Timestamp of RTIO writes / s. Defaults to `1/75e3` since the
                 Fastino has a 75 kHz low-pass filter.
         """
+        self.set_currents_ramping_numpoints(
+            currents_start, currents_end, duration, 1 + int(duration // ramp_step)
+        )
 
+    @kernel
+    def actual_timestep_mu(self, duration: TFloat, num_points: TInt32):
+        return self.core.seconds_to_mu(duration / float(num_points))
+
+
+    @kernel
+    def set_currents_ramping_numpoints(
+        self,
+        currents_start: TList(TFloat),
+        currents_end: TList(TFloat),
+        duration: TFloat,
+        num_points: TInt32 = 1000,
+    ):
+        """
+        Queue a linear ramp of the currents controlled by this object
+
+        This method will write lots of RTIO events for the `duration` of the
+        ramp and will advance the timeline until the end of the ramp. It will
+        also require quite a lot of time to compute and queue the ramp, so users
+        should consider DMA if performance is limiting.
+
+        Note that `time_step` will be approximate - this method will ensure that
+        initial and final writes occurs at the start and end of the `duration`
+        period, with `time_step` varied slightly to ensure that. Note also that
+        this means you cannot immediately start a new ramp when the old one ends
+        - it must be spaced at least one Fastino write away
+        (`1.5us + 808ns * len(currents)` at time of writing).
+
+        Args:
+            currents_start (TList): List of starting currents / A
+
+            currents_end (TList): List of ending currents / A
+
+            duration (TFloat): Time to perform the ramp for
+
+            num_points (TInt32, optional): Number of samples
+        """
         if self.debug_enabled:
             logger.info("Starting ramp for %.3f ms", 1e3 * duration)
 
         # Compute grid for writes
-        num_points = 1 + int(duration // ramp_step)
-        actual_time_step_mu = self.core.seconds_to_mu(duration / float(num_points))
+        actual_time_step_mu = self.actual_timestep_mu(duration, num_points)
 
         current_steps = [0.0] * self.num_supplies
         for i_supply in range(self.num_supplies):
@@ -195,11 +234,11 @@ class SetAnalogCurrentSupplies(Fragment):
 
         # Queue the points, including an initial and final point
         for _ in range(num_points):
-            # Set voltages
-            self.fastino.set_group(self.fastino_channels, voltages_now)
-
-            # Calculate next voltages
+            # Set voltages and calculate next voltages
             for i_supply in range(self.num_supplies):
+                self.fastino.set_dac(
+                    self.fastino_channels[i_supply], voltages_now[i_supply]
+                )
                 voltages_now[i_supply] += voltage_steps[i_supply]
 
             delay_mu(actual_time_step_mu)
