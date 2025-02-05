@@ -41,6 +41,10 @@ pip install -e "git+https://github.com/OxfordIonTrapGroup/ndscan.git#egg=ndscan"
 # pydantic
 pip install pydantic
 
+# pyserial
+pip install pyvisa-py
+pip install pyserial
+
 ############        POST INSTALLATION CHECKS        ############
 pip list | sort >end_pip_list.txt
 
