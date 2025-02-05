@@ -86,21 +86,18 @@ class MSO24:
         """Set the horizontal timebase scale."""
         self.write(f"HORizontal:MAIn:SCAle {scale}")
 
-    def set_vertical_scale(self, channel: int, scale: float):
+    def set_volt_scale(self, channel: int, scale: float):
         """Set the vertical scale for a given channel."""
         self.write(f"CH{channel}:SCAle {scale}")
 
     def set_trigger(self, channel: int, level: float):
         """Set the trigger level for a given channel."""
         self.write(f"TRIGger:A:EDGE:SOUrce CH{channel}")
-        self.write(f"TRIGger:A:EDGE:LEVel {level}")
-
+        self.write(f"TRIGger:A:LEVel:CH{channel} {level}")
 
     def get_trace(self, channel: int, trigger_channel: int):
         """Extract a trace from a channel based on another channel's trigger."""
-        self.set_trigger(trigger_channel, 1.0)
-        self.write("ACQuire:STATE ON")
-        time.sleep(1)
+        self.set_trigger(trigger_channel, 0.0)
 
         # Retrieve scaling factors
         tscale = float(self.query("WFMOutpre:XINCR?"))
@@ -159,5 +156,5 @@ if __name__ == "__main__":
     with MSO24() as mso24:
         mso24.afg_sin(1e6, 1)
         mso24.set_timebase(1e-6)
-        mso24.set_vertical_scale(1, 1)
+        mso24.set_volt_scale(1, 1)
         mso24.plot_trace(1, 1)
