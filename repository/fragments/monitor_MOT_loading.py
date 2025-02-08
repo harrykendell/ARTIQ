@@ -26,6 +26,8 @@ from repository.fragments.read_adc import ReadSUServoADC
 from repository.fragments.current_supply_setter import SetAnalogCurrentSupplies
 from repository.models.devices import VDRIVEN_SUPPLIES
 
+from device_db import server_addr
+
 logger = logging.getLogger(__name__)
 
 
@@ -199,7 +201,7 @@ class MeasureMOTWithPDFrag(ExpFragment):
         self.ccb.issue(
             "create_applet",
             "MOT Photodiode Voltage",
-            f"${{artiq_applet}}plot_xy {self.name}.voltage --title 'tau = {fit_results['tau']: .3f}' --x {self.name}.time --fit {self.name}.fit",
+            f"${{artiq_applet}}plot_xy {self.name}.voltage --title 'tau = {fit_results['tau']: .3f}' --x {self.name}.time --fit {self.name}.fit --server {server_addr}",
         )
 
 

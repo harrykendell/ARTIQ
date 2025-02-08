@@ -1,5 +1,4 @@
 import logging
-from typing import List
 
 from artiq.coredevice.core import Core
 from artiq.coredevice.suservo import Channel as SUServoChannel
@@ -9,10 +8,9 @@ from artiq.experiment import (
     kernel,
     ms,
     rpc,
-    TArray,
-    TFloat,
+    delay,
 )
-from ndscan.experiment import ExpFragment, FloatParam, ResultChannel
+from ndscan.experiment import ExpFragment, FloatParam
 from ndscan.experiment.entry_point import make_fragment_scan_exp
 from ndscan.experiment.parameters import FloatParamHandle
 from repository.fragments.default_beam_setter import (
@@ -21,6 +19,8 @@ from repository.fragments.default_beam_setter import (
 )
 from repository.models.devices import SUSERVOED_BEAMS
 from repository.fragments.read_adc import ReadSUServoADC
+
+from device_db import server_addr
 
 logger = logging.getLogger(__name__)
 
@@ -49,37 +49,40 @@ class SingleSUServoReadingFrag(ExpFragment):
         )
         self.waittime: FloatParamHandle
 
-        beam_info_names = list(SUSERVOED_BEAMS.keys())
+        beam_names = list(SUSERVOED_BEAMS.keys())
         self.setattr_argument(
-            "beam_info_name",
+            "beam_name",
             EnumerationValue(
-                beam_info_names,
-                default=beam_info_names[0],
+                beam_names,
+                default=beam_names[0],
             ),
+            tooltip="The beam to monitor",
         )
-        self.beam_info_name: str
+        self.beam_name: str
 
         self.setattr_argument(
             "turn_on_beam_with_default_settings",
             BooleanValue(True),
+            tooltip="Turn on the beam with default settings",
         )
         self.turn_on_beam_with_default_settings: bool
 
         self.setattr_argument(
             "enable_servoing",
             BooleanValue(False),
+            tooltip="Enable the servoing for the beam",
         )
         self.enable_servoing: bool
 
         # %% devices
 
-        self.beam_info = SUSERVOED_BEAMS[self.beam_info_name or beam_info_names[0]]
+        self.beam = SUSERVOED_BEAMS[self.beam_name or beam_names[0]]
 
         if not self.enable_servoing:
-            self.beam_info.servo_enabled = False
+            self.beam.servo_enabled = False
 
         self.suservo_channel_device: SUServoChannel = self.get_device(
-            self.beam_info.suservo_device
+            self.beam.suservo_device
         )
 
         # Get beam setter fragment
@@ -105,7 +108,7 @@ class SingleSUServoReadingFrag(ExpFragment):
         self.suservo_profile_number = self.suservo_channel_device.servo_channel
 
         super().host_setup()
-        self.name = f"SUServo{self.beam_info_name}"
+        self.name = f"SUServo{self.beam_name}"
         self.set_dataset(
             self.name,
             [],
@@ -115,7 +118,7 @@ class SingleSUServoReadingFrag(ExpFragment):
         self.ccb.issue(
             "create_applet",
             self.name,
-            f"${{artiq_applet}}plot_xy {self.name}",
+            f"${{artiq_applet}}plot_xy {self.name} --server {server_addr}",
         )
 
     @kernel
@@ -137,14 +140,14 @@ class SingleSUServoReadingFrag(ExpFragment):
         self.core.break_realtime()
         while True:
             for i in range(1000):
-                v = self.adc_reader.read_adc() - self.beam_info.photodiode_offset
+                v = self.adc_reader.read_adc() - self.beam.photodiode_offset
                 delay(self.waittime.get())
                 self.update_data(v)
             self.reset_data()
 
     @rpc
     def update_data(self, data):
-        self.name = f"SUServo{self.beam_info_name}"
+        self.name = f"SUServo{self.beam_name}"
         self.append_to_dataset(self.name, data)
 
     @rpc
