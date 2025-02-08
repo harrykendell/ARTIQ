@@ -1,14 +1,17 @@
-from artiq.coredevice.suservo import Channel as SUServoChannel
 from artiq.experiment import kernel
-from ndscan.experiment import BoolParam
-from ndscan.experiment import EnumerationValue
-from ndscan.experiment import ExpFragment
-from ndscan.experiment import FloatParam
-from ndscan.experiment import IntParam
+from ndscan.experiment import (
+    BoolParam,
+    EnumerationValue,
+    ExpFragment,
+    FloatParam,
+    IntParam,
+)
 from ndscan.experiment.entry_point import make_fragment_scan_exp
-from ndscan.experiment.parameters import BoolParamHandle
-from ndscan.experiment.parameters import FloatParamHandle
-from ndscan.experiment.parameters import IntParamHandle
+from ndscan.experiment.parameters import (
+    BoolParamHandle,
+    FloatParamHandle,
+    IntParamHandle,
+)
 
 from repository.fragments.suservo import LibSetSUServoStatic
 from repository.models.devices import SUSERVOED_BEAMS, SUServoedBeam
@@ -29,27 +32,29 @@ class SetSUServoTune(ExpFragment):
             k for k in SUSERVOED_BEAMS.keys() if SUSERVOED_BEAMS[k].setpoint != 0.0
         ]
         default: SUServoedBeam = SUSERVOED_BEAMS[suservo_channels[0]]
+        
         if not suservo_channels:
             raise ValueError("No suservo channels found in device_db")
         self.setattr_argument(
             "channel",
             EnumerationValue(suservo_channels, default=default.name),
         )
+        self.channel: str
+        if self.channel is None:
+            self.channel = default.name
 
         self.setattr_param(
             "kp",
             FloatParam,
             description="Proportional gain of the IIR filter",
-            default=-0.005,
+            default=-1.0,
         )
 
         self.setattr_param(
             "ki",
             FloatParam,
             description="Integral gain of the IIR filter",
-            default=-10.0,
-            min=0,
-            max=1,
+            default=-10000.0,
         )
         self.setattr_param(
             "gain_limit",
@@ -63,7 +68,7 @@ class SetSUServoTune(ExpFragment):
             description="Setpoint to servo to",
             default=default.setpoint,
             unit="V",
-            min=0,
+            min=-10.0,
             max=10.0,
         )
 
@@ -97,7 +102,11 @@ class SetSUServoTune(ExpFragment):
         self.enable_iir: BoolParamHandle
         self.pgia_setting: IntParamHandle
 
-        self.setattr_fragment("LibSetSUServoStatic", LibSetSUServoStatic, self.channel)
+        self.setattr_fragment(
+            "LibSetSUServoStatic",
+            LibSetSUServoStatic,
+            SUSERVOED_BEAMS[self.channel].suservo_device,
+        )
         self.LibSetSUServoStatic: LibSetSUServoStatic
 
     @kernel
@@ -114,6 +123,8 @@ class SetSUServoTune(ExpFragment):
 
         if not self.enable_iir.get():
             self.LibSetSUServoStatic.set_y(1.0)
+
+        self.LibSetSUServoStatic.log_channel()
 
 
 SetSUServoSTuneExp = make_fragment_scan_exp(SetSUServoTune)

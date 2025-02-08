@@ -35,6 +35,9 @@ class SetSUServoStatic(ExpFragment):
             "channel",
             EnumerationValue(suservo_channels, default=default.name),
         )
+        self.channel: str
+        if self.channel is None:
+            self.channel = default.name
 
         self.setattr_param(
             "frequency",
@@ -94,7 +97,11 @@ class SetSUServoStatic(ExpFragment):
         self.rf_switch: BoolParamHandle
         self.enable_iir: BoolParamHandle
 
-        self.setattr_fragment("LibSetSUServoStatic", LibSetSUServoStatic, self.channel)
+        self.setattr_fragment(
+            "LibSetSUServoStatic",
+            LibSetSUServoStatic,
+            SUSERVOED_BEAMS[self.channel].suservo_device,
+        )
         self.LibSetSUServoStatic: LibSetSUServoStatic
 
     @kernel

@@ -4,6 +4,7 @@ exist solely for the purpose of working around ARTIQ's inability to infer the
 type of an empty list. You can therefore add one of these into your list in
 build() if it's empty, and it won't do anything when called.
 """
+
 from artiq.experiment import kernel
 from artiq.experiment import TBool
 from artiq.experiment import TFloat
@@ -17,14 +18,14 @@ class DummySUServoFrag:
         freq: TFloat,
         amplitude: TFloat,
         attenuation: TFloat = 30.0,
-        rf_switch_state: TBool = True,
+        en_out: TBool = True,
         setpoint_v: TFloat = 0.0,
         enable_iir: TBool = False,
     ):
         pass
 
     @kernel
-    def set_channel_state(self, rf_switch_state=True, enable_iir=True):
+    def set_channel_state(self, en_out=True, enable_iir=True):
         pass
 
 

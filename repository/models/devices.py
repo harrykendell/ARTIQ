@@ -87,14 +87,14 @@ SUSERVOED_BEAMS = [
     SUServoedBeam(
         name="Locking",
         frequency=198.0 * MHz,
-        attenuation=16.0 * dB,
+        attenuation=16.5 * dB,
         suservo_device="suservo_aom_LOCK",
     ),
     SUServoedBeam(
         name="MOT",
         suservo_device="suservo_aom_MOT",
         frequency=193.0 * MHz,
-        attenuation=16.0 * dB,
+        attenuation=16.5 * dB,
         shutter_device="shutter_3DMOT",
         shutter_delay=35.0 * ms,
         setpoint=2.0,
