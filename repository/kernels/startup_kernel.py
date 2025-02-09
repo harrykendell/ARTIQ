@@ -9,6 +9,8 @@ from artiq.coredevice.ttl import TTLOut, TTLInOut
 from artiq.coredevice.core import Core
 from artiq.coredevice.suservo import SUServo
 from artiq.coredevice.fastino import Fastino
+from artiq.coredevice.mirny import Mirny
+from artiq.coredevice.adf5356 import ADF5356 as MirnyChannel
 
 import logging
 
@@ -19,20 +21,13 @@ class Startup(EnvExperiment):
         self.core: Core = self.get_device("core")
 
         # LEDs
-        self.led0: TTLOut = self.get_device("led0")
-        self.led1: TTLOut = self.get_device("led1")
-        self.led2: TTLOut = self.get_device("led2")
-        self.led: list[TTLOut] = [self.__dict__["led" + str(i)] for i in range(3)]
+        self.led: list[TTLOut] = [self.get_device("led" + str(i)) for i in range(3)]
 
         # TTLs - we have 4 that are output only and 12 that are input/output
-        for i in range(4):
-            self.setattr_device("ttl" + str(i))
-        self.ttlOut: list[TTLOut] = [self.__dict__["ttl" + str(i)] for i in range(4)]
+        self.ttlOut: list[TTLOut] = [self.get_device("ttl" + str(i)) for i in range(4)]
 
-        for i in range(12):
-            self.setattr_device("ttl" + str(i + 4))
         self.ttl: list[TTLInOut] = [
-            self.__dict__["ttl" + str(i + 4)] for i in range(12)
+            self.get_device("ttl" + str(i + 4)) for i in range(12)
         ]
 
         # Fastino
@@ -41,8 +36,16 @@ class Startup(EnvExperiment):
         # SUServo
         self.suservo: SUServo = self.get_device("suservo")
 
+        # Mirny
+        self.mirny_cpld: Mirny = self.get_device("mirny_cpld")
+        self.mirny_ch: list[MirnyChannel] = [
+            self.get_device("mirny_ch" + str(i)) for i in range(4)
+        ]
+
     @kernel
     def run(self):
+        # TODO: This should really setup according to devices.py defaults
+
         self.core.reset()
         self.core.break_realtime()
         # LEDs
@@ -68,5 +71,12 @@ class Startup(EnvExperiment):
         # SUServo
         self.suservo.init()
         delay(100 * ms)
+
+        # Mirny
+        self.mirny_cpld.init()
+        delay(100 * ms)
+        for ch in self.mirny_ch:
+            ch.init()
+            delay(100 * ms)
 
         self.core.wait_until_mu(now_mu())
