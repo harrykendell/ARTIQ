@@ -55,6 +55,7 @@ def make_set_beams_to_default(
     """
     if not isinstance(suservo_beam_infos, list):
         suservo_beam_infos = list(suservo_beam_infos.values())
+
     class SetBeamsToDefaultsCustomised(SetBeamsToDefaults):
         default_suservo_beam_infos = suservo_beam_infos
         automatic_setup = use_automatic_setup
@@ -317,18 +318,16 @@ class SetBeamsToDefaults(Fragment):
             frequency = settings.frequency_handle.get()
             initial_amplitude = settings.initial_amplitude_handle.get()
 
-            rf_switch_state = light_enabled or (
-                not light_enabled and settings.shutter_present
-            )
+            en_out = light_enabled or (not light_enabled and settings.shutter_present)
 
             if self.debug_mode:
                 logger.info(
-                    "Enabling suservo (%s)\n- beam_info %s\n- setpoint %s\n- frequency %s\n- rf_switch_state %s\n- initial_amplitude %.3f",
+                    "Enabling suservo (%s)\n- beam_info %s\n- setpoint %s\n- frequency %s\n- en_out %s\n- initial_amplitude %.3f",
                     settings.setter,
                     beam_info,
                     setpoint,
                     frequency,
-                    rf_switch_state,
+                    en_out,
                     initial_amplitude,
                 )
                 self.core.break_realtime()
@@ -337,7 +336,7 @@ class SetBeamsToDefaults(Fragment):
                 frequency,
                 initial_amplitude,
                 float(beam_info.attenuation),
-                rf_switch_state=rf_switch_state,
+                en_out=en_out,
                 setpoint_v=setpoint,
                 enable_iir=beam_info.servo_enabled and light_enabled,
             )
