@@ -13,10 +13,6 @@ class Idle(EnvExperiment):
 
     @kernel
     def run(self):
-        logging.warning(
-            "\n\nI should really set the state to the config values somehow, while updating the dataset\n\n"
-        )
-
         start_time = now_mu() + self.core.seconds_to_mu(500*ms)
         while self.core.get_rtio_counter_mu() < start_time:
             pass
