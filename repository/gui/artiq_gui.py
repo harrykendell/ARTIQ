@@ -32,6 +32,8 @@ from managers.boosterTelemetry import BoosterTelemetry
 from managers.MirnyManager import MirnyManager
 from managers.FastinoManager import FastinoManager, DeltaElektronikaManager
 
+from artiq.coredevice.core import Core
+
 from artiq.experiment import *
 from artiq.language import MHz, ms
 
@@ -737,7 +739,7 @@ class ArtiqGUIExperiment(EnvExperiment):
     """Artiq GUI"""
 
     def build(self):
-        self.core = self.get_device("core")
+        self.core: Core = self.get_device("core")
 
         self.suservo = self.get_device("suservo")
         self.suservo_chs = [self.get_device(f"suservo_ch{i}") for i in range(8)]
@@ -758,6 +760,7 @@ class ArtiqGUIExperiment(EnvExperiment):
 
     def run(self):
         # Startups run methods
+        self.core.reset()
 
         # SUServo
         self.suservoManager = SUServoManager(
