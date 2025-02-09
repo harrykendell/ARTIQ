@@ -30,5 +30,6 @@ if [[ -d $TOOL_PATH ]]; then
     echo -e "${GREEN}Flashing complete, firmware updated in 'crate config/bu2402001_current'${NC}"
 else
     echo -e "${RED}${TOOL_PATH} not found, cannot build and flash artiq crate${NC}"
-    echo -e "Available versions:\n$(ls /opt/Xilinx/Vivado)"
+    echo -e "Found versions:\n\t$(ls /opt/Xilinx/Vivado)"
+    echo -e "Please install the required version of Vivado (Vitis) and rerun the script\n${GREEN}https://www.xilinx.com/support/download.html${NC}"
 fi
