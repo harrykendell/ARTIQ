@@ -1,27 +1,29 @@
 #! /bin/bash
 # This script builds and flashes the latest artiq release-8 firmware to the crate
 
-# ensure packages are up to date
-./env.sh
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 NC='\033[0m' # No Color
 
+# The directory where the script is located
+SCRIPT_DIR="$(dirname "$(realpath "$0")")"
+# go to the main artiq directory
+cd $SCRIPT_DIR/..
+
+echo $(pwd)
 # check for required build tool
 if [[ -d /opt/Xilinx/Vivado/2022.2 ]]; then
     echo -e "${GREEN}Vivado 2020.2 found, flashing artiq crate${NC}"
-    cd ../src/artiq
 
     # ensure the reference device_db reflects the currently flashed details
-    nix develop --command bash -c "artiq_ddb_template ../../crate\ config/bu2402001.json > ../../crate\ config/device_db.py"
+    nix develop git+https://github.com/m-labs/artiq.git/?ref=release-8#boards --command bash -c "artiq_ddb_template crate\ config/bu2402001.json > crate\ config/device_db.py"
     
     # build firmware - 8.0+
-    nix develop --command bash -c "export PYTHONPATH=$(pwd):$PYTHONPATH"
-    nix develop --command bash -c "python -m artiq.gateware.targets.kasli ../../crate\ config/bu2402001.json"
+    nix develop git+https://github.com/m-labs/artiq.git/?ref=release-8#boards --command bash -c "python -m artiq.gateware.targets.kasli crate\ config/bu2402001.json"
 
     # flash crate
-    cp -TR artiq_kasli/bu2402001 ../../crate\ config/bu2402001_current
-    nix develop --command bash -c "artiq_flash --srcbuild -d artiq_kasli/bu2402001"
+    cp -TR artiq_kasli/bu2402001 crate\ config/bu2402001_current && rm -rf artiq_kasli
+    nix develop git+https://github.com/m-labs/artiq.git/?ref=release-8#boards --command bash -c "artiq_flash --srcbuild -d crate\ config/bu2402001_current"
 
     echo -e "${GREEN}Flashing complete, firmware updated in 'crate config/bu2402001_current'${NC}"
 else
