@@ -1,5 +1,5 @@
 from repository.models import SUServoedBeam, EOM, VDrivenSupply, Shutter
-from artiq.language.units import ms, dB, MHz
+from artiq.language.units import ms, dB, MHz, V
 
 EOMS = [
     EOM(
@@ -97,7 +97,7 @@ SUSERVOED_BEAMS = [
         attenuation=16.5 * dB,
         shutter_device="shutter_3DMOT",
         shutter_delay=35.0 * ms,
-        setpoint=2.0,
+        setpoint=2.0 * V,
     ),
     SUServoedBeam(
         name="IMG",
