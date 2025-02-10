@@ -62,8 +62,8 @@ class SingleSUServoReadingFrag(ExpFragment):
 
         self.setattr_argument(
             "turn_on_beam_with_default_settings",
-            BooleanValue(True),
-            tooltip="Turn on the beam with default settings",
+            BooleanValue(False),
+            tooltip="Reset the beam to default settings",
         )
         self.turn_on_beam_with_default_settings: bool
 

@@ -32,7 +32,7 @@ class SetSUServoTune(ExpFragment):
             k for k in SUSERVOED_BEAMS.keys() if SUSERVOED_BEAMS[k].setpoint != 0.0
         ]
         default: SUServoedBeam = SUSERVOED_BEAMS[suservo_channels[0]]
-        
+
         if not suservo_channels:
             raise ValueError("No suservo channels found in device_db")
         self.setattr_argument(
@@ -47,20 +47,20 @@ class SetSUServoTune(ExpFragment):
             "kp",
             FloatParam,
             description="Proportional gain of the IIR filter",
-            default=-1.0,
+            default=-30.0,
         )
 
         self.setattr_param(
             "ki",
             FloatParam,
             description="Integral gain of the IIR filter",
-            default=-10000.0,
+            default=-200000.0,
         )
         self.setattr_param(
             "gain_limit",
             FloatParam,
             description="Gain limit of the IIR filter",
-            default=0.0,
+            default=-200.0,
         )
         self.setattr_param(
             "setpoint_v",
@@ -84,7 +84,7 @@ class SetSUServoTune(ExpFragment):
         self.setattr_param(
             "rf_switch",
             BoolParam,
-            description="State of the RF switch",
+            description="Enable the DDS output",
             default=True,
         )
         self.setattr_param(
@@ -111,6 +111,7 @@ class SetSUServoTune(ExpFragment):
 
     @kernel
     def run_once(self):
+
         self.LibSetSUServoStatic.set_iir_params(
             kp=self.kp.get(), ki=self.ki.get(), gain_limit=self.gain_limit.get()
         )

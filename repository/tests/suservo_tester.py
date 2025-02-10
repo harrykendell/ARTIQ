@@ -45,21 +45,21 @@ class SUServoTester(EnvExperiment):
         self.suschannels: list[Channel] = sorted(self.suschannels.items())
 
     @kernel
-    def setup_suservo(self, channel: SUServo):
+    def setup_suservo(self, suservo: SUServo):
         self.core.break_realtime()
-        channel.init()
+        suservo.init()
         delay(1 * us)
         # ADC PGIA gain 0
         for i in range(8):
-            channel.set_pgia_mu(i, 0)
+            suservo.set_pgia_mu(i, 0)
             delay(10 * us)
         # DDS attenuator 10dB
         for i in range(4):
-            for cpld in channel.cplds:
+            for cpld in suservo.cplds:
                 cpld.set_att(i, 10.0)
         delay(1 * us)
         # Servo is done and disabled
-        assert channel.get_status() & 0xFF == 2
+        assert suservo.get_status() & 0xFF == 2
         delay(10 * us)
 
     @kernel
