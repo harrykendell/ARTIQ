@@ -3,16 +3,23 @@ from typing import Set
 
 from artiq.coredevice.core import Core
 from artiq.coredevice.suservo import Channel
-from artiq.coredevice.suservo import SUServo
+from artiq.coredevice.suservo import SUServo, T_CYCLE, COEFF_SHIFT, COEFF_WIDTH
 from artiq.coredevice.urukul import CPLD
-from artiq.experiment import delay_mu
-from artiq.experiment import kernel
-from artiq.experiment import rpc
-from artiq.experiment import TBool
-from artiq.experiment import TFloat
-from artiq.experiment import TInt32
+from artiq.experiment import (
+    delay,
+    delay_mu,
+    kernel,
+    rpc,
+    TBool,
+    TFloat,
+    TInt32,
+    MHz,
+    ms,
+)
 from ndscan.experiment import Fragment
-from numpy import int64
+from numpy import int32
+
+from repository.models.devices import SUSERVOED_BEAMS
 
 
 class LibSetSUServoStatic(Fragment):
@@ -66,6 +73,27 @@ class LibSetSUServoStatic(Fragment):
         self.suservo_channel: Channel = self.get_device(self.channel)
         self.suservo: SUServo = self.suservo_channel.servo
 
+        # We pull default settings for the other beams on this cpld to avoid clobbering their atts in set_all_attenuations
+        # We assume that all suservo_chs are ordered properly by channel# so that for each set of 4 they share a cpld
+
+        # Find the default attenuations from SUSERVOED_BEAMS
+        beams = [
+            (dev.name, dev.suservo_device, dev.attenuation)
+            for dev in SUSERVOED_BEAMS.values()
+        ]
+        minch = min([self.get_device(dev[1]).channel for dev in beams])
+        # Assume cplds are logically chunked by channel number
+        start_ch = (self.suservo_channel.channel - minch) // 4 * 4
+        # our number inside the group of 4
+        self.ch_4 = (self.suservo_channel.channel - minch) % 4
+        # we now want this and the next 3 channels
+        self.beams = beams[start_ch : start_ch + 4]
+        if self.debug_enabled:
+            logging.info(
+                "Default beams: %s",
+                self.beams,
+            )
+
         # These are conventions in the AION lab:
         self.sampler_channel: int = self.suservo_channel.servo_channel
         self.suservo_profile: int = self.suservo_channel.servo_channel
@@ -74,6 +102,19 @@ class LibSetSUServoStatic(Fragment):
         self.kernel_invariants.add("suservo")
         self.kernel_invariants.add("sampler_channel")
         self.kernel_invariants.add("suservo_profile")
+        self.kernel_invariants.add("beams")
+
+    @kernel
+    def calc_atts_reg(self, att):
+        # We have to write all 4 channels at once due to hardware constraints.
+        # We therefore need to use the defaults for everything but ourselves
+        reg = 0
+        for i in range(4):
+            delay(1*ms)
+            reg += self.suservo.cplds[0].att_to_mu(
+                self.beams[i][2] if i != self.ch_4 else att
+            ) << (i * 8)
+        return reg
 
     @rpc
     def mark_suservo_initiated(self, suservo_channel: TInt32) -> TBool:
@@ -98,7 +139,7 @@ class LibSetSUServoStatic(Fragment):
         if self.first_run and not self.mark_suservo_initiated(self.suservo.channel):
             if self.debug_enabled:
                 logging.info(
-                    "Initiating suservo %s = artiq channel 0x%x",
+                    "Initiating suservo %s = artiq channel 0x%x -> enabled",
                     self.channel,
                     self.suservo.channel,
                 )
@@ -114,22 +155,91 @@ class LibSetSUServoStatic(Fragment):
                     self.channel,
                 )
 
-        # if self.first_run:
-        #     self.first_run = False
+        if self.first_run:
+            self.first_run = False
+            self.core.break_realtime()
 
-        #     if self.debug_enabled:
-        #         logging.info(
-        #             "Initiating suservo %s with default IIR and PGIA settings",
-        #             self.channel,
-        #         )
+            # Set the PGIA to 1x - there's no way to read it, so we have to have
+            # a deterministic initialisation
+            self.set_pgia_gain_mu(0)
 
-        #     # Set default IIR settings
-        #     self.core.break_realtime()
-        #     self.set_iir_params()
+    @kernel
+    def log_channel(self, profile_num: int32 = -1):
+        """
+        Extract approximate real values from the mu-encoded profile
 
-        #     # Set the PGIA to 1x - there's no way to read it, so we have to have
-        #     # a deterministic initialisation
-        #     self.set_pgia_gain_mu(0)
+        profile_mu is
+        [ftw >> 16, b1, pow, adc | (delay << 8), offset, a1, ftw & 0xffff, b0]
+
+        returns : freq, phase, sampler_channel, delay, offset, kp, ki, gain_limit
+        """
+        if profile_num == -1:
+            profile_num = self.suservo_profile
+
+        buffer = [0] * 8
+        self.core.break_realtime()
+        self.suservo_channel.get_profile_mu(profile_num, buffer)
+
+        self.core.break_realtime()
+        freq = self.suservo_channel.dds.ftw_to_frequency((buffer[0] << 16) | buffer[6])
+        self.core.break_realtime()
+        phase = self.suservo_channel.dds.pow_to_turns(buffer[2])
+        sampler_channel = buffer[3] & 0xFF
+        delay = (buffer[3] >> 8) * T_CYCLE
+        offset = buffer[4] / (1 << COEFF_WIDTH - 1)
+
+        a1 = float(buffer[5])
+        b0 = float(buffer[7])
+        b1 = float(buffer[1])
+
+        kp = 0.0
+        ki = 0.0
+        gain_limit = 0.0
+
+        B_NORM = 1 << COEFF_SHIFT + 1
+        A_NORM = 1 << COEFF_SHIFT
+
+        if a1 == 0.0:  # pure P so ki=0 and gain can't be recovered
+            kp = b0
+        # I or PI
+        elif a1 == A_NORM:  # g == 0 so get kp and ki
+            kp = (b0 - b1) / 2.0
+            ki = (b0 + b1) / 2.0
+        else:  # g != 0 so get all three
+            c = (a1 / A_NORM + 1.0) / 2.0
+            kp = (b0 - b1) / 2.0 / c
+            ki = (b0 - kp) / c
+
+            gain_limit = ki / B_NORM / (1.0 / c - 1.0)
+
+        kp /= B_NORM
+        ki /= B_NORM * T_CYCLE / 2.0
+
+        self.core.break_realtime()
+        y = self.suservo_channel.get_y(profile_num)
+        self.core.break_realtime()
+        status = self.suservo.get_status()
+        # Bit 0: enabled, bit 1: done, bits 8-15: channel clip indicators.
+        logging.info("a1=%s, b0=%s, b1=%s", a1, b0, b1)
+        logging.info(
+            "SUServo enabled=%s,done=%s,clipping=%s",
+            bool(status & 1),
+            bool(status & 2),
+            status >> 8,
+        )
+        logging.info(
+            "Profile %s (y=%s): freq=%s, phase=%s, sampler_channel=%s, delay=%s, offset=%s, kp=%s, ki=%s, gain_limit=%s",
+            profile_num,
+            y,
+            freq / MHz,
+            phase,
+            sampler_channel,
+            delay,
+            offset,
+            kp,
+            ki,
+            gain_limit,
+        )
 
     @kernel
     def setpoint_to_offset(self, setpoint_v: TFloat) -> TFloat:
@@ -148,33 +258,35 @@ class LibSetSUServoStatic(Fragment):
     def set_this_attenuation(self, attenuation: TFloat):
         # Set the attenuator for this channel on this Urukul
         attenuator_channel = self.suservo_channel.servo_channel % 4
+
+        if self.debug_enabled:
+            logging.info(
+                "Setting the attenuator for %s (%s/4) to %f",
+                self.channel,
+                attenuator_channel,
+                attenuation,
+            )
+            self.core.break_realtime()
+
         cpld = self.suservo_channel.dds.cpld  # type: CPLD
         cpld.set_att(attenuator_channel, attenuation)
 
     @kernel
     def set_all_attenuations(self, attenuation: TFloat):
         """
-        Set all channels on the same DDS as this channel to the same, given
-        attenuation
+        Set all channels on the same DDS as this channel to their defaults
 
         This is annoyingly required because there is no way of getting
         information out from the SUServo gateware about the current settings, so
         they have to be reset on each run.
         """
-        logging.warning("Setting the attenuator for all channels")
+        logging.warning("Setting the attenuator for all channels to their defaults")
 
         self.core.break_realtime()
         cpld = self.suservo_channel.dds.cpld  # type: CPLD
         cpld.get_att_mu()
-        attenuation_mu = cpld.att_to_mu(attenuation)
-        att_reg = (
-            attenuation_mu
-            | (attenuation_mu << 1 * 8)
-            | (attenuation_mu << 2 * 8)
-            | (attenuation_mu << 3 * 8)
-        )
-        self.core.break_realtime()
-        cpld.set_all_att_mu(att_reg)
+
+        cpld.set_all_att_mu(self.calc_atts_reg(attenuation))
 
     @kernel
     def set_suservo(
@@ -182,7 +294,7 @@ class LibSetSUServoStatic(Fragment):
         freq: TFloat,
         amplitude: TFloat,
         attenuation: TFloat = 16.5,
-        rf_switch_state: TBool = True,
+        en_out: TBool = True,
         setpoint_v: TFloat = 0.0,
         enable_iir: TBool = False,
     ):
@@ -195,48 +307,75 @@ class LibSetSUServoStatic(Fragment):
             freq (TFloat): Frequency in Hz
             amplitude (TFloat): Amplitude from 0 to 1 when 1 is 100% output.
             attenuation (TFloat, optional): Attenuation on the variable attenuator. Defaults to 16.5.
-            rf_switch_state (TBool, optional): State of the RF switch. Defaults to on.
+            en_out (TBool, optional): State of the RF switch. Defaults to on.
             setpoint_v (TFloat, optional): SUServo setpoint. Only relevant if enable_IRR=True. Defaults to 0.0.
             enable_iir (TBool, optional): Enable the servo loop. Defaults to False.
         """
-
-        if self.debug_enabled:
-            logging.info(
-                "Setting channel %s to %f MHz, amp = %f, att = %f, rf_switch_state=%s, setpoint_v=%s, enable_iir=%s, suservo_profile=%s",
-                self.channel,
-                1e-6 * freq,
-                amplitude,
-                attenuation,
-                rf_switch_state,
-                setpoint_v,
-                enable_iir,
-                self.suservo_profile,
-            )
-            self.core.break_realtime()
-            delay_mu(int64(self.core.ref_multiplier))
-
         # Set the attenuator for this channel
         self.set_this_attenuation(attenuation)
 
         # Configure this profile to have the requested amplitude and frequency
-        self.suservo_channel.set_y(profile=self.suservo_profile, y=amplitude)
-        self.suservo_channel.set_dds(
+        self.set_y(amplitude)
+
+        self.set_dds(
             profile=self.suservo_profile,
             offset=self.setpoint_to_offset(setpoint_v),
             frequency=freq,
-            phase=0.0,
         )
 
         # Set channel output state
-        self.set_channel_state(rf_switch_state, enable_iir)
+        self.set_channel_state(en_out, enable_iir)
+
+    @kernel
+    def set_dds(
+        self,
+        frequency: TFloat,
+        profile: TInt32,
+        offset: TFloat,
+        phase: TFloat = 0.0,
+    ):
+        """
+        Set the DDS parameters for this channel.
+
+        Args:
+            frequency (TFloat): Frequency in Hz
+            phase (TFloat): Phase in radians
+            profile (TInt32): Profile number
+            offset (TFloat): IIR offset (negative setpoint) in units of full scale
+        """
+        if self.debug_enabled:
+            logging.info(
+                "Setting DDS for %s (profile=%s): frequency=%s, offset=%s, phase=%s",
+                self.channel,
+                profile,
+                frequency,
+                offset,
+                phase,
+            )
+            self.core.break_realtime()
+
+        self.suservo_channel.set_dds(
+            profile=profile,
+            offset=offset,
+            frequency=frequency,
+            phase=phase,
+        )
 
     @kernel
     def set_pgia_gain_mu(self, gain_mu):
         """
-        Set the PGIA gain of this channel
+        Set the PGIA gain of this channel (0,1,2,3) = (1x,10x,100x,1000x)
 
         See :meth:`artiq.coredevice.suservo.SUServo.set_pgia_mu` for details.
         """
+        if self.debug_enabled:
+            logging.info(
+                "Setting PGIA gain for %s: %s",
+                self.sampler_channel,
+                gain_mu,
+            )
+            self.core.break_realtime()
+
         self.suservo.set_pgia_mu(self.sampler_channel, gain_mu)
 
     @kernel
@@ -246,40 +385,59 @@ class LibSetSUServoStatic(Fragment):
         Updates only the SUServo setpoint. Does not enable the SUServo / RF switch or change any other parameters.
 
         Args:
-            new_offset (TFloat): The new offset in volts_
+            new_offset (TFloat): The new offset in volts
         """
+        offset = self.setpoint_to_offset(new_setpoint)
+
         if self.debug_enabled:
             logging.info(
-                "Setting setpoint for %s: %s", self.suservo_channel, new_setpoint
+                "Setting setpoint for %s (profile=%s): %s V -> %s",
+                self.channel,
+                self.suservo_profile,
+                new_setpoint,
+                offset,
             )
             self.core.break_realtime()
-        self.suservo_channel.set_dds_offset(
-            profile=self.suservo_profile, offset=self.setpoint_to_offset(new_setpoint)
-        )
+
+        self.suservo_channel.set_dds_offset(profile=self.suservo_profile, offset=offset)
 
     @kernel
-    def set_channel_state(self, rf_switch_state: TBool, enable_iir: TBool):
+    def set_channel_state(self, en_out: TBool, enable_iir: TBool):
         """
         Quickly enable / disable the RF switch and servo. This method does not
         advance the timeline.
+
+        Automatically sets the profile to the AION lab convention of the channel number.
         """
-        # Enable this channel
+        out = 1 if en_out else 0
+        iir = 1 if enable_iir else 0
+
+        if self.debug_enabled:
+            logging.info(
+                "Setting channel state for %s (profile=%s): en_out=%s, enable_iir=%s",
+                self.channel,
+                self.suservo_profile,
+                out,
+                iir,
+            )
+            self.core.break_realtime()
+
         self.suservo_channel.set(
-            en_out=(1 if rf_switch_state else 0),
-            en_iir=(1 if enable_iir else 0),
+            en_out=out,
+            en_iir=iir,
             profile=self.suservo_profile,
         )
 
     @kernel
-    def set_iir_params(self, kp=-0.005, ki=-10, gain_limit=0.0, delay=0.0):
+    def set_iir_params(self, kp=-30.0, ki=-200000.0, gain_limit=-200.0, delay=0.0):
         """
         Set loop filter parameters for the suservo. See ARTIQ documentation for
-        details. Note that gains should usually be negative.
+        details. Note all of kp,ki,gain_limit should usually be negative.
         """
         if self.debug_enabled:
             logging.info(
-                "Setting iir params for %s: profile= %s, sampler_channel=%s, kp=%s, ki=%s, gain_limit=%s, delay=%s",
-                self.suservo_channel,
+                "Setting iir params for %s (profile= %s): sampler_channel=%s, kp=%s, ki=%s, gain_limit=%s, delay=%s",
+                self.channel,
                 self.suservo_profile,
                 self.sampler_channel,
                 kp,
@@ -289,6 +447,7 @@ class LibSetSUServoStatic(Fragment):
             )
             self.core.break_realtime()
 
+        self.set_y(0.0)  # clear integrator
         self.suservo_channel.set_iir(
             self.suservo_profile, self.sampler_channel, kp, ki, gain_limit, delay
         )
@@ -296,4 +455,13 @@ class LibSetSUServoStatic(Fragment):
     @kernel
     def set_y(self, amplitude: TFloat):
         """Set the amplitude of the channel"""
+        if self.debug_enabled:
+            logging.info(
+                "Setting y for %s (profile= %s): y=%s",
+                self.channel,
+                self.suservo_profile,
+                amplitude,
+            )
+            self.core.break_realtime()
+
         self.suservo_channel.set_y(profile=self.suservo_profile, y=amplitude)
