@@ -59,7 +59,7 @@ class SUServoManager:  # {{{
             [-0.1] * 8,
             [-30.] * 8,
             [-200000.0] * 8,
-            [-200] * 8,
+            [-200.0] * 8,
             [0] * 2,
         ]
         units = [
@@ -269,11 +269,11 @@ class SUServoManager:  # {{{
         self.core.break_realtime()
         delay(500 * ms)
 
-        buffer = [0] * 8
+        # buffer = [0] * 8
         for ch in range(8):
-            self.core.break_realtime()
-            self.channels[ch].get_profile_mu(ch, buffer)
-            delay(150 * ms)
+            # self.core.break_realtime()
+            # self.channels[ch].get_profile_mu(ch, buffer)
+            # delay(150 * ms)
             # if there doesn't seem to be any state held in the suservo channel we just use our dataset values
             # if (
             #     self.suservo.ddses[0].ftw_to_frequency(buffer[0] << 16 | buffer[6])
