@@ -8,6 +8,7 @@ from artiq.coredevice.mirny import Mirny
 
 from numpy import int32
 
+
 class MirnyManager:  # {{{
     """
     Manages a mirny with almazny mezzanine
@@ -41,7 +42,7 @@ class MirnyManager:  # {{{
         defaults = [
             [1] + [0] * 3,
             [3.0] + [31.5] * 3,
-            [3285e6] + [4000] * 3,
+            [3285.0] + [4000.0] * 3,
             [0] * 4,
         ]
         units = [
@@ -121,7 +122,10 @@ class MirnyManager:  # {{{
 
     @kernel
     def set_freq(self, ch: int32, freq: float):
-        self._mutate_and_set_float("freqs", self.freqs, ch, freq * MHz)
+        """
+        Frequency in MHz
+        """
+        self._mutate_and_set_float("freqs", self.freqs, ch, freq)
         # 53.125 MHz <= f <= 6800 MHz
         if freq < 53.125:
             raise ValueError("Frequency too low")
@@ -130,7 +134,7 @@ class MirnyManager:  # {{{
 
         # self.core.break_realtime() but faster
         at_mu(rtio_get_counter() + 1000)
-        self.channels[ch].set_frequency(freq * MHz)
+        self.channels[ch].set_frequency(freq*MHz)
 
     @kernel
     def set_all(self):
@@ -152,7 +156,7 @@ class MirnyManager:  # {{{
             self.channels[ch].init()
 
             self.set_att(ch, self.atts[ch])
-            self.set_freq(ch, self.freqs[ch] / MHz)
+            self.set_freq(ch, self.freqs[ch])
             if self.en_outs[ch]:
                 self.enable(ch)
             else:

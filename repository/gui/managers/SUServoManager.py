@@ -52,12 +52,12 @@ class SUServoManager:  # {{{
             1,
             [0] * 8,
             [16.5] * 8,
-            [204e6, 193e6, 219e6, 86e6, 200e6, 200e6, 110e6, 110e6],
+            [198.0, 193.0, 219.0, 86.0, 200.0, 200.0, 110.0, 110.0],
             [0] * 8,
             [1.0] * 8,
             [0] * 8,
             [-0.1] * 8,
-            [-30.] * 8,
+            [-30.0] * 8,
             [-200000.0] * 8,
             [-200.0] * 8,
             [0] * 2,
@@ -166,31 +166,38 @@ class SUServoManager:  # {{{
 
     @kernel
     def set_dds(self, ch: np.int32, freq, offset):
+        """
+        Frequency is in MHz
+        Offset in V
+        """
+        if freq < 0.0 or freq > 400.0:
+            raise ValueError("Frequency out of range")
         self._mutate_and_set_float("freqs", self.freqs, ch, freq)
         offset = -offset * (10.0 ** (self.gains[ch] - 1))
         self._mutate_and_set_float("offsets", self.offsets, ch, offset)
 
         self.core.break_realtime()
 
-        self.channels[ch].set_dds(profile=ch, frequency=freq * MHz, offset=offset)
+        self.channels[ch].set_dds(profile=ch, frequency=freq*MHz, offset=offset)
 
     @kernel
     def set_freq(self, ch: np.int32, freq):
-        self._mutate_and_set_float("freqs", self.freqs, ch, freq * MHz)
-        # 0 MHz <= f <= 400 MHz
-        if freq < 0:
-            raise ValueError("Frequency too low")
-        if freq > 400.0:
-            raise ValueError("Frequency too high")
+        """
+        Frequency is in Hz
+        """
+        self._mutate_and_set_float("freqs", self.freqs, ch, freq)
+        if freq < 0.0 or freq > 400.0:
+            raise ValueError("Frequency out of range")
+
         self.core.break_realtime()
 
         self.channels[ch].set_dds(
-            profile=ch, frequency=freq * MHz, offset=self.offsets[ch]
+            profile=ch, frequency=freq*MHz, offset=self.offsets[ch]
         )
 
     @kernel
     def set_offset(self, ch: np.int32, v):
-        self.set_dds(ch, self.freqs[ch], v)
+        self.set_dds(ch, self.freqs[ch]*MHz, v)
 
     @kernel
     def set_y(self, ch: np.int32, y):
@@ -264,45 +271,8 @@ class SUServoManager:  # {{{
             self.name + ".enabled", self.enabled, persist=True, archive=False
         )
         self.core.break_realtime()
-        # Initialize SUServo - this will leave it disabled
-        self.suservo.init()
-        self.core.break_realtime()
-        delay(500 * ms)
 
-        # buffer = [0] * 8
         for ch in range(8):
-            # self.core.break_realtime()
-            # self.channels[ch].get_profile_mu(ch, buffer)
-            # delay(150 * ms)
-            # if there doesn't seem to be any state held in the suservo channel we just use our dataset values
-            # if (
-            #     self.suservo.ddses[0].ftw_to_frequency(buffer[0] << 16 | buffer[6])
-            #     != 0.0
-            # ):
-            #     delay(50 * ms)
-            #     logging.info(
-            #         "Loading state from SUServo Ch%d\nfreq %.1f MHz targetting %sV giving y=%f",
-            #         ch,
-            #         self.suservo.ddses[0].ftw_to_frequency(buffer[0] << 16 | buffer[6])
-            #         / MHz,
-            #         buffer[4] / (1 << COEFF_WIDTH - 1),
-            #         self.channels[ch].get_y(ch),
-            #     )
-            #     self.core.break_realtime()
-            #     delay(100 * us)
-            #     self._mutate_and_set_float(
-            #         "offsets", self.offsets, ch, buffer[4] / (1 << COEFF_WIDTH - 1)
-            #     )
-            #     self._mutate_and_set_float(
-            #         "freqs",
-            #         self.freqs,
-            #         ch,
-            #         self.suservo.ddses[0].ftw_to_frequency(buffer[0] << 16 | buffer[6]),
-            #     )
-            #     self._mutate_and_set_float(
-            #         "ys", self.ys, ch, self.channels[ch].get_y(ch)
-            #     )
-
             self.core.break_realtime()
             # set gain on Sampler channel  to 10^gain - these are wiped in the init
             self.suservo.set_pgia_mu(ch, self.gains[ch])

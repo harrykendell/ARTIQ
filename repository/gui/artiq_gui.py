@@ -107,7 +107,7 @@ class DDSControl(QWidget):
 
         # text inputs
         self.text = QLineEdit()
-        self.text.setText(str(round(self.manager.freqs[ch] / MHz, 3)))
+        self.text.setText(str(round(self.manager.freqs[ch], 3)))
         self.text.setValidator(QDoubleValidator())
         self.text.setAlignment(Qt.AlignCenter)
         self.text.editingFinished.connect(lambda: self.setfreq(self.text.text()))
@@ -137,7 +137,7 @@ class DDSControl(QWidget):
         self.slider = QSlider(Qt.Horizontal)
         self.slider.setSingleStep(1)
         self.slider.setRange(int(self.min), int(self.max))
-        self.slider.setValue(int(self.manager.freqs[ch] / MHz))
+        self.slider.setValue(int(self.manager.freqs[ch]))
         self.slider.valueChanged.connect(lambda x: self.setfreq(x))
 
         sliderline = QHBoxLayout()
@@ -156,7 +156,7 @@ class DDSControl(QWidget):
             return
 
         # guard against recursion already at the correct frequency
-        if val == self.manager.freqs[self.ch] / MHz:
+        if val == self.manager.freqs[self.ch]:
             return
 
         val = min(max(val, self.min), self.max)
