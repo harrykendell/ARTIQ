@@ -33,25 +33,14 @@ class MirnyManager:  # {{{
 
         assert len(self.channels) == 4, "There must be 4 channels per Mirny"
 
-        datasets = [
-            "en_almazny",
-            "atts",
-            "freqs",
-            "en_outs",
+        vals = [
+            ("en_almazny", [1] + [0] * 3, None),
+            ("atts", [17.0] + [31.5] * 3, "dB"),
+            ("freqs", [3285.0] + [4000.0] * 3, "MHz"),
+            ("en_outs", [0] * 4, None),
         ]
-        defaults = [
-            [1] + [0] * 3,
-            [3.0] + [31.5] * 3,
-            [3285.0] + [4000.0] * 3,
-            [0] * 4,
-        ]
-        units = [
-            None,
-            "dB",
-            "MHz",
-            None,
-        ]
-        for dataset, default, unit in zip(datasets, defaults, units):
+
+        for dataset, default, unit in vals:
             temp = experiment.get_dataset(name + "." + dataset, default=default)
             # we set the values back so we are allowed to mutate then later
             experiment.set_dataset(
@@ -134,7 +123,7 @@ class MirnyManager:  # {{{
 
         # self.core.break_realtime() but faster
         at_mu(rtio_get_counter() + 1000)
-        self.channels[ch].set_frequency(freq*MHz)
+        self.channels[ch].set_frequency(freq * MHz)
 
     @kernel
     def set_all(self):

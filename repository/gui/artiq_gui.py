@@ -25,6 +25,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QDoubleValidator, QIntValidator, QIcon
+from PyQt5.QtCore import QTimer
 
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 from managers.SUServoManager import SUServoManager
@@ -225,7 +226,7 @@ class BoosterControl(QWidget):
 class PIDControl(QWidget):
     def __init__(self, manager, ch=0):
         super().__init__()
-        self.manager = manager
+        self.manager: SUServoManager = manager
         self.en_out = self.manager.en_outs[ch]
         self.ch = ch
 
@@ -244,15 +245,30 @@ class PIDControl(QWidget):
         top.addWidget(self.setpoint)
 
         # Gain
-        gain_label = QLabel("Gain")
-        top.addWidget(gain_label)
-        self.gain = QLineEdit()
-        self.gain.setText(str(self.manager.gains[ch]))
-        self.gain.setValidator(QIntValidator(0, 3))
-        self.gain.editingFinished.connect(
-            lambda: self.manager.set_gain(ch, int(self.gain.text()))
-        )
-        top.addWidget(self.gain)
+        # gain_label = QLabel("Gain")
+        # top.addWidget(gain_label)
+        # self.gain = QLineEdit()
+        # self.gain.setText(str(self.manager.gains[ch]))
+        # self.gain.setValidator(QIntValidator(0, 3))
+        # self.gain.editingFinished.connect(
+        #     lambda: self.manager.set_gain(ch, int(self.gain.text()))
+        # )
+        # top.addWidget(self.gain)
+
+        # if we are visible we want to update the ADC value
+        def update_adc():
+            if self.isVisible():
+                self.adc_val.setText(
+                    f"ADC: {self.manager.get_adc(ch):.2f} <b>V</b> (y: {self.manager.get_y(ch):.2f})"
+                )
+
+        self.adc_val = QLabel("ADC: 0.00 <b>V</b> (y: 0.00)")
+        top.addStretch()
+        top.addWidget(self.adc_val)
+
+        self.timer = QTimer()
+        self.timer.timeout.connect(lambda: update_adc())
+        self.timer.start(500)
 
         layout.addLayout(top)
         bottom = QHBoxLayout()
@@ -497,7 +513,7 @@ class SUServoGUI(QWidget):
         shutterlabel = QLabel("Shutters")
         shutterlabel.setStyleSheet("font: bold 14pt")
         hbox.addWidget(shutterlabel)
-        for ch, name in enumerate(["2DMOT", "3DMOT"]):
+        for ch, name in enumerate(["2DMOT", "3DMOT", "LATTICE"]):
             self.shutter_button = Switch(
                 default=self.manager.en_shutters[ch],
                 turn_on=lambda channel=ch: self.manager.open_shutter(channel),
@@ -746,6 +762,7 @@ class ArtiqGUIExperiment(EnvExperiment):
         self.shutters = [
             self.get_device("shutter_2DMOT"),
             self.get_device("shutter_3DMOT"),
+            self.get_device("shutter_LATTICE"),
         ]
         self.suservoManager: SUServoManager
 

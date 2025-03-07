@@ -34,41 +34,22 @@ class SUServoManager:  # {{{
 
         assert len(self.channels) == 8, "There must be 8 channels per SUServo"
 
-        datasets = [
-            "enabled",
-            "gains",
-            "atts",
-            "freqs",
-            "en_outs",
-            "ys",
-            "en_iirs",
-            "offsets",
-            "Ps",
-            "Is",
-            "Gls",
-            "en_shutters",
+        vals = [
+            ("enabled", 1, None),
+            ("gains", [0] * 8, None),
+            ("atts", [16.5] * 8, "dB"),
+            ("freqs", [198.0, 193.0, 219.0, 86.0, 200.0, 200.0, 110.0, 110.0], "MHz"),
+            ("en_outs", [0] * 8, None),
+            ("ys", [1.0] * 8, None),
+            ("en_iirs", [0] * 8, None),
+            ("offsets", [2.5] * 8, "V"),
+            ("Ps", [-1.0] * 8, None),
+            ("Is", [-200000.0] * 8, None),
+            ("Gls", [-200.0] * 8, None),
+            ("en_shutters", [0] * 3, None),
         ]
-        defaults = [
-            1,
-            [0] * 8,
-            [16.5] * 8,
-            [198.0, 193.0, 219.0, 86.0, 200.0, 200.0, 110.0, 110.0],
-            [0] * 8,
-            [1.0] * 8,
-            [0] * 8,
-            [-0.1] * 8,
-            [-30.0] * 8,
-            [-200000.0] * 8,
-            [-200.0] * 8,
-            [0] * 2,
-        ]
-        units = [
-            None,
-            "dB",
-            "dB",
-            "MHz",
-        ] + [None] * 8
-        for dataset, default, unit in zip(datasets, defaults, units):
+
+        for dataset, default, unit in vals:
             temp = experiment.get_dataset(name + "." + dataset, default=default)
             # we set the values back so we are allowed to mutate then later
             experiment.set_dataset(
@@ -87,12 +68,29 @@ class SUServoManager:  # {{{
         Get the ADC value for a given channel
         Delays by 20us to ensure the servo was disabled
         """
-        self.suservo.set_config(0)
-        delay(10 * us)
+        self.core.break_realtime()
+        # self.suservo.set_config(0)
+        # delay(50 * us)
         v = self.suservo.get_adc(ch)
-        self.suservo.set_config(self.enabled)
-        delay(10 * us)
+        delay(50 * us)
+        # self.suservo.set_config(self.enabled)
+        # delay(50 * us)
         return v
+    
+    @kernel
+    def get_y(self, ch: np.int64):
+        """
+        Get the Y value for a given channel
+        Delays by 20us to ensure the servo was disabled
+        """
+        self.core.break_realtime()
+        # self.suservo.set_config(0)
+        # delay(50 * us)
+        y = self.channels[ch].get_y(ch)
+        delay(50 * us)
+        # self.suservo.set_config(self.enabled)
+        # delay(50 * us)
+        return y
 
     @kernel
     def _mutate_and_set_float(self, dataset, variable, index, value):
@@ -165,6 +163,13 @@ class SUServoManager:  # {{{
         self.suservo.cplds[ch // 4].set_all_att_mu(reg)
 
     @kernel
+    def offset_to_mu(self, setpoint, ch=0):
+        """
+        Convert a setpoint in V to the corresponding mu value
+        """
+        return -setpoint * (10.0 ** (self.gains[ch] - 1))
+
+    @kernel
     def set_dds(self, ch: np.int32, freq, offset):
         """
         Frequency is in MHz
@@ -173,31 +178,29 @@ class SUServoManager:  # {{{
         if freq < 0.0 or freq > 400.0:
             raise ValueError("Frequency out of range")
         self._mutate_and_set_float("freqs", self.freqs, ch, freq)
-        offset = -offset * (10.0 ** (self.gains[ch] - 1))
         self._mutate_and_set_float("offsets", self.offsets, ch, offset)
 
         self.core.break_realtime()
 
-        self.channels[ch].set_dds(profile=ch, frequency=freq*MHz, offset=offset)
+        self.channels[ch].set_dds(
+            profile=ch,
+            frequency=freq * MHz,
+            offset=self.offset_to_mu(offset, ch),
+        )
 
     @kernel
     def set_freq(self, ch: np.int32, freq):
         """
         Frequency is in Hz
         """
-        self._mutate_and_set_float("freqs", self.freqs, ch, freq)
-        if freq < 0.0 or freq > 400.0:
-            raise ValueError("Frequency out of range")
-
-        self.core.break_realtime()
-
-        self.channels[ch].set_dds(
-            profile=ch, frequency=freq*MHz, offset=self.offsets[ch]
-        )
+        self.set_dds(ch, freq, self.offsets[ch])
 
     @kernel
-    def set_offset(self, ch: np.int32, v):
-        self.set_dds(ch, self.freqs[ch]*MHz, v)
+    def set_offset(self, ch: np.int32, offset):
+        """
+        Offset is in V
+        """
+        self.set_dds(ch, self.freqs[ch], offset)
 
     @kernel
     def set_y(self, ch: np.int32, y):
@@ -212,7 +215,6 @@ class SUServoManager:  # {{{
         self._mutate_and_set_float("Is", self.Is, ch, I)
         self._mutate_and_set_float("Gls", self.Gls, ch, Gl)
 
-        logging.warning("Setting IIR for channel %d: P=%f, I=%f, Gl=%f", ch, P, I, Gl)
         self.core.break_realtime()
         self.channels[ch].set_iir(profile=ch, adc=adc, kp=P, ki=I, g=Gl)
 
@@ -229,6 +231,8 @@ class SUServoManager:  # {{{
 
         self.core.break_realtime()
         self.channels[ch].set(self.en_outs[ch], 0, ch)
+        delay(10 * us)
+        self.set_y(ch, self.ys[ch])
 
     @kernel
     def open_shutter(self, ch):

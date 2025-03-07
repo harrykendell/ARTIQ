@@ -335,6 +335,7 @@ aliases = {
     # 852 Lattice
     "suservo_aom_LATX": "suservo_ch4",
     "suservo_aom_LATY": "suservo_ch5",
+    "shutter_LATTICE": "ttl2",
     # 1064 Cross Dipole Trap
     "suservo_aom_CDT1": "suservo_ch6",
     "suservo_aom_CDT2": "suservo_ch7",

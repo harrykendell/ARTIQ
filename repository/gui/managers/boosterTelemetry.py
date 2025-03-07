@@ -39,6 +39,18 @@ class TelemetryWorker(QObject):
         except aiomqtt.exceptions.MqttError as e:
             logging.error(f"Booster: Setting telemetry period failed: {e}")
 
+    async def set_fan_speed(self, speed=0.2):
+        if speed < 0 or speed > 1:
+            logging.error("Fan speed must be between 0 and 1")
+        try:
+            async with aiomqtt.Client(self.server) as client:
+                await client.publish(
+                    "dt/sinara/booster/fc-0f-e7-23-77-30/settings/fan_speed",
+                    str(speed),
+                )
+        except aiomqtt.exceptions.MqttError as e:
+            logging.error(f"Booster: Setting fan speed failed: {e}")
+
     async def set_interlock(self, ch, db=35.0):
         """Set the interlock state of a channel ch to db"""
         try:
