@@ -7,6 +7,10 @@ import logging
 logging.basicConfig(level=logging.WARNING)
 
 
+def assert_near(a, b, tol=1e-9):
+    assert np.all(np.abs(a - b) < tol)
+
+
 class MSO24:
     def __init__(self, ip_address: str = "192.168.0.5", timeout: int = 10000):
         """
@@ -20,7 +24,7 @@ class MSO24:
         self.instrument.encoding = "latin_1"
         self.instrument.read_termination = "\n"
         self.instrument.write_termination = None
-        self.reset()
+        # self.reset()
         print(self.query("*IDN?"))
 
     def __enter__(self):
@@ -95,48 +99,67 @@ class MSO24:
         self.write(f"TRIGger:A:EDGE:SOUrce CH{channel}")
         self.write(f"TRIGger:A:LEVel:CH{channel} {level}")
 
-    def get_trace(self, channel: int, trigger_channel: int):
-        """Extract a trace from a channel based on another channel's trigger."""
-        self.set_trigger(trigger_channel, 0.0)
+    def set_averaging(self, num_avg: int = 1):
+        """Set the number of averages for the acquisition."""
+        self.write("ACQUIRE:STOPAFTER SEQUENCE")
+        self.write(f"ACQUIRE:NUMAVG {num_avg}")
+        self.write("ACQUIRE:MODE AVERAGE")
 
-        # Retrieve scaling factors
-        tscale = float(self.query("WFMOutpre:XINCR?"))
-        tstart = float(self.query("WFMOutpre:XZERO?"))
-        vscale = float(self.query("WFMOutpre:YMULT?"))
-        voff = float(self.query("WFMOutpre:YZERO?"))
-        vpos = float(self.query("WFMOutpre:YOFF?"))
-        att = float(self.query(f"CH{channel}:PROBEFunc:EXTAtten?"))
+    def get_trace(self, channels: int | list[int]):
+        """Extract traces from the given channels."""
+
+        if isinstance(channels, int):
+            channels = [channels]
+
+        self.write("ACQUIRE:STATE 0")  # Stop acquisition
+        self.write("ACQUIRE:STOPAFTER SEQUENCE")
+        self.write("ACQUIRE:STATE 1")  # Start acquisition
+        self.query("*OPC?")  # Wait for aquisition to complete
 
         # Configure data retrieval
         self.write("HEADER 0")
         self.write("DATA:ENCDG SRIBINARY")
-        self.write(f"DATA:SOURCE CH{channel}")
-        record = int(self.query("HORIZONTAL:RECORDLENGTH?"))
-        logging.info(f"Record length: {record}")
-        self.write(f"DATA:START 1")
-        self.write(f"DATA:STOP {record}")
-        self.write("WFMOutpre:BYT_N 1")
-        self.write("ACQUIRE:STATE 0")  # Stop acquisition
-        self.write("ACQUIRE:STOPAFTER SEQUENCE")
-        self.write("ACQUIRE:STATE 1")  # Start acquisition
-        self.query("*OPC?")  # Wait for operation complete
 
         # Retrieve binary waveform data
-        bin_wave = self.instrument.query_binary_values(
-            "CURVE?", datatype="b", container=np.array
-        )
+        waves = dict()
 
-        # Scale data
+        chs = self.query("DATA:SOURCE:AVAILABLE?").split(",")
+        for ch in channels:
+            if f"CH{ch}" not in chs:
+                logging.warning(
+                    f"CH{ch} not available for data retrieval (available: {chs})"
+                )
+                continue
+
+            self.write(f"DATA:SOURCE CH{ch}")
+
+            self.write(f"DATA:START 1")
+            record = int(self.query("HORIZONTAL:RECORDLENGTH?"))
+            self.write(f"DATA:STOP {record}")
+            self.write("WFMOutpre:BYT_N 1")
+            self.query("*OPC?")  # Wait for operation complete
+            bin_wave = self.instrument.query_binary_values(
+                "CURVE?", datatype="b", container=np.array
+            )
+
+            # Retrieve scaling factors
+            vscale = float(self.query("WFMOutpre:YMULT?"))
+            voff = float(self.query("WFMOutpre:YZERO?"))
+            vpos = float(self.query("WFMOutpre:YOFF?"))
+            att = float(self.query(f"CH{ch}:PROBEFunc:EXTAtten?"))
+            # Scale data
+            waves[ch] = (bin_wave - vpos) * vscale / att + voff
+
+        tscale = float(self.query("WFMOutpre:XINCR?"))
+        tstart = float(self.query("WFMOutpre:XZERO?"))
         total_time = tscale * record
         tstop = tstart + total_time
-        scaled_time = np.linspace(tstart, tstop, num=record, endpoint=False)
-        scaled_wave = (bin_wave - vpos) * vscale / att + voff
+        time = np.linspace(tstart, tstop, num=record, endpoint=False)
 
-        return scaled_time, scaled_wave
+        return time, waves
 
-    def plot_trace(self, channel: int, trigger_channel: int):
-        """Plot the trace from a channel with correct scaling."""
-        time_axis, voltage_trace = self.get_trace(channel, trigger_channel)
+    def plot_trace(self, time_axis, voltage_trace, channel: int = 1):
+        """Basic plot of a trace from a channel."""
         plt.figure()
         plt.plot(time_axis, voltage_trace, label=f"Channel {channel}")
         plt.xlabel("Time (s)")
@@ -144,6 +167,39 @@ class MSO24:
         plt.title(f"Trace from Channel {channel}")
         plt.legend()
         plt.show()
+
+    def save_trace_to_file(self, time_axis, voltage_trace, filename: str = "trace.csv"):
+        """Save the trace to a file."""
+        # if theres no filetype, add .csv
+        if "." not in filename:
+            filename = filename + ".csv"
+
+        with open(filename, "w") as f:
+            f.write("Time (s),Voltage (V)\n")
+            for t, v in zip(time_axis, voltage_trace):
+                f.write(f"{t},{v}\n")
+
+    def save_traces_to_file(
+        self,
+        time: np.ndarray,
+        voltage_traces: dict[int, np.ndarray],
+        filename: str = "traces.csv",
+    ):
+        """Save multiple traces to a file."""
+        if "." not in filename:
+            filename = filename + ".csv"
+
+        with open(filename, "w") as f:
+            f.write("Time (s)")
+            for i in voltage_traces.keys():
+                f.write(f",Ch{i} (V)")
+            f.write("\n")
+
+            for t, vs in zip(time, zip(*voltage_traces.values())):
+                f.write(f"{t}")
+                for v in vs:
+                    f.write(f",{v}")
+                f.write("\n")
 
     def close(self):
         """Close the connection to the oscilloscope."""
@@ -153,8 +209,50 @@ class MSO24:
 
 
 if __name__ == "__main__":
-    with MSO24() as mso24:
-        mso24.afg_sin(1e6, 1)
-        mso24.set_timebase(1e-6)
-        mso24.set_volt_scale(1, 1)
-        mso24.plot_trace(1, 1)
+    import argparse
+
+    # Parse command line arguments
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        "-ip",
+        "--ip_address",
+        type=str,
+        default="192.168.0.5",
+        help="IP address of the oscilloscope",
+    )
+
+    parser.add_argument(
+        "-c",
+        "--channel",
+        type=int,
+        default=1,
+        help="Channel number to read from",
+    )
+
+    parser.add_argument(
+        "-o",
+        "--output_file",
+        type=str,
+        default="trace.csv",
+        help="Output file to save the trace",
+    )
+    args = parser.parse_args()
+
+    # Connect to the oscilloscope
+    with MSO24(ip_address=args.ip_address) as ms024:
+
+        # # Output a sine wave, and read a trace from channel 1
+        # ms024.afg_sin(1e6, 1)
+        # ms024.set_timebase(1e-6)
+        # ms024.set_volt_scale(1, 1)
+        # ms024.set_trigger(1, 0)
+
+        ms024.set_averaging(50)
+        ts, vs = ms024.get_trace([1, 3])
+        plt.plot(ts, vs[1], label="Channel 1")
+        plt.plot(ts, vs[3], label="Channel 3")
+        plt.show()
+
+        ms024.save_traces_to_file(ts, vs, filename=args.output_file)
+        print(f"Trace saved to {args.output_file}")

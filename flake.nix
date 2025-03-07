@@ -168,6 +168,7 @@
           pkgs.python3Packages.poetry-core
           pkgs.python3Packages.poetry-dynamic-versioning
         ];
+        # We don't need to do this anymore as oitg made it optional in 3ecba4b
         # patch out qiskit dependecy as it doesn't support python 3.11 and we dont personally use it
         postPatch = ''
           sed -i -e "s/^qiskit = .*//" pyproject.toml
@@ -208,6 +209,7 @@
             ps.pydantic
             ps.ifaddr
 
+            ps.pyvisa
             windfreak
             booster
             pco
