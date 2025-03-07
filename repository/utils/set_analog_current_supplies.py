@@ -1,15 +1,11 @@
 import logging
 
 from artiq.coredevice.core import Core
-from artiq.experiment import EnumerationValue
-from artiq.experiment import delay
-from artiq.experiment import kernel
-from ndscan.experiment import ExpFragment
-from ndscan.experiment import FloatParam
+from artiq.experiment import EnumerationValue, delay, kernel
+from ndscan.experiment import ExpFragment, FloatParam
 from ndscan.experiment.entry_point import make_fragment_scan_exp
 from ndscan.experiment.parameters import FloatParamHandle
 
-from repository.models import VDrivenSupply
 from repository.fragments.current_supply_setter import SetAnalogCurrentSupplies
 from repository.models.devices import VDRIVEN_SUPPLIES
 

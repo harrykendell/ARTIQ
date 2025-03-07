@@ -26,7 +26,7 @@ triggers = [
 BINNING = 1
 FULL_ROI = (1, 1, 1392 // BINNING, 1040 // BINNING)
 WHOLE_CELL_ROI = (620, 475, 750, 650)
-MOT_ROI = (650, 540, 740, 620)
+MOT_ROI = (640, 540, 770, 620)
 """
 For the pixelfly:
     "serial": 19701804,

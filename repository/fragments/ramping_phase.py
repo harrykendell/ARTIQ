@@ -21,7 +21,7 @@ from numpy import int64
 
 from repository.utils.dummy_devices import DummyAD9910
 from repository.utils.dummy_devices import DummySUServoChannel
-from repository.fragments.suservo import LibSetSUServoStatic
+from repository.fragments.suservo_frag import SUServoFrag
 
 logger = logging.getLogger(__name__)
 
@@ -321,7 +321,7 @@ class GeneralRampingPhase(Fragment):
     def _build_suservos(self):
         suservo_setters_and_param_handles: List[
             Tuple[
-                LibSetSUServoStatic,
+                SUServoFrag,
                 FloatParamHandle,
                 FloatParamHandle,
                 FloatParamHandle,
@@ -342,7 +342,7 @@ class GeneralRampingPhase(Fragment):
             # the user will be able to override those value through normal
             # NDScan behaviour.
             setter = self.setattr_fragment(
-                f"setter_{suservo_name}", LibSetSUServoStatic, suservo_name
+                f"setter_{suservo_name}", SUServoFrag, suservo_name
             )
 
             setpoint_nominal_handle = self.setattr_param(

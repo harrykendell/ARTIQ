@@ -1,11 +1,11 @@
-from repository.models import SUServoedBeam, EOM, VDrivenSupply, Shutter
-from artiq.language.units import ms, dB, MHz, V
+from repository.models import CoilPair, Eom, Shutter, SUServoedBeam, VDrivenSupply
+from artiq.language.units import ms, dB, MHz, V, A
 
 EOMS = [
-    EOM(
+    Eom(
         name="repump_eom",
         frequency=3285.0 * MHz,
-        attenuation=3.0 * dB,
+        attenuation=17.0 * dB,
         mirny_ch="mirny_eom_repump",
         almazny_ch="almazny_eom_repump",
     )
@@ -18,55 +18,67 @@ VDRIVEN_SUPPLIES = [
         name="X1",
         fastino="fastino",
         ch=0,
-        gain=2.0,
-        current_limit=3.0,
-        default_current=0.95,
+        gain=2.0 * A / V,
+        current_limit=3.0 * A,
+        default_current=0.95 * A,
     ),
     VDrivenSupply(
         name="X2",
         fastino="fastino",
         ch=1,
-        gain=2.0,
-        current_limit=3.0,
-        default_current=1.0,
+        gain=2.0 * A / V,
+        current_limit=3.0 * A,
+        default_current=1.0 * A,
     ),
     VDrivenSupply(
         name="Y",
         fastino="fastino",
         ch=2,
-        gain=2.0,
-        current_limit=3.0,
-        default_current=0.0,
+        gain=2.0 * A / V,
+        current_limit=3.0 * A,
+        default_current=0.0 * A,
     ),
     VDrivenSupply(
         name="Z",
         fastino="fastino",
         ch=3,
-        gain=2.0,
-        current_limit=3.0,
-        default_current=0.03,
+        gain=2.0 * A / V,
+        current_limit=3.0 * A,
+        default_current=0.03 * A,
     ),
     VDrivenSupply(
         name="GreenTA",
         fastino="fastino",
         ch=6,
-        gain=0.4,  # 4A max * V / 10V -> 0.4 A/V
-        current_limit=2.0,
-        default_current=1.450,
+        gain=0.4 * A / V,  # 4A max * V / 10V -> 0.4 A/V
+        current_limit=2.0 * A,
+        default_current=1.450 * A,
         # TODO: Actually set me up
     ),
     VDrivenSupply(
         name="Dispenser",
         fastino="fastino",
         ch=7,
-        gain=0.0,
-        current_limit=3.0,
-        default_current=2.70,
+        gain=0.0 * A / V,
+        current_limit=3.0 * A,
+        default_current=2.70 * A,
         # TODO: Actually set me up
     ),
 ]
 # Convert to dict for ease of use
 VDRIVEN_SUPPLIES = {supply.name: supply for supply in VDRIVEN_SUPPLIES}
+
+COIL_PAIRS = [
+    CoilPair(
+        name="X",
+        coil1="X1",
+        coil2="X2",
+        default_current_comm=0.95 * A,
+        default_current_diff=0.05 * A,
+    ),
+]
+# Convert to dict for ease of use
+COIL_PAIRS = {pair.name: pair for pair in COIL_PAIRS}
 
 SHUTTERS = [
     Shutter(

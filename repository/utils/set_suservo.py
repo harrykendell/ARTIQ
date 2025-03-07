@@ -9,18 +9,18 @@ from ndscan.experiment.entry_point import make_fragment_scan_exp
 from ndscan.experiment.parameters import BoolParamHandle
 from ndscan.experiment.parameters import FloatParamHandle
 
-from repository.fragments.suservo import LibSetSUServoStatic
+from repository.fragments.suservo_frag import SUServoFrag
 from repository.models.devices import SUSERVOED_BEAMS, SUServoedBeam
 
 import logging
 
 
-class SetSUServoStatic(ExpFragment):
+class SetSUServoExpFrag(ExpFragment):
     """
     Set a static SUServo output
 
     This ExpFragment just breaks out the functionality of
-    :class:`.LibSetSUServoStatic`.
+    :class:`.SUServoFrag`.
     """
 
     def build_fragment(self):
@@ -98,20 +98,20 @@ class SetSUServoStatic(ExpFragment):
         self.enable_iir: BoolParamHandle
 
         self.setattr_fragment(
-            "LibSetSUServoStatic",
-            LibSetSUServoStatic,
+            "SUServoFrag",
+            SUServoFrag,
             SUSERVOED_BEAMS[self.channel].suservo_device,
         )
-        self.LibSetSUServoStatic: LibSetSUServoStatic
+        self.SUServoFrag: SUServoFrag
 
     @kernel
     def run_once(self):
         logging.warning("clobbering attenuations")
         self.core.break_realtime()
 
-        self.LibSetSUServoStatic.set_all_attenuations(self.attenuation.get())
+        self.SUServoFrag.set_all_attenuations(self.attenuation.get())
 
-        self.LibSetSUServoStatic.set_suservo(
+        self.SUServoFrag.set_suservo(
             self.frequency.get(),
             self.amplitude.get(),
             self.attenuation.get(),
@@ -121,4 +121,4 @@ class SetSUServoStatic(ExpFragment):
         )
 
 
-SetSUServoStaticExp = make_fragment_scan_exp(SetSUServoStatic)
+SetSUServoExp = make_fragment_scan_exp(SetSUServoExpFrag)

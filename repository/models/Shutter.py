@@ -9,13 +9,12 @@ models act as normal python classes and so are fully compatible with ARTIQ
 kernels.
 """
 
-import logging
-from artiq.experiment import HasEnvironment
 from pydantic.dataclasses import dataclass
+from repository.models.Device import DEVICE
 
 
 @dataclass
-class Shutter:
+class Shutter(DEVICE):
     """
     A simple class that holds information about a Shutter driven by a TTL signal
 
@@ -27,26 +26,3 @@ class Shutter:
     delay: float
 
     enabled: bool = False
-
-    def from_dataset(hasEnv: HasEnvironment, name: str):
-        # initialise the class with the data from the dataset
-        try:
-            data = hasEnv.get_dataset("Shutter." + name)
-        except KeyError:
-            logging.error(f"Could not find dataset {'Shutter.'+name}")
-            raise
-        return Shutter(name=name, **data)
-
-    def to_dataset(self, hasEnv: HasEnvironment):
-        # update the dataset with the current class values
-        data = {
-            n: getattr(self, n)
-            for n in self.__dataclass_fields__
-            if getattr(self, n) is not None
-        }
-        hasEnv.set_dataset(
-            "Shutter." + self.name,
-            data,
-            persist=True,
-            broadcast=True,
-        )

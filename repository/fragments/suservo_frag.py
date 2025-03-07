@@ -22,7 +22,7 @@ from numpy import int32
 from repository.models.devices import SUSERVOED_BEAMS
 
 
-class LibSetSUServoStatic(Fragment):
+class SUServoFrag(Fragment):
     """
     Set a static SUServo output
 
@@ -30,7 +30,7 @@ class LibSetSUServoStatic(Fragment):
     :meth:`.build_fragment`, e.g.::
 
         self.setattr_fragment(
-            "LibSetSUServoStatic", LibSetSUServoStatic, "suservo0_ch0",
+            "SUServoFrag", SUServoFrag, "suservo0_ch0",
         )
 
     The :meth:`~ndscan.experiment.fragment.Fragment.device_setup` of this
@@ -110,7 +110,7 @@ class LibSetSUServoStatic(Fragment):
         # We therefore need to use the defaults for everything but ourselves
         reg = 0
         for i in range(4):
-            delay(1*ms)
+            delay(1 * ms)
             reg += self.suservo.cplds[0].att_to_mu(
                 self.beams[i][2] if i != self.ch_4 else att
             ) << (i * 8)
@@ -429,7 +429,7 @@ class LibSetSUServoStatic(Fragment):
         )
 
     @kernel
-    def set_iir_params(self, kp=-30.0, ki=-200000.0, gain_limit=-200.0, delay=0.0):
+    def set_iir_params(self, kp=-1.0, ki=-200000.0, gain_limit=-200.0, delay=0.0):
         """
         Set loop filter parameters for the suservo. See ARTIQ documentation for
         details. Note all of kp,ki,gain_limit should usually be negative.

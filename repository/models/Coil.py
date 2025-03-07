@@ -9,27 +9,19 @@ models act as normal python classes and so are fully compatible with ARTIQ
 kernels.
 """
 
-from typing import Optional
 from pydantic.dataclasses import dataclass
 from repository.models.Device import DEVICE
-from artiq.experiment import HasEnvironment
-import logging
 
 
 @dataclass
-class VDrivenSupply(DEVICE):
+class CoilPair(DEVICE):
     """
-    A simple class that holds information about a current supply driven from the fastino
+    A simple class that holds information about a pair of coils driven from the fastino
 
     """
 
-    name: str  # friendly name to access by
+    coil1: str  # The first voltage driven supply
+    coil2: str  # The second voltage driven supply
 
-    fastino: str
-    ch: int
-
-    gain: float  # The Current gain in Amps/Volt
-    current_limit: float
-    enabled: bool = False
-
-    default_current: Optional[float] = None
+    default_current_comm: float = None
+    default_current_diff: float = None

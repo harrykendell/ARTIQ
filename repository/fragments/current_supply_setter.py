@@ -27,8 +27,7 @@ class SetAnalogCurrentSupplies(Fragment):
         self.setattr_device("core")
         self.core: Core
 
-        self.current_configs = current_configs
-        self.current_configs: list[VDrivenSupply]
+        self.current_configs: list[VDrivenSupply] = current_configs
 
         assert all(
             [c.fastino == self.current_configs[0].fastino for c in self.current_configs]

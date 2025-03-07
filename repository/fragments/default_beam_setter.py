@@ -1,20 +1,17 @@
 import logging
-import warnings
 from dataclasses import dataclass
 from typing import *
 
+from numpy import int64
+
 from artiq.coredevice.core import Core
 from artiq.coredevice.ttl import TTLOut
-from artiq.experiment import delay_mu
-from artiq.experiment import host_only
-from artiq.experiment import kernel
-from artiq.experiment import portable
+from artiq.experiment import delay_mu, host_only, kernel, portable
 from ndscan.experiment import Fragment
-from ndscan.experiment.parameters import FloatParam
-from ndscan.experiment.parameters import FloatParamHandle
+from ndscan.experiment.parameters import FloatParam, FloatParamHandle
 
 from repository.utils.dummy_devices import *
-from repository.fragments.suservo import LibSetSUServoStatic
+from repository.fragments.suservo_frag import SUServoFrag
 from repository.models import SUServoedBeam
 
 
@@ -35,7 +32,7 @@ def make_set_beams_to_default(
     class to have the exact same attributes, and ndscan assumes that all
     `setattr_fragment` calls in a Fragment's `build_fragment` will have the same
     order, number and type-signatures. That's not true for this `Fragment`:
-    we'll be setting up variable numbers of `LibSetSUServoStatic` subfragments,
+    we'll be setting up variable numbers of `SUServoFrag` subfragments,
     so need a subclass for each instance.
 
     You can provide a `name` if you wish, which will result in nicer annotations
@@ -49,9 +46,6 @@ def make_set_beams_to_default(
     `device_setup`. This requires `use_automatic_setup==True`.
 
     See the docs for :class:`~SetBeamsToDefaults` for more information.
-
-    TODO: Idea: I could speed up compilation times by sharing the same class
-    definitions where possible, though this might be hard to detect.
     """
     if not isinstance(suservo_beam_infos, list):
         suservo_beam_infos = list(suservo_beam_infos.values())
@@ -63,7 +57,7 @@ def make_set_beams_to_default(
 
     if not name:
         name = "SetBeamsToDefaults"
-        warnings.warn(
+        logging.warning(
             "No name provided for default beam setter. Consider providing one to improve ndscan fragment naming"
         )
 
@@ -143,7 +137,7 @@ class SetBeamsToDefaults(Fragment):
 
         @dataclass
         class SUServoSettings:
-            setter: LibSetSUServoStatic
+            setter: SUServoFrag
             setpoint_handle: FloatParamHandle
             shutter_present: bool
             initial_amplitude_handle: FloatParamHandle
@@ -152,12 +146,12 @@ class SetBeamsToDefaults(Fragment):
         self.suservo_setters_and_info: List[SUServoSettings] = []
 
         # Loop over all the suservo beams, defining:
-        #   * LibSetSUServoStatic fragments to control them
+        #   * SUServoFrag fragments to control them
         #   * Parameters for their setpoints
         #   * Devices for their shutters, if defined
         for beam_info in self.default_suservo_beam_infos:
             setter = self.setattr_fragment(
-                beam_info.name, LibSetSUServoStatic, beam_info.suservo_device
+                beam_info.name, SUServoFrag, beam_info.suservo_device
             )
 
             if beam_info.shutter_device:
@@ -215,6 +209,8 @@ class SetBeamsToDefaults(Fragment):
         # the real ones, but actually do nothing. The compiler will optimize
         # these away so they won't have an impact on performance.
 
+        if not self.shutter_ttls:
+            self.shutter_ttls = [self.dummy_ttl]
         if not self.suservo_setters_and_info:
             self.suservo_setters_and_info = [
                 SUServoSettings(
@@ -304,6 +300,7 @@ class SetBeamsToDefaults(Fragment):
             )
 
         self._turn_on_suservos(light_enabled=light_enabled)
+        self._set_shutters(light_enabled=light_enabled)
 
     @kernel
     def _turn_on_suservos(self, light_enabled):
@@ -340,3 +337,9 @@ class SetBeamsToDefaults(Fragment):
                 setpoint_v=setpoint,
                 enable_iir=beam_info.servo_enabled and light_enabled,
             )
+
+    @kernel
+    def _set_shutters(self, light_enabled):
+        for ttl in self.shutter_ttls:
+            ttl.set_o(light_enabled)
+            delay_mu(int64(self.core.ref_multiplier))

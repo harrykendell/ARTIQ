@@ -9,14 +9,14 @@ models act as normal python classes and so are fully compatible with ARTIQ
 kernels.
 """
 
-import logging
-from typing import Optional
-from artiq.experiment import HasEnvironment
 from pydantic.dataclasses import dataclass
+from repository.models.Device import DEVICE
+
+from typing import Optional
 
 
 @dataclass
-class SUServoedBeam:
+class SUServoedBeam(DEVICE):
     """
     A simple class that holds information about a beam to be controlled via a
     SUServo.
@@ -27,7 +27,7 @@ class SUServoedBeam:
     frequency: float
     attenuation: float
 
-    suservo_device: str # the name of the suservo channel
+    suservo_device: str  # the name of the suservo channel
 
     """
     TODO:
@@ -43,26 +43,3 @@ class SUServoedBeam:
     initial_amplitude: float = 1.0
     # The zero point of the photodiode, in volts - added to the setpoint
     photodiode_offset: float = 0.0
-
-    def from_dataset(hasEnv: HasEnvironment, name: str):
-        # initialise the class with the data from the dataset
-        try:
-            data = hasEnv.get_dataset("SUServoedBeam." + name)
-        except KeyError:
-            logging.error(f"Could not find dataset {"SUServoedBeam."+name}")
-            raise
-        return SUServoedBeam(name=name, **data)
-
-    def to_dataset(self, hasEnv: HasEnvironment):
-        # update the dataset with the current class values
-        data = {
-            n: getattr(self, n)
-            for n in self.__dataclass_fields__
-            if getattr(self, n) is not None
-        }
-        hasEnv.set_dataset(
-            "SUServoedBeam." + self.name,
-            data,
-            persist=True,
-            broadcast=True,
-        )

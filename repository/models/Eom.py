@@ -9,27 +9,24 @@ models act as normal python classes and so are fully compatible with ARTIQ
 kernels.
 """
 
-from typing import Optional
 from pydantic.dataclasses import dataclass
 from repository.models.Device import DEVICE
-from artiq.experiment import HasEnvironment
-import logging
 
 
 @dataclass
-class VDrivenSupply(DEVICE):
+class Eom(DEVICE):
     """
-    A simple class that holds information about a current supply driven from the fastino
+    A simple class that holds information about an EOM driven by a mirny/almazny
 
     """
 
     name: str  # friendly name to access by
 
-    fastino: str
-    ch: int
+    frequency: float  # The mirny frequency
+    attenuation: float
 
-    gain: float  # The Current gain in Amps/Volt
-    current_limit: float
-    enabled: bool = False
+    mirny_ch: str
+    almazny_ch: str
 
-    default_current: Optional[float] = None
+    mirny_enabled: bool = False
+    almazny_enabled: bool = False

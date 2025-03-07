@@ -13,16 +13,16 @@ from ndscan.experiment.parameters import (
     IntParamHandle,
 )
 
-from repository.fragments.suservo import LibSetSUServoStatic
+from repository.fragments.suservo_frag import SUServoFrag
 from repository.models.devices import SUSERVOED_BEAMS, SUServoedBeam
 
 
-class SetSUServoTune(ExpFragment):
+class TuneSUServoExpFrag(ExpFragment):
     """
     Tune the SUServo IIR
 
     This ExpFragment just breaks out the functionality of
-    :class:`.LibSetSUServoStatic`.
+    :class:`.SUServoFrag`.
     """
 
     def build_fragment(self):
@@ -47,7 +47,7 @@ class SetSUServoTune(ExpFragment):
             "kp",
             FloatParam,
             description="Proportional gain of the IIR filter",
-            default=-30.0,
+            default=-1.0,
         )
 
         self.setattr_param(
@@ -103,29 +103,27 @@ class SetSUServoTune(ExpFragment):
         self.pgia_setting: IntParamHandle
 
         self.setattr_fragment(
-            "LibSetSUServoStatic",
-            LibSetSUServoStatic,
+            "SUServoFrag",
+            SUServoFrag,
             SUSERVOED_BEAMS[self.channel].suservo_device,
         )
-        self.LibSetSUServoStatic: LibSetSUServoStatic
+        self.SUServoFrag: SUServoFrag
 
     @kernel
     def run_once(self):
 
-        self.LibSetSUServoStatic.set_iir_params(
+        self.SUServoFrag.set_iir_params(
             kp=self.kp.get(), ki=self.ki.get(), gain_limit=self.gain_limit.get()
         )
 
-        self.LibSetSUServoStatic.set_setpoint(new_setpoint=self.setpoint_v.get())
+        self.SUServoFrag.set_setpoint(new_setpoint=self.setpoint_v.get())
 
-        self.LibSetSUServoStatic.set_channel_state(
-            self.rf_switch.get(), self.enable_iir.get()
-        )
+        self.SUServoFrag.set_channel_state(self.rf_switch.get(), self.enable_iir.get())
 
         if not self.enable_iir.get():
-            self.LibSetSUServoStatic.set_y(1.0)
+            self.SUServoFrag.set_y(1.0)
 
-        self.LibSetSUServoStatic.log_channel()
+        self.SUServoFrag.log_channel()
 
 
-SetSUServoSTuneExp = make_fragment_scan_exp(SetSUServoTune)
+TuneSUServo = make_fragment_scan_exp(TuneSUServoExpFrag)
