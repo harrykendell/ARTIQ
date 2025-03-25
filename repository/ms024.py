@@ -1,4 +1,3 @@
-import time
 import pyvisa
 import numpy as np
 import matplotlib.pyplot as plt
@@ -79,7 +78,7 @@ class MSO24:
         self.write(f"AFG:FUNCtion {waveform}")
         self.write(f"AFG:FREQuency {frequency}")
         self.write(f"AFG:AMPLitude {amplitude}")
-        self.write(f"AFG:OUTput:MODe CONTinuous")
+        self.write("AFG:OUTput:MODe CONTinuous")
         self.write("AFG:OUTput:STATE ON")
 
     def afg_sin(self, frequency: float, amplitude: float):
@@ -133,7 +132,7 @@ class MSO24:
 
             self.write(f"DATA:SOURCE CH{ch}")
 
-            self.write(f"DATA:START 1")
+            self.write("DATA:START 1")
             record = int(self.query("HORIZONTAL:RECORDLENGTH?"))
             self.write(f"DATA:STOP {record}")
             self.write("WFMOutpre:BYT_N 1")

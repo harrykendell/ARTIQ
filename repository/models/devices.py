@@ -20,7 +20,7 @@ VDRIVEN_SUPPLIES = [
         ch=0,
         gain=2.0 * A / V,
         current_limit=3.0 * A,
-        default_current=0.95 * A,
+        default_current=1.0 * A,
     ),
     VDrivenSupply(
         name="X2",
@@ -44,7 +44,7 @@ VDRIVEN_SUPPLIES = [
         ch=3,
         gain=2.0 * A / V,
         current_limit=3.0 * A,
-        default_current=0.03 * A,
+        default_current=0.0 * A,
     ),
     VDrivenSupply(
         name="GreenTA",
@@ -73,8 +73,8 @@ COIL_PAIRS = [
         name="X",
         coil1="X1",
         coil2="X2",
-        default_current_comm=0.95 * A,
-        default_current_diff=0.05 * A,
+        default_current_comm=1.0 * A,
+        default_current_diff=1.0 * A,
     ),
 ]
 # Convert to dict for ease of use
@@ -109,7 +109,8 @@ SUSERVOED_BEAMS = [
         attenuation=16.5 * dB,
         shutter_device="shutter_3DMOT",
         shutter_delay=35.0 * ms,
-        setpoint=2.0 * V,
+        setpoint=2.5 * V,
+        servo_enabled=True,
     ),
     SUServoedBeam(
         name="IMG",

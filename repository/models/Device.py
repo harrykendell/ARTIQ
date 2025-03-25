@@ -2,7 +2,7 @@
 Example usage:
 
     @dataclass
-    class Example(Component):
+    class Example(DEVICE):
         some_value: int = 0  # Additional fields specific to Example
         maybe_value: Optional[int] = None # Optional fields
 
@@ -57,4 +57,4 @@ class DEVICE:
             raise
         # the dataset should have some strict subset of our fields
         for n in data:
-            setattr(self, n, data[n]) # This will fail if the field is not in the class
+            setattr(self, n, data[n])  # This will fail if the field is not in the class

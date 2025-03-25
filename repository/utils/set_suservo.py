@@ -1,13 +1,8 @@
-from artiq.coredevice.suservo import Channel as SUServoChannel
+from artiq.coredevice.core import Core
 from artiq.experiment import kernel
-from ndscan.experiment import BoolParam
-from ndscan.experiment import EnumerationValue
-from ndscan.experiment import ExpFragment
-from ndscan.experiment import FloatParam
-from ndscan.experiment import IntParam
+from ndscan.experiment import BoolParam, EnumerationValue, ExpFragment, FloatParam
 from ndscan.experiment.entry_point import make_fragment_scan_exp
-from ndscan.experiment.parameters import BoolParamHandle
-from ndscan.experiment.parameters import FloatParamHandle
+from ndscan.experiment.parameters import BoolParamHandle, FloatParamHandle
 
 from repository.fragments.suservo_frag import SUServoFrag
 from repository.models.devices import SUSERVOED_BEAMS, SUServoedBeam
@@ -25,6 +20,7 @@ class SetSUServoExpFrag(ExpFragment):
 
     def build_fragment(self):
         self.setattr_device("core")
+        self.core: Core
 
         suservo_channels = list(SUSERVOED_BEAMS.keys())
         default: SUServoedBeam = SUSERVOED_BEAMS[suservo_channels[0]]
@@ -109,7 +105,7 @@ class SetSUServoExpFrag(ExpFragment):
         logging.warning("clobbering attenuations")
         self.core.break_realtime()
 
-        self.SUServoFrag.set_all_attenuations(self.attenuation.get())
+        self.SUServoFrag.set_attenuation(self.attenuation.get())
 
         self.SUServoFrag.set_suservo(
             self.frequency.get(),
