@@ -8,7 +8,6 @@ from artiq.language.units import ms, s
 from ndscan.experiment import (
     Fragment,
     ExpFragment,
-    FloatChannel,
     OpaqueChannel,
     FloatParam,
     IntParam,
@@ -25,7 +24,6 @@ from submodules.oitg.oitg.fitting import exponential_decay
 from repository.fragments.read_adc import ReadSUServoADC
 from repository.fragments.current_supply_setter import SetAnalogCurrentSupplies
 from repository.models.devices import VDRIVEN_SUPPLIES
-
 from device_db import server_addr
 
 logger = logging.getLogger(__name__)
@@ -65,22 +63,31 @@ class MOTPhotodiodeMeasurement(Fragment):
         self.adc_reader: ReadSUServoADC
 
     @kernel
+    def reload_MOT(self, initial_delay_mu: TInt64):  # type: ignore
+        """
+        Reload the MOT by turning off the coils, waiting, and then turning them back on.
+
+        This writes the turn off into the past by the initial delay, and starts loading the MOT now.
+        """
+        delay_mu(-initial_delay_mu)
+        self.coil_setter.turn_off()
+        delay_mu(initial_delay_mu)
+        self.coil_setter.set_currents([self.current.get()])
+
+    @kernel
     def measure_MOT_fluorescence(
         self,
-        num_points: TInt32,
-        delay_between_points_mu: TInt64,
-        initial_delay_mu: TInt64,
-        data: TList(TFloat),
+        num_points: TInt32,  # type: ignore
+        delay_between_points_mu: TInt64,  # type: ignore
+        initial_delay_mu: TInt64,  # type: ignore
+        data: TList(TFloat),  # type: ignore
     ) -> None:
         """
         Read the fluorescence out into an array.
 
         You must pass an array of floats with size <num_points> to `data`.
         """
-        self.coil_setter.turn_off()
-        delay_mu(2 * initial_delay_mu)
-        self.coil_setter.set_currents([self.current.get()])
-        delay_mu(-initial_delay_mu)
+        self.reload_MOT(initial_delay_mu)
 
         for i in range(num_points):
             data[i] = self.adc_reader.read_adc()
@@ -102,7 +109,7 @@ class MeasureMOTWithPDFrag(ExpFragment):
         self.setattr_param(
             "initial_delay",
             FloatParam,
-            description="Delay between closing shutter and starting loading the MOT",
+            description="Time to clear out MOT beofre loading",
             default=100 * ms,
             unit="ms",
             min=1 * ms,
@@ -201,7 +208,8 @@ class MeasureMOTWithPDFrag(ExpFragment):
         self.ccb.issue(
             "create_applet",
             "MOT Photodiode Voltage",
-            f"${{artiq_applet}}plot_xy {self.name}.voltage --title 'tau = {fit_results['tau']: .3f}' --x {self.name}.time --fit {self.name}.fit --server {server_addr}",
+            f"${{artiq_applet}}plot_xy {self.name}.voltage --title 'tau = {fit_results['tau']: .3f}'"
+            f" --x {self.name}.time --fit {self.name}.fit --server {server_addr}",
         )
 
 

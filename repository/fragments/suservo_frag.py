@@ -73,7 +73,7 @@ class SUServoFrag(Fragment):
         self.suservo_channel: Channel = self.get_device(self.channel)
         self.suservo: SUServo = self.suservo_channel.servo
 
-        # We pull default settings for the other beams on this cpld to avoid clobbering their atts in set_all_attenuations
+        # We pull default atts on this cpld to avoid clobbering their atts in reset_all_attenuations
         # We assume that all suservo_chs are ordered properly by channel# so that for each set of 4 they share a cpld
 
         # Find the default attenuations from SUSERVOED_BEAMS
@@ -85,7 +85,7 @@ class SUServoFrag(Fragment):
         # Assume cplds are logically chunked by channel number
         start_ch = (self.suservo_channel.channel - minch) // 4 * 4
         # our number inside the group of 4
-        self.ch_4 = (self.suservo_channel.channel - minch) % 4
+        self.channel_index_within_group = (self.suservo_channel.channel - minch) % 4
         # we now want this and the next 3 channels
         self.beams = beams[start_ch : start_ch + 4]
         if self.debug_enabled:
@@ -112,7 +112,7 @@ class SUServoFrag(Fragment):
         for i in range(4):
             delay(1 * ms)
             reg += self.suservo.cplds[0].att_to_mu(
-                self.beams[i][2] if i != self.ch_4 else att
+                self.beams[i][2] if i != self.channel_index_within_group else att
             ) << (i * 8)
         return reg
 
@@ -255,8 +255,17 @@ class SUServoFrag(Fragment):
         return -1.0 * setpoint_v / 10.0
 
     @kernel
-    def set_this_attenuation(self, attenuation: TFloat):
-        # Set the attenuator for this channel on this Urukul
+    def set_attenuation(self, attenuation: TFloat, needs_reset: TBool = False):
+        """
+        Set only the attenuator for this channel on this Urukul
+
+        If reset_all_attenuations hasn't been called this will clobber
+        the other channels on the same Urukul
+        """
+        if needs_reset:
+            self._reset_all_attenuations(attenuation)
+            return
+
         attenuator_channel = self.suservo_channel.servo_channel % 4
 
         if self.debug_enabled:
@@ -272,17 +281,19 @@ class SUServoFrag(Fragment):
         cpld.set_att(attenuator_channel, attenuation)
 
     @kernel
-    def set_all_attenuations(self, attenuation: TFloat):
+    def _reset_all_attenuations(self, attenuation: TFloat):
         """
-        Set all channels on the same DDS as this channel to their defaults
+        Set the required attenuation but also reset the attenuations of all
+        other channels on the same Urukul to their defaults
 
         This is annoyingly required because there is no way of getting
         information out from the SUServo gateware about the current settings, so
         they have to be reset on each run.
         """
-        logging.warning("Setting the attenuator for all channels to their defaults")
+        if self.debug_enabled:
+            logging.warning("Setting the attenuator for all channels to their defaults")
+            self.core.break_realtime()
 
-        self.core.break_realtime()
         cpld = self.suservo_channel.dds.cpld  # type: CPLD
         cpld.get_att_mu()
 
@@ -312,7 +323,7 @@ class SUServoFrag(Fragment):
             enable_iir (TBool, optional): Enable the servo loop. Defaults to False.
         """
         # Set the attenuator for this channel
-        self.set_this_attenuation(attenuation)
+        self.set_attenuation(attenuation)
 
         # Configure this profile to have the requested amplitude and frequency
         self.set_y(amplitude)

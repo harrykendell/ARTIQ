@@ -325,7 +325,7 @@ aliases = {
     "MOT_photodiode": "suservo_ch0",
     # 780 MOT
     "suservo_aom_LOCK": "suservo_ch0",
-    "suservo_aom_MOT": "suservo_ch1",
+    "suservo_aom_MOT": "suservo_ch1",  # has its photodiode on it's channel
     "suservo_aom_IMG": "suservo_ch2",
     "suservo_aom_PUMP": "suservo_ch3",
     "mirny_eom_repump": "mirny_ch0",
@@ -339,6 +339,8 @@ aliases = {
     # 1064 Cross Dipole Trap
     "suservo_aom_CDT1": "suservo_ch6",
     "suservo_aom_CDT2": "suservo_ch7",
+    # PCO camera
+    "pco_camera": "ttl8",
 }
 
 device_db |= aliases
