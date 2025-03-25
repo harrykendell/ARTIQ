@@ -18,7 +18,10 @@ if [ "$SCRIPT_DIR" != "$(pwd)" ]; then
 fi
 
 #  PyQt5 fix
-FIX=". ./scripts/nix-fix-pyqt.sh"
+PYQTFIX=". ./scripts/nix-fix-pyqt.sh"
+
+# Not finding .so files
+SOFIX="export LD_LIBRARY_PATH=$(find /nix/store -type d -wholename '/nix/store/*artiq-env/lib')"
 
 # ThorlabsPM
 TLPM="(python ./ThorlabsPM/ThorlabsPM.py &)"
@@ -43,7 +46,7 @@ if [[ $found -eq 1 ]]; then
     echo -e "${GREEN}Running on the ARTIQ server${NC}"
     # Be good citizens and clean up old aqctls on exit
     trap 'sleep 1; pkill -9 -f aqctl; exit' EXIT
-    nix shell --command bash -c "$FIX ; $TLPM ; $ARTIQ"
+    nix shell --command bash -c "$PYQTFIX ; $SOFIX ; $TLPM ; $ARTIQ"
 else
     echo -e "${RED}Not running on the ARTIQ server${NC}"
     artiq_dashboard --server="$SERVER_ADDRESS" -p ndscan.dashboard_plugin
