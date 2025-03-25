@@ -1,6 +1,6 @@
 import logging
 from dataclasses import dataclass
-from typing import *
+from typing import List, Type
 
 from numpy import int64
 
@@ -199,7 +199,7 @@ class SetBeamsToDefaults(Fragment):
             + [0]
         )
 
-        self.debug_mode = logger.isEnabledFor(logging.DEBUG)
+        self.debug_mode = logger.isEnabledFor(logging.INFO)
 
         # %% Dummy elements
 

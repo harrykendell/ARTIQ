@@ -40,7 +40,7 @@ class SetAnalogCurrentSupplies(Fragment):
 
         # %% Kernel variables
         self.first_run = init
-        self.debug_enabled = logger.isEnabledFor(logging.DEBUG)
+        self.debug_enabled = logger.isEnabledFor(logging.INFO)
         self.num_supplies = len(self.current_configs)
 
         # %% Kernel invariants
@@ -96,16 +96,18 @@ class SetAnalogCurrentSupplies(Fragment):
 
         self._currents_to_volts(currents, voltages)
 
-        if False:
-            logger.debug(
-                "Setting currents = %s with voltages = %s on channels %s",
+        if self.debug_enabled:
+            logger.info(
+                "Setting currents = %s via voltages = %s on channels %s",
                 currents,
                 voltages,
                 self.fastino_channels,
             )
+            self.core.break_realtime()
 
         for idx in range(len(self.fastino_channels)):
             self.fastino.set_dac(self.fastino_channels[idx], voltages[idx])
+            delay_mu(8)  # Nothing happens for multiple channels if we use a shorter delay?!
 
     @kernel
     def set_defaults(self):
@@ -156,7 +158,6 @@ class SetAnalogCurrentSupplies(Fragment):
     @kernel
     def actual_timestep_mu(self, duration: TFloat, num_points: TInt32):
         return self.core.seconds_to_mu(duration / float(num_points))
-
 
     @kernel
     def set_currents_ramping_numpoints(

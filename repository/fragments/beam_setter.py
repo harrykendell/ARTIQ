@@ -5,15 +5,10 @@ import numpy as np
 from artiq.coredevice.core import Core
 from artiq.coredevice.suservo import Channel as SUServoChannel
 from artiq.coredevice.ttl import TTLOut
-from artiq.experiment import at_mu
-from artiq.experiment import delay
-from artiq.experiment import delay_mu
-from artiq.experiment import kernel
-from artiq.experiment import now_mu
-from artiq.experiment import portable
+from artiq.experiment import at_mu, delay, delay_mu, kernel, now_mu, portable
 from ndscan.experiment import Fragment
 
-from repository.utils import get_local_devices
+from repository.utils.get_local_devices import get_local_devices
 from repository.models import SUServoedBeam
 
 
@@ -50,8 +45,8 @@ class ControlBeamsWithoutCoolingAOM(Fragment):
 
         from ndscan.experiment import *
 
-        from pyaion.fragments.beam_setter import ControlBeamsWithoutCoolingAOM
-        from pyaion.models import SUServoedBeam
+        from repository.fragments.beam_setter import ControlBeamsWithoutCoolingAOM
+        from repository.models import SUServoedBeam
 
 
         my_beam = SUServoedBeam(
@@ -99,11 +94,20 @@ class ControlBeamsWithoutCoolingAOM(Fragment):
         self.setattr_device("core")
         self.core: Core
 
+        # Kernel variables
+        self.debug_enabled = logger.isEnabledFor(logging.INFO)
+
+        self.unshuttered_suservos: List[SUServoChannel] = []
         self.beam_suservos: List[SUServoChannel] = []
         self.beam_shutters: List[TTLOut] = []
+        self.shutter_indexes: List[int] = []
 
         # Sort beams by order of delay - smallest delay first
         self.beam_infos = sorted(beam_infos, key=lambda v: v.shutter_delay)
+
+        # We can't use Optionals so set the shutter device to 'None' not None
+        for beam in self.beam_infos:
+            beam.shutter_device = str(beam.shutter_device)
 
         # Add a dummy entry to the list. This is so that the ARTIQ compiler can
         # infer the type even if we're passed an empty list. We'll ignore these
@@ -119,20 +123,25 @@ class ControlBeamsWithoutCoolingAOM(Fragment):
         self.beam_infos.insert(0, dummy_beaminfo)
 
         for beam_info in self.beam_infos:
-            if beam_info.shutter_device is None:
-                raise ValueError(
-                    "Beam [{:s}] has no shutter configured".format(beam_info.name)
-                )
-
             self.beam_suservos.append(self.get_device(beam_info.suservo_device))
-            self.beam_shutters.append(self.get_device(beam_info.shutter_device))
+
+            if beam_info.shutter_device == 'None':
+                if self.debug_enabled and beam_info.name != "dummy":
+                    logger.info("Beam [%s] has no shutter", beam_info.name)
+                self.shutter_indexes.append(-1)
+            else:
+                self.beam_shutters.append(self.get_device(beam_info.shutter_device))
+                self.shutter_indexes.append(len(self.beam_shutters) - 1)
+                if self.debug_enabled and beam_info.name != "dummy":
+                    logger.info(
+                        "Beam [%s] has shutter [%s]",
+                        beam_info.name,
+                        beam_info.shutter_device,
+                    )
 
         self.longest_beam_delay = max([info.shutter_delay for info in self.beam_infos])
 
-        # %% Kernel variables
-        self.debug_enabled = logger.isEnabledFor(logging.DEBUG)
-
-        # %% Kernel invariants
+        # Kernel invariants
         kernel_invariants = getattr(self, "kernel_invariants", set())
         self.kernel_invariants = kernel_invariants | {
             "debug_enabled",
@@ -175,9 +184,19 @@ class ControlBeamsWithoutCoolingAOM(Fragment):
 
         if not ignore_shutters:
             for i in range(len(self.beam_infos) - 1, 0, -1):
-                suservo = self.beam_suservos[i]
-                shutter = self.beam_shutters[i]
                 beam_info = self.beam_infos[i]
+                if beam_info.shutter_device == 'None':
+                    continue
+
+                suservo = self.beam_suservos[i]
+                shutter = self.beam_shutters[self.shutter_indexes[i]]
+
+                if self.debug_enabled:
+                    logger.info(
+                        "Opening Shutter [%s] for beam [%s]",
+                        shutter.channel,
+                        beam_info.name,
+                    )
 
                 delay(-beam_info.shutter_delay)
 
@@ -194,7 +213,6 @@ class ControlBeamsWithoutCoolingAOM(Fragment):
 
         for i in range(len(self.beam_infos) - 1, 0, -1):
             suservo = self.beam_suservos[i]
-            shutter = self.beam_shutters[i]
             beam_info = self.beam_infos[i]
 
             if self.debug_enabled:
@@ -203,13 +221,11 @@ class ControlBeamsWithoutCoolingAOM(Fragment):
                     (
                         "AOM+shuttering ON: "
                         "suservo = 0x%x, "
-                        "shutter = 0x%x, "
                         "delay_by = %s, "
                         "servo_enabled = %s, "
                         "info = %s"
                     ),
                     suservo.channel,
-                    shutter.channel,
                     beam_info.shutter_delay,
                     beam_info.servo_enabled,
                     beam_info,
@@ -219,7 +235,7 @@ class ControlBeamsWithoutCoolingAOM(Fragment):
             suservo.set(
                 en_out=1,
                 en_iir=1 if beam_info.servo_enabled else 0,
-                profile=suservo.channel,
+                profile=suservo.servo_channel,
             )
 
             delay_mu(self.t_rtio_cycle_mu)
@@ -248,12 +264,29 @@ class ControlBeamsWithoutCoolingAOM(Fragment):
 
         for i in range(1, len(self.beam_infos)):
             suservo = self.beam_suservos[i]
-            shutter = self.beam_shutters[i]
+            beam_info = self.beam_infos[i]
+
+            if self.debug_enabled:
+                slack_mu = now_mu() - self.core.get_rtio_counter_mu()
+                logger.info(
+                    (
+                        "AOM+shuttering OFF: "
+                        "suservo = 0x%x, "
+                        "delay_by = %s, "
+                        "servo_enabled = %s, "
+                        "info = %s"
+                    ),
+                    suservo.channel,
+                    beam_info.shutter_delay,
+                    beam_info.servo_enabled,
+                    beam_info,
+                )
+                at_mu(self.core.get_rtio_counter_mu() + slack_mu)
 
             suservo.set(
                 en_out=0,
                 en_iir=0,
-                profile=suservo.channel,
+                profile=suservo.servo_channel,
             )
 
             # TODO: Not having the below delay DOES cause this method to consume
@@ -261,15 +294,26 @@ class ControlBeamsWithoutCoolingAOM(Fragment):
             # I'm removing it here in case others have the same problem.
             # delay_mu(self.t_rtio_cycle_mu)
 
-            if not ignore_shutters:
+            if not ignore_shutters and beam_info.shutter_device != 'None':
+                shutter = self.beam_shutters[self.shutter_indexes[i]]
                 shutter.off()
                 delay_mu(self.t_rtio_cycle_mu)
 
         if not ignore_shutters:
             for i in range(1, len(self.beam_infos)):
-                suservo = self.beam_suservos[i]
-                shutter = self.beam_shutters[i]
                 beam_info = self.beam_infos[i]
+                if beam_info.shutter_device == 'None':
+                    continue
+
+                suservo = self.beam_suservos[i]
+                shutter = self.beam_shutters[self.shutter_indexes[i]]
+
+                if self.debug_enabled:
+                    logger.info(
+                        "Closing shutter [%s] for beam [%s]",
+                        shutter.channel,
+                        beam_info.name,
+                    )
 
                 delay(beam_info.shutter_delay)
 
@@ -277,7 +321,7 @@ class ControlBeamsWithoutCoolingAOM(Fragment):
                 suservo.set(
                     en_out=1,
                     en_iir=0,
-                    profile=suservo.channel,
+                    profile=suservo.servo_channel,
                 )
 
                 delay_mu(self.t_rtio_cycle_mu)
