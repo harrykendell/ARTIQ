@@ -2,16 +2,16 @@
 Simple example of how to retrieve image data from pco.Camera.
 """
 
-from artiq.experiment import *
+# from artiq.experiment import *
 
 import time
 import numpy as np
 import pco
 
-from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel, QDoubleSpinBox
+from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout
 from PyQt6.QtCore import QTimer
-from PyQt6.QtGui import QImage, QPixmap
 
+import pco.logging
 import pyqtgraph as pg
 
 # logger.addHandler(pco.stream_handler)
@@ -25,8 +25,11 @@ triggers = [
 
 BINNING = 1
 FULL_ROI = (1, 1, 1392 // BINNING, 1040 // BINNING)
-WHOLE_CELL_ROI = (620, 475, 750, 650)
-MOT_ROI = (640, 540, 770, 620)
+WHOLE_CELL_ROI = (3 * 1392 // 8, 3 * 1040 // 8, 5 * 1392 // 8, 5 * 1040 // 8)
+MOT_SIZE = 40
+MOT_X = 715
+MOT_Y = 575
+MOT_ROI = (MOT_X - MOT_SIZE, MOT_Y - MOT_SIZE, MOT_X + MOT_SIZE, MOT_Y + MOT_SIZE)
 """
 For the pixelfly:
     "serial": 19701804,
@@ -45,6 +48,8 @@ For the pixelfly:
 
 def init_cam(cam: pco.Camera):
     cam.default_configuration()
+
+    pco.logging.logging.getLogger().setLevel(pco.logging.logging.WARNING)
 
     cam.configuration = {
         "timestamp": "binary",
@@ -96,7 +101,6 @@ class CameraWidget(QWidget):
         self.timer.start(100)
 
     def update_image(self):
-        # essentially self.cam.wait_for_new_image() but for only fifo mode
         settings = self.cam.rec.get_settings()
         status = self.cam.rec.get_status()
 
@@ -130,7 +134,7 @@ class CameraWidget(QWidget):
 def main_gui():
     app = QApplication([])
 
-    with pco.Camera() as cam:
+    with pco.Camera(interface="USB 2.0") as cam:
         init_cam(cam)
 
         widget = CameraWidget(cam)
