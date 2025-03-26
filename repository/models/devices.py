@@ -135,6 +135,8 @@ SUSERVOED_BEAMS = [
         suservo_device="suservo_aom_LATY",
         frequency=200.0 * MHz,
         attenuation=20.0 * dB,
+        shutter_device="shutter_LATTICE",
+        shutter_delay=35.0 * ms,
     ),
     SUServoedBeam(
         name="CDT1",
