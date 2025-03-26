@@ -157,7 +157,7 @@ class ControlBeamsWithoutCoolingAOM(Fragment):
         return super().host_setup()
 
     @kernel
-    def turn_beams_on(self, ignore_shutters=False):
+    def turn_beams_on(self, ignore_shutters=False, already_on=False):
         """
         Turn on the beams using the AOM and shutter
 
@@ -174,11 +174,13 @@ class ControlBeamsWithoutCoolingAOM(Fragment):
         responsible for making sure that the shutters are arranged such that
         this results in something interesting happening.
 
+        If already_on == True, the AOMs are not turned off before opening shutters
+        to avoid transient loss of power if the beam should already be on
+
         Event queueing behaviour:
 
-        * t < 0: If ignore_shutters == False and there are shutterable AOMs in
-        the suservo list, this method will write shutter opening events in the
-        past by "shutter_delay_time" seconds.
+        * -longest_beam_delay < t < 0: AOMS turned off and shutters opened
+        * t = 0: AOMs turned on
         * t > 0: No events are written in the future.
         """
 
@@ -199,12 +201,12 @@ class ControlBeamsWithoutCoolingAOM(Fragment):
                     )
 
                 delay(-beam_info.shutter_delay)
-
-                suservo.set(
-                    en_out=0,
-                    en_iir=0,
-                    profile=suservo.channel,
-                )
+                if not already_on:
+                    suservo.set(
+                        en_out=0,
+                        en_iir=0,
+                        profile=suservo.channel,
+                    )
                 delay_mu(self.t_rtio_cycle_mu)
                 shutter.on()
                 delay_mu(self.t_rtio_cycle_mu)
@@ -257,9 +259,8 @@ class ControlBeamsWithoutCoolingAOM(Fragment):
         Event queueing behaviour:
 
         * t < 0: No events are written in the past.
-        * t > 0: If ignore_shutters == False and there are shutterable AOMs in
-        the suservo list, this method will write shutter closing
-        events into the future by "shutter_delay_time" seconds.
+        * t = 0: AOM and shutter turned off
+        * 0 < t < longest_beam_delay: AOMs turned back on to stay warm
         """
 
         for i in range(1, len(self.beam_infos)):
