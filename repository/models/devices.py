@@ -80,16 +80,17 @@ COIL_PAIRS = [
 # Convert to dict for ease of use
 COIL_PAIRS = {pair.name: pair for pair in COIL_PAIRS}
 
+THORLABS_SHUTTER_DELAY = 35.0 * ms
 SHUTTERS = [
     Shutter(
         name="MOT2D",
         ttl="shutter_2DMOT",
-        delay=35.0 * ms,
+        delay=THORLABS_SHUTTER_DELAY,
     ),
     Shutter(
         name="MOT3D",
         ttl="shutter_3DMOT",
-        delay=35.0 * ms,
+        delay=THORLABS_SHUTTER_DELAY,
     ),
 ]
 # Convert to dict for ease of use
@@ -108,7 +109,7 @@ SUSERVOED_BEAMS = [
         frequency=193.0 * MHz,
         attenuation=16.5 * dB,
         shutter_device="shutter_3DMOT",
-        shutter_delay=35.0 * ms,
+        shutter_delay=THORLABS_SHUTTER_DELAY,
         setpoint=2.5 * V,
         servo_enabled=True,
     ),
@@ -136,7 +137,7 @@ SUSERVOED_BEAMS = [
         frequency=200.0 * MHz,
         attenuation=20.0 * dB,
         shutter_device="shutter_LATTICE",
-        shutter_delay=35.0 * ms,
+        shutter_delay=THORLABS_SHUTTER_DELAY,
     ),
     SUServoedBeam(
         name="CDT1",
