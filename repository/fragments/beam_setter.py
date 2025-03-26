@@ -125,7 +125,7 @@ class ControlBeamsWithoutCoolingAOM(Fragment):
         for beam_info in self.beam_infos:
             self.beam_suservos.append(self.get_device(beam_info.suservo_device))
 
-            if beam_info.shutter_device == 'None':
+            if beam_info.shutter_device == "None":
                 if self.debug_enabled and beam_info.name != "dummy":
                     logger.info("Beam [%s] has no shutter", beam_info.name)
                 self.shutter_indexes.append(-1)
@@ -159,26 +159,17 @@ class ControlBeamsWithoutCoolingAOM(Fragment):
     @kernel
     def turn_beams_on(self, ignore_shutters=False, already_on=False):
         """
-        Turn on the beams using the AOM and shutter
-
         This method will use the AOM to turn on the beam at the cursor, having
         first disabled the AOM and opened the shutter to prevent the AOM from
         cooling down too much.
 
-        Start with the shutters with the longest delay to avoid switching
-        backwards and forwards in time.
-
         This method advances the timeline cursor by a few RTIO events ~ 100ns
 
-        If ignore_shutters == True, only the AOMs are used. The user is
-        responsible for making sure that the shutters are arranged such that
-        this results in something interesting happening.
-
-        If already_on == True, the AOMs are not turned off before opening shutters
-        to avoid transient loss of power if the beam should already be on
+        If ignore_shutters == True, Shutters are not touched
+        
+        If already_on == True, The AOMs don't turn off transiently for a hard edge
 
         Event queueing behaviour:
-
         * -longest_beam_delay < t < 0: AOMS turned off and shutters opened
         * t = 0: AOMs turned on
         * t > 0: No events are written in the future.
@@ -187,18 +178,20 @@ class ControlBeamsWithoutCoolingAOM(Fragment):
         if not ignore_shutters:
             for i in range(len(self.beam_infos) - 1, 0, -1):
                 beam_info = self.beam_infos[i]
-                if beam_info.shutter_device == 'None':
+                if beam_info.shutter_device == "None":
                     continue
 
                 suservo = self.beam_suservos[i]
                 shutter = self.beam_shutters[self.shutter_indexes[i]]
 
                 if self.debug_enabled:
+                    slack_mu = now_mu() - self.core.get_rtio_counter_mu()
                     logger.info(
                         "Opening Shutter [%s] for beam [%s]",
                         shutter.channel,
                         beam_info.name,
                     )
+                    at_mu(self.core.get_rtio_counter_mu() + slack_mu)
 
                 delay(-beam_info.shutter_delay)
                 if not already_on:
@@ -245,21 +238,16 @@ class ControlBeamsWithoutCoolingAOM(Fragment):
     @kernel
     def turn_beams_off(self, ignore_shutters=False):
         """
-        Turn off the beams using the AOM and shutter
-
         This method will turn off the beam at the cursor and then close the
         shutter and turn the AOM back on to stop it cooling down.
 
         This method advances the timeline cursor by a few RTIO events ~ 100ns
 
-        If ignore_shutters == True, only the AOMs are used. The user is
-        responsible for making sure that the shutters are arranged such that
-        this results in something interesting happening.
+        If ignore_shutters == True, Shutters are not touched
 
         Event queueing behaviour:
-
         * t < 0: No events are written in the past.
-        * t = 0: AOM and shutter turned off
+        * t = 0: AOM off and Shutter closed
         * 0 < t < longest_beam_delay: AOMs turned back on to stay warm
         """
 
@@ -295,7 +283,7 @@ class ControlBeamsWithoutCoolingAOM(Fragment):
             # I'm removing it here in case others have the same problem.
             # delay_mu(self.t_rtio_cycle_mu)
 
-            if not ignore_shutters and beam_info.shutter_device != 'None':
+            if not ignore_shutters and beam_info.shutter_device != "None":
                 shutter = self.beam_shutters[self.shutter_indexes[i]]
                 shutter.off()
                 delay_mu(self.t_rtio_cycle_mu)
@@ -303,18 +291,20 @@ class ControlBeamsWithoutCoolingAOM(Fragment):
         if not ignore_shutters:
             for i in range(1, len(self.beam_infos)):
                 beam_info = self.beam_infos[i]
-                if beam_info.shutter_device == 'None':
+                if beam_info.shutter_device == "None":
                     continue
 
                 suservo = self.beam_suservos[i]
                 shutter = self.beam_shutters[self.shutter_indexes[i]]
 
                 if self.debug_enabled:
+                    slack_mu = now_mu() - self.core.get_rtio_counter_mu()
                     logger.info(
                         "Closing shutter [%s] for beam [%s]",
                         shutter.channel,
                         beam_info.name,
                     )
+                    at_mu(self.core.get_rtio_counter_mu() + slack_mu)
 
                 delay(beam_info.shutter_delay)
 
@@ -328,6 +318,66 @@ class ControlBeamsWithoutCoolingAOM(Fragment):
                 delay_mu(self.t_rtio_cycle_mu)
 
                 delay(-beam_info.shutter_delay)
+
+    @kernel
+    def _set_shutters(self, state=True, ignore_delay=False):
+        for i in range(len(self.beam_infos) - 1, 0, -1):
+            beam_info = self.beam_infos[i]
+            if beam_info.shutter_device == "None":
+                continue
+
+            shutter = self.beam_shutters[self.shutter_indexes[i]]
+
+            if self.debug_enabled:
+                slack_mu = now_mu() - self.core.get_rtio_counter_mu()
+                logger.info(
+                    "%s Shutter [%s] for beam [%s]",
+                    "Opening" if state else "Closing",
+                    shutter.channel,
+                    beam_info.name,
+                )
+                at_mu(self.core.get_rtio_counter_mu() + slack_mu)
+
+            delay(-beam_info.shutter_delay)
+            delay_mu(self.t_rtio_cycle_mu)
+            if state:
+                shutter.on()
+            else:
+                shutter.off()
+            delay_mu(self.t_rtio_cycle_mu)
+            delay(beam_info.shutter_delay)
+
+    @kernel
+    def open_shutters(self, ignore_delay=False):
+        """
+        Open the shutters for all beams at the cursor.
+
+        This method advances the timeline cursor by a few RTIO events ~ 100ns
+
+        If ignore_delay == True, the shutters start opening at the cursor
+
+        Event queueing behaviour:
+        * -longest_shutter_delay < t < 0: Shutters open if ignore_delay == False
+        * t = 0: Shutters open if ignore_delay == True
+        * t > 0: No events are written in the future.
+        """
+        self._set_shutters(state=True, ignore_delay=ignore_delay)
+
+    @kernel
+    def close_shutters(self, ignore_delay=False):
+        """
+        Open the shutters for all beams at the cursor.
+
+        This method advances the timeline cursor by a few RTIO events ~ 100ns
+
+        If ignore_delay == True, the shutters start opening at the cursor
+
+        Event queueing behaviour:
+        * -longest_shutter_delay < t < 0: Shutters open if ignore_delay == False
+        * t = 0: Shutters open if ignore_delay == True
+        * t > 0: No events are written in the future.
+        """
+        self._set_shutters(state=False, ignore_delay=ignore_delay)
 
     @portable
     def get_longest_shutter_delay(self):
