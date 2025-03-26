@@ -14,6 +14,13 @@ from PyQt6.QtCore import QTimer
 import pco.logging
 import pyqtgraph as pg
 
+MOT_SIZE = 40
+MOT_X = 715
+MOT_Y = 575
+MOT_ROI = (MOT_X - MOT_SIZE, MOT_Y - MOT_SIZE, MOT_X + MOT_SIZE, MOT_Y + MOT_SIZE)
+WHOLE_CELL_ROI = (3 * 1392 // 8, 3 * 1040 // 8, 5 * 1392 // 8, 5 * 1040 // 8)
+
+
 # logger.addHandler(pco.stream_handler)
 
 triggers = [
@@ -22,14 +29,6 @@ triggers = [
     "external exposure start & software trigger",  # takes a picture when Trig goes high
     "external exposure control",  # seems to just always immediately take a picture?
 ]
-
-BINNING = 1
-FULL_ROI = (1, 1, 1392 // BINNING, 1040 // BINNING)
-WHOLE_CELL_ROI = (3 * 1392 // 8, 3 * 1040 // 8, 5 * 1392 // 8, 5 * 1040 // 8)
-MOT_SIZE = 40
-MOT_X = 715
-MOT_Y = 575
-MOT_ROI = (MOT_X - MOT_SIZE, MOT_Y - MOT_SIZE, MOT_X + MOT_SIZE, MOT_Y + MOT_SIZE)
 """
 For the pixelfly:
     "serial": 19701804,
@@ -54,8 +53,7 @@ def init_cam(cam: pco.Camera):
     cam.configuration = {
         "timestamp": "binary",
         "trigger": triggers[0],
-        "exposure time": 5_00e-6,
-        "binning": (BINNING, BINNING),
+        "exposure time": 500e-6,
     }
 
     print(f"{cam.camera_name} ({cam.camera_serial})")
@@ -112,7 +110,7 @@ class CameraWidget(QWidget):
         if settings["recorder type"] == 0x0003:
             if status["dwProcImgCount"] == 0:
                 return
-        img, meta = self.cam.image(roi=MOT_ROI)
+        img, meta = self.cam.image(roi=WHOLE_CELL_ROI)
         self.im.setImage(
             img,
             autoHistogramRange=self.first,

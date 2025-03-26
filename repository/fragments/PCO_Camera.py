@@ -18,17 +18,16 @@ from device_db import server_addr
 
 from ndscan.experiment.parameters import FloatParamHandle, IntParamHandle
 
-
 logger = logging.getLogger(__name__)
 logging.getLogger("pco").setLevel(logging.WARNING)
 
-MOT_SIZE = 40
-MOT_X = 715
-MOT_Y = 575
-MOT_ROI = (MOT_X - MOT_SIZE, MOT_Y - MOT_SIZE, MOT_X + MOT_SIZE, MOT_Y + MOT_SIZE)
-
 
 class PcoCamera(Fragment):
+    FULL_ROI = (1, 1, 1392, 1040)
+    WHOLE_CELL_ROI = (3 * 1392 // 8, 3 * 1040 // 8, 5 * 1392 // 8, 5 * 1040 // 8)
+    MOT_SIZE = 40; MOT_X = 715; MOT_Y = 575 # noqa
+    MOT_ROI = (MOT_X - MOT_SIZE, MOT_Y - MOT_SIZE, MOT_X + MOT_SIZE, MOT_Y + MOT_SIZE)
+
     def build_fragment(self):
         self.setattr_device("core")
         self.core: Core
@@ -37,7 +36,7 @@ class PcoCamera(Fragment):
             "num_images",
             IntParam,
             "The number of images we will take",
-            default=3,
+            default=4,
             min=0,
             max=10,
         )
@@ -63,12 +62,8 @@ class PcoCamera(Fragment):
         """
         Setup the host-side camera controls
         """
-        print("PCO Camera setup")
 
         self.cam = pco.Camera(interface="USB 2.0")
-
-        print("PCO Camera opened")
-
         self.cam.default_configuration()
 
         self.cam.configuration = {
@@ -101,9 +96,11 @@ class PcoCamera(Fragment):
         """
         Set the exposure time of the camera
 
-        It must not be changed while the camera is recording
+        temporarily stops recording to make the change
         """
+        self.cam.stop()
         self.cam.configuration = {"exposure time": exposure_time}
+        self.cam.record(self.num_images.get(), mode="sequence non blocking")
 
     @kernel
     def device_setup(self):
@@ -123,6 +120,7 @@ class PcoCamera(Fragment):
     def capture_image(self) -> None:
         """
         Capture an image, this doesn't advance the timeline.
+
         Another image should not be captured until the previous one has been exposed
         """
         self.pco_camera.on()
@@ -130,22 +128,24 @@ class PcoCamera(Fragment):
         self.pco_camera.off()
 
     @host_only
-    def retrieve_images(self):
+    def retrieve_images(self, timeout=5.0 * s, roi=WHOLE_CELL_ROI):
         """
         Pulls all stored images off the camera and stores the first into the diagnostic dataset
         """
 
         # spin for 5 secs hoping we get all the images we were promised
         now = time.time()
-        while time.time() - now < 5.0:
+        while time.time() - now < timeout:
             logger.info(
-                "Waiting for images %s / %s",
+                "Waiting for images %s / %s for %.1f / %.1f",
                 self.cam.recorded_image_count,
                 self.num_images.get(),
+                time.time() - now,
+                timeout,
             )
             if self.cam.recorded_image_count == self.num_images.get():
                 break
-            time.sleep(0.1)
+            time.sleep(timeout / 10)
         else:
             logging.warning(
                 "Recieved %d images, expected %d",
@@ -155,7 +155,7 @@ class PcoCamera(Fragment):
             if self.cam.recorded_image_count == 0:
                 return None
 
-        self.images, _ = self.cam.images(roi=MOT_ROI)
+        self.images, _ = self.cam.images(roi=roi)
         self.images = self.rotate_and_flip(self.images)
         self.set_dataset(
             "Images.Latest_image", self.images[-1], broadcast=True, persist=True
