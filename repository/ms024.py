@@ -157,13 +157,17 @@ class MSO24:
 
         return time, waves
 
-    def plot_trace(self, time_axis, voltage_trace, channel: int = 1):
+    def plot_traces(self, time_axis, voltage_traces, names=None):
         """Basic plot of a trace from a channel."""
+        if names is None:
+            names = {ch: f"Channel {ch}" for ch in voltage_traces.keys()}
+            
         plt.figure()
-        plt.plot(time_axis, voltage_trace, label=f"Channel {channel}")
+        for ch in voltage_traces.keys():
+            plt.plot(time_axis, voltage_traces[ch], label=names[ch])
         plt.xlabel("Time (s)")
         plt.ylabel("Voltage (V)")
-        plt.title(f"Trace from Channel {channel}")
+        plt.title("Trace from MS024")
         plt.legend()
         plt.show()
 
@@ -247,11 +251,9 @@ if __name__ == "__main__":
         # ms024.set_volt_scale(1, 1)
         # ms024.set_trigger(1, 0)
 
-        ms024.set_averaging(50)
-        ts, vs = ms024.get_trace([1, 3])
-        plt.plot(ts, vs[1], label="Channel 1")
-        plt.plot(ts, vs[3], label="Channel 3")
-        plt.show()
+        ms024.set_averaging(10)
+        ts, vs = ms024.get_trace([1, 2])
+        ms024.plot_traces(ts, vs, names={1: "Photodiode signal", 2: "Shutter TTL"})
 
         ms024.save_traces_to_file(ts, vs, filename=args.output_file)
         print(f"Trace saved to {args.output_file}")
