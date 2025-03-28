@@ -16,10 +16,10 @@ This is achieved by running a Subscriber in the background that listens for chan
 widgets can register to be updated for specific datasets
 """
 
-import sys, logging
-
-from PyQt5.QtWidgets import QApplication, QLabel, QVBoxLayout, QWidget
-from PyQt5 import QtCore
+import sys
+import logging
+import numpy as np
+import matplotlib.pyplot as plt
 
 # Data subscriptions
 from sipyco.pc_rpc import AsyncioClient
@@ -29,14 +29,21 @@ from qasync import QEventLoop
 import aiomqtt
 
 from artiq.master.scheduler import Scheduler
+from artiq.dashboard import datasets
 
 # GUI
-from PyQt5.QtWidgets import QApplication, QLabel, QWidget, QVBoxLayout, QTextEdit
+from PyQt5.QtWidgets import (
+    QApplication,
+    QLabel,
+    QWidget,
+    QVBoxLayout,
+    QTextEdit,
+    QPushButton,
+)
 
 # include the artiq path by slicing our current path to the root
 sys.path.append(__file__.split("artiq")[0] + "artiq")
-
-from repository.gui.components.ScientificSpin import ScientificSpin
+from repository.gui.components.ScientificSpin import ScientificSpin  # noqa
 
 
 class GUIClient:
@@ -155,7 +162,7 @@ class GUIClient:
                         message
                     )  # Pass each incoming message to the handler
         except aiomqtt.exceptions.MqttError or asyncio.TimeoutError as e:
-            logging.error(f"Failed to connect to Booster")
+            logging.error(f"Failed to connect to Booster:\n{e}")
             return
         logging.info("Connected to Booster")
 
@@ -228,7 +235,15 @@ class MainWindow(QWidget):
             layout.addWidget(label)
             layout.addWidget(self.__dict__[f"{name}_text"])
             fn()
-        self.setLayout(layout)
+
+            if name == "dataset":
+                layout.addWidget(QLabel("Save"))
+                save_button = QPushButton("Save")
+                save_button.clicked.connect(self.saveDataset)
+                layout.addWidget(save_button)
+
+        self.layout = layout
+        self.setLayout(self.layout)
 
     def update_dataset(self):
         text = ""
@@ -257,6 +272,12 @@ class MainWindow(QWidget):
     def register_callbacks(self):
         for target in ["dataset", "explist", "schedule", "dlcpro", "booster"]:
             self.client.register_callback(target, getattr(self, f"update_{target}"))
+
+    def saveDataset(self):
+        data = {key: val[1] for key, val in self.client.dataset.items()}
+        print("Saving dataset, type: ", type(data))
+        np.save("dataset.npy", data)
+
 
 def main():
     logging.basicConfig(level=logging.INFO)
