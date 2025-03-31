@@ -34,7 +34,7 @@ function on_exit
 
 function artiq_stack
 {
-    MASTER="\"artiq_master -v --repository . --experiment-subdir repository --log-file log/artiq.log --bind=$SERVER_ADDRESS --name 'GECKO ARTIQ'\"";
+    MASTER="\"artiq_master -v --repository . --experiment-subdir repository --log-file artiq.log --bind=$SERVER_ADDRESS --name 'GECKO ARTIQ'\"";
     CTLMGR="\"sleep 1 && controllers/artiq_ctlmgr.py --bind=$SERVER_ADDRESS -s=$SERVER_ADDRESS -v\"";
     JANITOR="\"sleep 1 && ndscan_dataset_janitor\"";
 
@@ -61,4 +61,5 @@ fi
 
 # Be good citizens and clean up old aqctls on exit
 trap on_exit SIGCHLD
+cat /dev/null > artiq.log
 artiq_stack
