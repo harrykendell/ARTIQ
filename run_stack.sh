@@ -16,6 +16,7 @@ if [ "$SCRIPT_DIR" != "$(pwd)" ]; then
     echo -e "Changing directory to $SCRIPT_DIR${NC}"
     cd $SCRIPT_DIR
 fi
+cat /dev/null > artiq.log
 
 #  PyQt5 fix
 PYQTFIX=". ./scripts/nix-fix-pyqt.sh"
@@ -61,5 +62,4 @@ fi
 
 # Be good citizens and clean up old aqctls on exit
 trap on_exit SIGCHLD
-cat /dev/null > artiq.log
 artiq_stack
