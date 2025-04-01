@@ -19,7 +19,6 @@ widgets can register to be updated for specific datasets
 import sys
 import logging
 import numpy as np
-import matplotlib.pyplot as plt
 
 # Data subscriptions
 from sipyco.pc_rpc import AsyncioClient
@@ -29,7 +28,6 @@ from qasync import QEventLoop
 import aiomqtt
 
 from artiq.master.scheduler import Scheduler
-from artiq.dashboard import datasets
 
 # GUI
 from PyQt5.QtWidgets import (

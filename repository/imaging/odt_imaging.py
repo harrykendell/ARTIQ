@@ -142,20 +142,20 @@ class ODTImageExpFrag(ExpFragment):
             self.set_dataset(f"{name}.{img_name}", images[num], persist=True)
 
             # save for applet
-            self.set_dataset(f"Images.{img_name}", images[num], persist=True)
+            self.set_dataset(f"Images.{img_name}", images[num], broadcast=True)
             self.ccb.issue(
                 "create_applet",
                 img_name,
                 f"${{artiq_applet}}image Images.{img_name} --server {server_addr}",
             )
 
-        self.set_dataset("Images.MOT-REF", images[0] - images[2], persist=True)
+        self.set_dataset("Images.MOT-REF", images[0] - images[2], broadcast=True)
         self.ccb.issue(
             "create_applet",
             "MOT-REF",
             f"${{artiq_applet}}image Images.MOT-REF --server {server_addr}",
         )
-        self.set_dataset("Images.TOF-REF", images[1] - images[2], persist=True)
+        self.set_dataset("Images.TOF-REF", images[1] - images[2], broadcast=True)
         self.ccb.issue(
             "create_applet",
             "TOF-REF",
