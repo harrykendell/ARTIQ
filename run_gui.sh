@@ -30,4 +30,5 @@ if [[ $found -eq 1 ]]; then
 else
     echo -e "${RED}Not running on the ARTIQ server${NC}"
     (python repository/gui/ArtiqGUI.py) &
-    artiq_dashboard -v --server="$SERVER_ADDRESS" -p ndscan.dashboard_plugin
+    artiq_dashboard -v --server="$SERVER_ADDRESS" -p="ndscan.dashboard_plugin"
+fi

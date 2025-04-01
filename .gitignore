@@ -172,3 +172,4 @@ results
 flake.lock
 src/
 crate config/bu2402001_*
+*.npy
