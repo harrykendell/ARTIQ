@@ -167,6 +167,7 @@ cython_debug/
 *.elf
 *.DS_Store
 dataset_db.mdb-lock
+dataset_db.mdb
 results
 
 flake.lock
