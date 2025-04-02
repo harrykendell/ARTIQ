@@ -35,5 +35,11 @@ if on_server; then
 else
     echo -e "${RED}Not running on the ARTIQ server${NC}"
     (python repository/gui/ArtiqGUI.py) &
-    artiq_dashboard -v --server="$SERVER_ADDRESS" -p="ndscan.dashboard_plugin"
+
+    if command -v nix 2>&1 >/dev/null
+    then
+        nix shell --command bash -c "artiq_dashboard -v --server=\"$SERVER_ADDRESS\" -p=\"ndscan.dashboard_plugin\""
+    else
+        artiq_dashboard -v --server="$SERVER_ADDRESS" -p="ndscan.dashboard_plugin"
+    fi
 fi
