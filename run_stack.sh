@@ -16,32 +16,29 @@ if [ "$SCRIPT_DIR" != "$(pwd)" ]; then
     echo -e "Changing directory to $SCRIPT_DIR${NC}"
     cd $SCRIPT_DIR
 fi
-cat /dev/null > artiq.log
+cat /dev/null >artiq.log
 
-#  PyQt5 fix
-PYQTFIX=". ./scripts/nix-fix-pyqt.sh"
+#  PyQt5 and SO fix
+FIX=". ./scripts/nix-fix-pyqt.sh ; export LD_LIBRARY_PATH=$(find /nix/store -type d -wholename '/nix/store/*artiq-env/lib')"
 
 # ARTIQ
 SERVER_ADDRESS=137.222.69.28
 
-
-function on_exit
-{
-    sleep 1;
-    pkill -9 -f aqctl;
+function on_exit {
+    sleep 1
+    pkill -9 -f aqctl
     echo "killed aqctl processes on exit"
-    exit;
+    exit
 }
 
-function artiq_stack
-{
-    MASTER="\"artiq_master -v --repository . --experiment-subdir repository --log-file artiq.log --bind=$SERVER_ADDRESS --name 'GECKO ARTIQ'\"";
-    CTLMGR="\"sleep 1 && controllers/artiq_ctlmgr.py --bind=$SERVER_ADDRESS -s=$SERVER_ADDRESS -v\"";
-    JANITOR="\"sleep 1 && ndscan_dataset_janitor\"";
+function artiq_stack {
+    MASTER="\"artiq_master -v --repository . --experiment-subdir repository --log-file artiq.log --bind=$SERVER_ADDRESS --name 'GECKO ARTIQ'\""
+    CTLMGR="\"sleep 1 && controllers/artiq_ctlmgr.py --bind=$SERVER_ADDRESS -s=$SERVER_ADDRESS -v\""
+    JANITOR="\"sleep 1 && ndscan_dataset_janitor\""
 
-    NAMES="master,ctlmgr,janitor";
-    CMDS="${MASTER} ${CTLMGR} ${JANITOR}";
-    nix shell --command bash -c "concurrently -c=auto --kill-others --prefix='{name} {time}' --timestamp-format='yyyy-MM-dd HH:mm:ss' -n ${NAMES} ${CMDS}";
+    NAMES="master,ctlmgr,janitor"
+    CMDS="${MASTER} ${CTLMGR} ${JANITOR}"
+    nix shell --command bash -c "concurrently -c=auto --kill-others --prefix='{name} {time}' --timestamp-format='yyyy-MM-dd HH:mm:ss' -n ${NAMES} ${CMDS}"
 }
 
 # Run the full ARTIQ stack
@@ -56,7 +53,7 @@ if [ -z "$TMUX" ]; then
         # run in the background
         echo -e "${GREEN}Running in the background${NC}"
         tmux new -s artiq "./run_stack.sh"
-        exit 0;
+        exit 0
     fi
 fi
 

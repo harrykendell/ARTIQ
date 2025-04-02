@@ -1,21 +1,3 @@
-"""
-We steal some of the functionality from artiq_client into a gui
-This is designed to be used alongside the dashboard
-
-    - Monitor device state via datasets
-        + The Idle kernel keeps reading out values into datasets e.g. sampler values
-        + BoosterTelemetry subscription
-        + DLCPro???
-
-    - Control devices by submitting experiment fragments for them
-
-    - The Idle kernel will set the device state to the database state between experiments
-
-
-This is achieved by running a Subscriber in the background that listens for changes to the datasets
-widgets can register to be updated for specific datasets
-"""
-
 import sys
 import logging
 import numpy as np
@@ -28,6 +10,8 @@ from qasync import QEventLoop
 import aiomqtt
 
 from artiq.master.scheduler import Scheduler
+from artiq.master.databases import DatasetDB
+
 
 # GUI
 from PyQt5.QtWidgets import (
@@ -191,6 +175,12 @@ class GUIClient:
             scheduling["flush"],
         )
         logging.info("Submitted '%s', RID is %d", title, rid)
+
+    async def delete_dataset(self, name):
+        dataset_db: DatasetDB = self.rpc_clients["dataset_db"]
+
+        dataset_db.delete(name)
+        logging.info("Deleted dataset '%s'", name)
 
     async def disconnect(self):
         """Disconnect all connections."""

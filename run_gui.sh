@@ -3,8 +3,8 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 NC='\033[0m' # No Color
 
-#  PyQt5 fix
-PYQTFIX=". ./scripts/nix-fix-pyqt.sh"
+#  PyQt5 and SO fix
+FIX=". ./scripts/nix-fix-pyqt.sh ; export LD_LIBRARY_PATH=$(find /nix/store -type d -wholename '/nix/store/*artiq-env/lib')"
 
 # ThorlabsPM
 TLPM="(python ./ThorlabsPM/ThorlabsPM.py &)"
@@ -26,7 +26,7 @@ done
 # Run the ARTIQ dashboard with the target IP if found
 if [[ $found -eq 1 ]]; then
     echo -e "${GREEN}Running on the ARTIQ server${NC}"
-    nix shell --command bash -c "$PYQTFIX ; $TLPM ; artiq_dashboard -v --server=\"$SERVER_ADDRESS\" -p ndscan.dashboard_plugin"
+    bash -c "$TLPM ; artiq_dashboard -v --server=\"$SERVER_ADDRESS\" -p ndscan.dashboard_plugin"
 else
     echo -e "${RED}Not running on the ARTIQ server${NC}"
     (python repository/gui/ArtiqGUI.py) &
