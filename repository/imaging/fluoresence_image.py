@@ -11,6 +11,8 @@ from repository.fragments.current_supply_setter import SetAnalogCurrentSupplies
 from repository.fragments.beam_setter import ControlBeamsWithoutCoolingAOM
 from repository.models.devices import SUSERVOED_BEAMS, VDRIVEN_SUPPLIES
 
+from repository.models.VDrivenSupply import VDrivenSupply
+
 
 class FluorescenceImageExpFrag(ExpFragment):
     """
@@ -36,6 +38,17 @@ class FluorescenceImageExpFrag(ExpFragment):
             init=False,
         )
         self.coil_setter: SetAnalogCurrentSupplies
+
+        self.setattr_fragment(
+            "coil_setter2",
+            SetAnalogCurrentSupplies,
+            [
+                VDrivenSupply.from_dataset(self, "X1"),
+                VDrivenSupply.from_dataset(self, "X2"),
+            ],
+            init=False,
+        )
+        self.coil_setter2: SetAnalogCurrentSupplies
 
         self.setattr_fragment(
             "mot_beam_setter",
@@ -75,51 +88,51 @@ class FluorescenceImageExpFrag(ExpFragment):
         self.core.break_realtime()
         delay(100 * ms)
 
-        # By ignoring shutters we don't drop the MOT for `shutter_delay` time if it was already loaded
-        self.mot_beam_setter.turn_beams_on(already_on=True)
-        self.img_beam_setter.turn_beams_off(ignore_shutters=True)
+        # # By ignoring shutters we don't drop the MOT for `shutter_delay` time if it was already loaded
+        # self.mot_beam_setter.turn_beams_on(already_on=True)
+        # self.img_beam_setter.turn_beams_off(ignore_shutters=True)
 
-        # initial image of loaded MOT
-        self.pco_camera.capture_image()
-        delay(150 * ms)
+        # # initial image of loaded MOT
+        # self.pco_camera.capture_image()
+        # delay(150 * ms)
 
-        # release MOT and propagate cloud
-        # we can't shutter as tof may be less than the delay
-        with parallel:
-            self.coil_setter.turn_off()
-            self.mot_beam_setter.turn_beams_off(ignore_shutters=True)
-        delay(self.expansion_time.get())
+        # # release MOT and propagate cloud
+        # # we can't shutter as tof may be less than the delay
+        # with parallel:
+        self.coil_setter2.turn_off()
+        #     self.mot_beam_setter.turn_beams_off(ignore_shutters=True)
+        # delay(self.expansion_time.get())
 
-        # image cloud
-        # don't shutter if using the mot beam to image as it interferes with the release stage
-        with parallel:
-            self.mot_beam_setter.turn_beams_on(ignore_shutters=True)
-            self.pco_camera.capture_image()
-        delay(self.exposure_time.get())
-        self.mot_beam_setter.turn_beams_off(ignore_shutters=True)
+        # # image cloud
+        # # don't shutter if using the mot beam to image as it interferes with the release stage
+        # with parallel:
+        #     self.mot_beam_setter.turn_beams_on(ignore_shutters=True)
+        #     self.pco_camera.capture_image()
+        # delay(self.exposure_time.get())
+        # self.mot_beam_setter.turn_beams_off(ignore_shutters=True)
 
-        delay(300 * ms)
+        # delay(300 * ms)
 
-        # reference image
-        with parallel:
-            self.mot_beam_setter.turn_beams_on()
-            self.pco_camera.capture_image()
-        delay(self.exposure_time.get())
-        self.mot_beam_setter.turn_beams_off()
-        delay(150 * ms)
+        # # reference image
+        # with parallel:
+        #     self.mot_beam_setter.turn_beams_on()
+        #     self.pco_camera.capture_image()
+        # delay(self.exposure_time.get())
+        # self.mot_beam_setter.turn_beams_off()
+        # delay(150 * ms)
 
-        # background image
-        self.pco_camera.capture_image()
-        delay(self.exposure_time.get())
-        delay(150 * ms)
+        # # background image
+        # self.pco_camera.capture_image()
+        # delay(self.exposure_time.get())
+        # delay(150 * ms)
 
-        # leave the MOT to reload
-        self.coil_setter.set_defaults()
-        self.mot_beam_setter.turn_beams_on()
-        self.img_beam_setter.turn_beams_off()
+        # # leave the MOT to reload
+        # self.coil_setter.set_defaults()
+        # self.mot_beam_setter.turn_beams_on()
+        # self.img_beam_setter.turn_beams_off()
 
-        self.core.wait_until_mu(now_mu())
-        self.update_image()
+        # self.core.wait_until_mu(now_mu())
+        # self.update_image()
 
     @rpc(flags={"async"})
     def update_image(self):
@@ -128,9 +141,7 @@ class FluorescenceImageExpFrag(ExpFragment):
 
         for num, img_name in enumerate(["MOT", "TOF", "REF", "BG"]):
             # save for propsperity
-            self.set_dataset(
-                f"{name}.{img_name}", images[num], persist=True
-            )
+            self.set_dataset(f"{name}.{img_name}", images[num], persist=True)
 
             # save for applet
             self.set_dataset(f"Images.{img_name}", images[num], broadcast=True)

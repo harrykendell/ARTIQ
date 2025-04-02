@@ -154,3 +154,13 @@ SUSERVOED_BEAMS = [
 ]
 # Convert to dict for ease of use
 SUSERVOED_BEAMS = {beam.name: beam for beam in SUSERVOED_BEAMS}
+
+# map from class to dict for initializing devices
+device_arrays = {
+    Eom: EOMS,
+    VDrivenSupply: VDRIVEN_SUPPLIES,
+    CoilPair: COIL_PAIRS,
+    Shutter: SHUTTERS,
+    SUServoedBeam: SUSERVOED_BEAMS,
+    # Add other classes as needed
+}
