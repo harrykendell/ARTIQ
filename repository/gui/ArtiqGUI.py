@@ -211,13 +211,14 @@ class MainWindow(QWidget):
         layout.addWidget(self.spinbox)
 
         for name, fn in [
+            ("schedule", self.update_schedule),
             ("dataset", self.update_dataset),
             ("explist", self.update_explist),
-            ("schedule", self.update_schedule),
             ("dlcpro", self.update_dlcpro),
             ("booster", self.update_booster),
         ]:
             label = QLabel(f"{name}::")
+            label.mousePressEvent = lambda *args, fn=fn: fn()
             self.__dict__[f"{name}_text"] = QTextEdit()
             self.__dict__[f"{name}_text"].setReadOnly(True)
             layout.addWidget(label)
