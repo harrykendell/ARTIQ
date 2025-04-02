@@ -15,10 +15,20 @@ import pco.logging
 import pyqtgraph as pg
 
 MOT_SIZE = 40
-MOT_X = 715
-MOT_Y = 575
-MOT_ROI = (MOT_X - MOT_SIZE, MOT_Y - MOT_SIZE, MOT_X + MOT_SIZE, MOT_Y + MOT_SIZE)
-WHOLE_CELL_ROI = (3 * 1392 // 8, 3 * 1040 // 8, 5 * 1392 // 8, 5 * 1040 // 8)
+MOT_X = 700
+MOT_Y = 540
+MOT_ROI = (
+    MOT_X - MOT_SIZE,
+    MOT_Y - MOT_SIZE,
+    MOT_X + MOT_SIZE,
+    MOT_Y + MOT_SIZE
+)
+WHOLE_CELL_ROI = (
+    MOT_X - 100,
+    MOT_Y - 150,
+    MOT_X + 100,
+    MOT_Y + 150,
+)
 
 
 # logger.addHandler(pco.stream_handler)
@@ -53,7 +63,7 @@ def init_cam(cam: pco.Camera):
     cam.configuration = {
         "timestamp": "binary",
         "trigger": triggers[0],
-        "exposure time": 500e-6,
+        "exposure time": 100e-6,
     }
 
     print(f"{cam.camera_name} ({cam.camera_serial})")

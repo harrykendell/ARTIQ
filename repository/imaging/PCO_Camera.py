@@ -24,9 +24,16 @@ logging.getLogger("pco").setLevel(logging.WARNING)
 
 class PcoCamera(Fragment):
     FULL_ROI = (1, 1, 1392, 1040)
-    WHOLE_CELL_ROI = (3 * 1392 // 8, 3 * 1040 // 8, 5 * 1392 // 8, 5 * 1040 // 8)
-    MOT_SIZE = 40; MOT_X = 715; MOT_Y = 575 # noqa
+    MOT_SIZE = 40
+    MOT_X = 700
+    MOT_Y = 540
     MOT_ROI = (MOT_X - MOT_SIZE, MOT_Y - MOT_SIZE, MOT_X + MOT_SIZE, MOT_Y + MOT_SIZE)
+    WHOLE_CELL_ROI = (
+        MOT_X - 100,
+        MOT_Y - 150,
+        MOT_X + 100,
+        MOT_Y + 150,
+    )
 
     def build_fragment(self):
         self.setattr_device("core")

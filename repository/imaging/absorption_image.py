@@ -78,6 +78,7 @@ class AbsorptionImageExpFrag(ExpFragment):
         # By ignoring shutters we don't drop the MOT for `shutter_delay` time if it was already loaded
         self.mot_beam_setter.turn_beams_on(already_on=True)
         self.img_beam_setter.turn_beams_off()
+        self.coil_setter.set_defaults()
 
         # initial image of loaded MOT
         self.pco_camera.capture_image()
