@@ -113,6 +113,8 @@ SUSERVOED_BEAMS = [
         shutter_delay=THORLABS_SHUTTER_DELAY,
         setpoint=2.5 * V,
         servo_enabled=True,
+        calib_gain=21.83,
+        calib_offset=0.037,
     ),
     SUServoedBeam(
         name="IMG",

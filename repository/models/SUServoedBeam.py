@@ -8,6 +8,7 @@ By using `Pydantic <https://docs.pydantic.dev/latest/>`_. dataclasses, these
 models act as normal python classes and so are fully compatible with ARTIQ
 kernels.
 """
+
 import sys
 from pydantic.dataclasses import dataclass
 from repository.models.Device import DEVICE
@@ -43,3 +44,6 @@ class SUServoedBeam(DEVICE):
     initial_amplitude: float = 1.0
     # The zero point of the photodiode, in volts - added to the setpoint
     photodiode_offset: float = 0.0
+    # A linear calibration of V to mW
+    calib_gain: float = 1.0
+    calib_offset: float = 0.0
