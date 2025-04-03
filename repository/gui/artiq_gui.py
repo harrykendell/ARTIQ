@@ -1,12 +1,3 @@
-##########################################################################################
-# Instructions to use:
-#       - go to the same directory as the 'device.db' file
-#           (otherwise you must specify the correct --device-db)
-#       - run this file as `artiq_run dds_control_interface.py`
-#      [-] specify `--device-db path/to/device.db` parameter with proper path if needed
-#      [-] add a & to the end of the call to run as a background process
-##########################################################################################
-
 import sys, os, json
 from PyQt5.QtWidgets import (
     QWidget,
@@ -20,11 +11,10 @@ from PyQt5.QtWidgets import (
     QHBoxLayout,
     QLineEdit,
     QSlider,
-    QComboBox,
     QTabWidget,
 )
 from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtGui import QDoubleValidator, QIntValidator, QIcon
+from PyQt5.QtGui import QDoubleValidator, QIcon
 from PyQt5.QtCore import QTimer
 
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
@@ -35,8 +25,8 @@ from managers.FastinoManager import FastinoManager, DeltaElektronikaManager
 
 from artiq.coredevice.core import Core
 
-from artiq.experiment import *
-from artiq.language import MHz, ms
+from artiq.experiment import kernel
+from artiq.language import ms
 
 
 class Switch(QWidget):
@@ -152,7 +142,7 @@ class DDSControl(QWidget):
         # check its a valid number - if not the text edit went wrong
         try:
             val = float(val)
-        except:
+        except ValueError:
             self.text.setText(str(self.slider.value()))
             return
 
@@ -233,9 +223,7 @@ class PIDControl(QWidget):
         layout = QVBoxLayout()
 
         top = QHBoxLayout()
-        # Setpoint -1 to 1 linedit
-        setpoint_label = QLabel("Offset (V)")
-        top.addWidget(setpoint_label)
+        top.addWidget(QLabel("Target (V)"))
         self.setpoint = QLineEdit()
         self.setpoint.setText(str(self.manager.offsets[ch]))
         self.setpoint.setValidator(QDoubleValidator(-10.00, 10.00, 10))
@@ -243,17 +231,6 @@ class PIDControl(QWidget):
             lambda: self.manager.set_offset(ch, float(self.setpoint.text()))
         )
         top.addWidget(self.setpoint)
-
-        # Gain
-        # gain_label = QLabel("Gain")
-        # top.addWidget(gain_label)
-        # self.gain = QLineEdit()
-        # self.gain.setText(str(self.manager.gains[ch]))
-        # self.gain.setValidator(QIntValidator(0, 3))
-        # self.gain.editingFinished.connect(
-        #     lambda: self.manager.set_gain(ch, int(self.gain.text()))
-        # )
-        # top.addWidget(self.gain)
 
         # if we are visible we want to update the ADC value
         def update_adc():
@@ -265,10 +242,10 @@ class PIDControl(QWidget):
                 if g != 1.0 or o != 0.0:
                     pow = f"{(g * volt + o):.2f} <b>mW</b> | "
                 self.adc_val.setText(
-                    f"{pow}{volt:.1f} <b>V</b>, y={self.manager.get_y(ch):.2f}"
+                    f"{pow}{volt:.1f} <b>V</b> | {self.manager.get_y(ch)*100:.0f}%"
                 )
 
-        self.adc_val = QLabel("0.00 <b>V</b>, y: 0.00")
+        self.adc_val = QLabel("0.00 <b>V</b> | 100%")
         top.addStretch()
         top.addWidget(self.adc_val)
 
@@ -287,10 +264,9 @@ class PIDControl(QWidget):
         self.P.setValidator(QDoubleValidator())
         self.P.editingFinished.connect(lambda: self.set())
         bottom.addWidget(self.P)
-        i_box = QHBoxLayout()
         I_label = QLabel("I")
         bottom.addWidget(I_label)
-        self.I = QLineEdit()
+        self.I = QLineEdit() # noqa: using 'I' makes sense in the context
         self.I.setText(str(self.manager.Is[ch]))
         self.I.setValidator(QDoubleValidator())
         self.I.editingFinished.connect(lambda: self.set())
@@ -476,7 +452,7 @@ class SingleChannelMirny(QWidget):
         # center label
         hhbox = QHBoxLayout()
         hhbox.addStretch()
-        almazny_freq = QLabel(f"Almazny is 2x Mirny")
+        almazny_freq = QLabel("Almazny is 2x Mirny")
         hhbox.addWidget(almazny_freq)
         hhbox.addStretch()
         vbox.addLayout(hhbox)
@@ -671,7 +647,7 @@ class SingleChannelFastino(QWidget):
         # check its a valid number - if not the text edit went wrong
         try:
             val = float(val)
-        except:
+        except ValueError:
             self.text.setText(str(self.slider.value() / 1000))
             return
 
