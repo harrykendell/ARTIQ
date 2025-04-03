@@ -5,8 +5,7 @@ from ndscan.experiment.entry_point import make_fragment_scan_exp
 from ndscan.experiment.parameters import BoolParamHandle, FloatParamHandle
 
 from repository.fragments.suservo_frag import SUServoFrag
-from repository.models.devices import SUSERVOED_BEAMS, SUServoedBeam
-from repository.models.SUServoedBeam import SUServoedBeam
+from repository.models.devices import SUServoedBeam, SUServoedBeam
 
 import logging
 
@@ -23,8 +22,8 @@ class SetSUServoExpFrag(ExpFragment):
         self.setattr_device("core")
         self.core: Core
 
-        suservo_channels = list(SUSERVOED_BEAMS.keys())
-        default: SUServoedBeam = SUServoedBeam.from_dataset(self, suservo_channels[0])
+        suservo_channels = list(SUServoedBeam.keys())
+        default: SUServoedBeam = SUServoedBeam[suservo_channels[0]]
 
         if not suservo_channels:
             raise ValueError("No suservo channels found in device_db")
@@ -97,7 +96,7 @@ class SetSUServoExpFrag(ExpFragment):
         self.setattr_fragment(
             "SUServoFrag",
             SUServoFrag,
-            SUServoedBeam.from_dataset(self, self.channel).suservo_device,
+            SUServoedBeam[self.channel].suservo_device,
         )
         self.SUServoFrag: SUServoFrag
 

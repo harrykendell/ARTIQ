@@ -13,7 +13,7 @@
 #     ControlBeamsWithoutCoolingAOM,
 # )
 
-# from repository.models.devices import SUSERVOED_BEAMS
+# from repository.models.devices import SUServoedBeam
 # from repository.lib.fragments.beams.reset_all_beams import ResetAllICLBeams
 # from repository.lib.fragments.magnetic_fields import SetMagneticFieldsQuick
 # from repository.lib.fragments.magnetic_fields import SetMagneticFieldsSlow
@@ -26,9 +26,7 @@
 
 
 # BlueBeamSetter = make_set_beams_to_default(
-#     suservo_beam_infos=[
-#         SUSERVOED_BEAMS[beam]
-#         for beam in [
+#     suservo_beam_infos= SUServoedBeam[
 #             "blue_push_beam",
 #             "blue_2dmot_A",
 #             "blue_2dmot_B",
@@ -37,8 +35,7 @@
 #             "blue_3dmot_axialminus",
 #             "repump_707",
 #             "repump_679",
-#         ]
-#     ],
+# ]
 #     urukul_beam_infos=[],
 #     name="BlueBeamSetter",
 # )
@@ -96,16 +93,15 @@
 #         self.setattr_fragment(
 #             "mot_all_beam_setter",
 #             ControlBeamsWithoutCoolingAOM,
-#             beam_infos=[
-#                 SUSERVOED_BEAMS["blue_3dmot_radial"],
-#                 SUSERVOED_BEAMS["blue_3dmot_axialplus"],
-#                 SUSERVOED_BEAMS["blue_3dmot_axialminus"],
-#                 SUSERVOED_BEAMS["repump_679"],
-#                 SUSERVOED_BEAMS["repump_707"],
-#                 SUSERVOED_BEAMS["blue_2dmot_A"],
-#                 SUSERVOED_BEAMS["blue_2dmot_B"],
-#                 SUSERVOED_BEAMS["blue_push_beam"],
-#             ],
+#             beam_infos= SUServoedBeam["blue_3dmot_radial",
+#                               "blue_3dmot_axialplus",
+#                               "blue_3dmot_axialminus",
+#                               "repump_679",
+#                               "repump_707",
+#                               "blue_2dmot_A",
+#                               "blue_2dmot_B",
+#                               "blue_push_beam",
+#                               ],
 #         )
 #         self.mot_all_beam_setter: ControlBeamsWithoutCoolingAOM
 
@@ -113,7 +109,7 @@
 #             "blue_push_beam_setter",
 #             ControlBeamsWithoutCoolingAOM,
 #             beam_infos=[
-#                 SUSERVOED_BEAMS["blue_push_beam"],
+#                 SUServoedBeam["blue_push_beam"],
 #             ],
 #         )
 #         self.blue_push_beam_setter: ControlBeamsWithoutCoolingAOM
@@ -121,53 +117,42 @@
 #         self.setattr_fragment(
 #             "mot_2d_and_3d_beams_setter",
 #             ControlBeamsWithoutCoolingAOM,
-#             beam_infos=[
-#                 SUSERVOED_BEAMS["blue_3dmot_radial"],
-#                 SUSERVOED_BEAMS["blue_3dmot_axialplus"],
-#                 SUSERVOED_BEAMS["blue_3dmot_axialminus"],
-#                 SUSERVOED_BEAMS["blue_push_beam"],
-#                 SUSERVOED_BEAMS["blue_2dmot_A"],
-#                 SUSERVOED_BEAMS["blue_2dmot_B"],
-#             ],
+#             beam_infos= SUServoedBeam["blue_3dmot_radial",
+#                               "blue_3dmot_axialplus",
+#                               "blue_3dmot_axialminus",
+#                               "blue_push_beam",
+#                               "blue_2dmot_A",
+#                               "blue_2dmot_B",
+#                               ],
 #         )
 #         self.mot_2d_and_3d_beams_setter: ControlBeamsWithoutCoolingAOM
 
 #         self.setattr_fragment(
 #             "mot_2d_and_3d_beams_nopush_setter",
 #             ControlBeamsWithoutCoolingAOM,
-#             beam_infos=[
-#                 SUSERVOED_BEAMS["blue_3dmot_radial"],
-#                 SUSERVOED_BEAMS["blue_3dmot_axialplus"],
-#                 SUSERVOED_BEAMS["blue_3dmot_axialminus"],
-#                 SUSERVOED_BEAMS["blue_2dmot_A"],
-#                 SUSERVOED_BEAMS["blue_2dmot_B"],
-#             ],
+#             beam_infos= SUServoedBeam["blue_3dmot_radial","blue_3dmot_axialplus","blue_3dmot_axialminus","blue_2dmot_A","blue_2dmot_B"],
 #         )
 #         self.mot_2d_and_3d_beams_nopush_setter: ControlBeamsWithoutCoolingAOM
 
 #         self.setattr_fragment(
 #             "mot_3d_beams_setter",
 #             ControlBeamsWithoutCoolingAOM,
-#             beam_infos=[
-#                 SUSERVOED_BEAMS["blue_3dmot_radial"],
-#                 SUSERVOED_BEAMS["blue_3dmot_axialplus"],
-#                 SUSERVOED_BEAMS["blue_3dmot_axialminus"],
-#             ],
+#             beam_infos= SUServoedBeam["blue_3dmot_radial","blue_3dmot_axialplus","blue_3dmot_axialminus"],
 #         )
 #         self.mot_3d_beams_setter: ControlBeamsWithoutCoolingAOM
 
 #         self.setattr_fragment(
 #             "mot_all_beams_except_radial_setter",
 #             ControlBeamsWithoutCoolingAOM,
-#             beam_infos=[
-#                 SUSERVOED_BEAMS["blue_3dmot_axialplus"],
-#                 SUSERVOED_BEAMS["blue_3dmot_axialminus"],
-#                 SUSERVOED_BEAMS["repump_679"],
-#                 SUSERVOED_BEAMS["repump_707"],
-#                 SUSERVOED_BEAMS["blue_2dmot_A"],
-#                 SUSERVOED_BEAMS["blue_2dmot_B"],
-#                 SUSERVOED_BEAMS["blue_push_beam"],
-#             ],
+#             beam_infos=
+#                 SUServoedBeam["blue_3dmot_axialplus",
+#                                   "blue_3dmot_axialminus",
+#                                   "repump_679",
+#                                   "repump_707",
+#                                   "blue_2dmot_A",
+#                                   "blue_2dmot_B",
+#                                   "blue_push_beam",
+#                   ],
 #         )
 #         self.mot_all_beams_except_radial_setter: ControlBeamsWithoutCoolingAOM
 
@@ -175,7 +160,7 @@
 #             "radial_beam_setter",
 #             ControlBeamsWithoutCoolingAOM,
 #             beam_infos=[
-#                 SUSERVOED_BEAMS["blue_3dmot_radial"],
+#                 SUServoedBeam["blue_3dmot_radial"],
 #             ],
 #         )
 #         self.radial_beam_setter: ControlBeamsWithoutCoolingAOM
@@ -183,10 +168,8 @@
 #         self.setattr_fragment(
 #             "repump_beam_setter",
 #             ControlBeamsWithoutCoolingAOM,
-#             beam_infos=[
-#                 SUSERVOED_BEAMS["repump_679"],
-#                 SUSERVOED_BEAMS["repump_707"],
-#             ],
+#             beam_infos=
+#                 SUServoedBeam["repump_679","repump_707"],
 #         )
 #         self.repump_beam_setter: ControlBeamsWithoutCoolingAOM
 

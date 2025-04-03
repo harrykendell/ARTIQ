@@ -19,7 +19,7 @@ from artiq.experiment import (
 from ndscan.experiment import Fragment
 from numpy import int32
 
-from repository.models.devices import SUSERVOED_BEAMS
+from repository.models.devices import SUServoedBeam
 
 
 class SUServoFrag(Fragment):
@@ -76,10 +76,9 @@ class SUServoFrag(Fragment):
         # We pull default atts on this cpld to avoid clobbering their atts in reset_all_attenuations
         # We assume that all suservo_chs are ordered properly by channel# so that for each set of 4 they share a cpld
 
-        # Find the default attenuations from SUSERVOED_BEAMS
+        # Find the default attenuations from SUServoedBeams
         beams = [
-            (dev.name, dev.suservo_device, dev.attenuation)
-            for dev in SUSERVOED_BEAMS.values()
+            (dev.name, dev.suservo_device, dev.attenuation) for dev in SUServoedBeam.all().values()
         ]
         minch = min([self.get_device(dev[1]).channel for dev in beams])
         # Assume cplds are logically chunked by channel number

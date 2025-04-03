@@ -17,7 +17,7 @@ from repository.fragments.default_beam_setter import (
     SetBeamsToDefaults,
     make_set_beams_to_default,
 )
-from repository.models.devices import SUSERVOED_BEAMS
+from repository.models.devices import SUServoedBeam
 from repository.fragments.read_adc import ReadSUServoADC
 
 from device_db import server_addr
@@ -49,7 +49,7 @@ class SingleSUServoReadingFrag(ExpFragment):
         )
         self.waittime: FloatParamHandle
 
-        beam_names = list(SUSERVOED_BEAMS.keys())
+        beam_names = SUServoedBeam.keys()
         self.setattr_argument(
             "beam_name",
             EnumerationValue(
@@ -76,7 +76,7 @@ class SingleSUServoReadingFrag(ExpFragment):
 
         # %% devices
 
-        self.beam = SUSERVOED_BEAMS[self.beam_name or beam_names[0]]
+        self.beam = SUServoedBeam[self.beam_name or beam_names[0]]
 
         if not self.enable_servoing:
             self.beam.servo_enabled = False
@@ -89,7 +89,7 @@ class SingleSUServoReadingFrag(ExpFragment):
         self.setattr_fragment(
             "beam_default_setter",
             make_set_beams_to_default(
-                SUSERVOED_BEAMS,
+                SUServoedBeam.all(),
                 name="BeamSettings",
             ),
         )

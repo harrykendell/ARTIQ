@@ -6,7 +6,7 @@ from repository.fragments.default_beam_setter import (
     SetBeamsToDefaults,
     make_set_beams_to_default,
 )
-from repository.models.devices import SUSERVOED_BEAMS
+from repository.models.devices import SUServoedBeam
 
 
 class ResetSUServoFrag(ExpFragment):
@@ -22,7 +22,7 @@ class ResetSUServoFrag(ExpFragment):
         self.setattr_fragment(
             "beam_default_setter",
             make_set_beams_to_default(
-                SUSERVOED_BEAMS,
+                SUServoedBeam.all(),
                 name="BeamSettings",
             ),
         )

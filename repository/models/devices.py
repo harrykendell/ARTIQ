@@ -1,4 +1,5 @@
 from repository.models import CoilPair, Eom, Shutter, SUServoedBeam, VDrivenSupply
+from repository.models.Device import device_arrays
 from artiq.language.units import ms, dB, MHz, V, A
 
 EOMS = [
@@ -156,11 +157,13 @@ SUSERVOED_BEAMS = [
 SUSERVOED_BEAMS = {beam.name: beam for beam in SUSERVOED_BEAMS}
 
 # map from class to dict for initializing devices
-device_arrays = {
-    Eom: EOMS,
-    VDrivenSupply: VDRIVEN_SUPPLIES,
-    CoilPair: COIL_PAIRS,
-    Shutter: SHUTTERS,
-    SUServoedBeam: SUSERVOED_BEAMS,
-    # Add other classes as needed
-}
+device_arrays.update(
+    {
+        Eom: EOMS,
+        VDrivenSupply: VDRIVEN_SUPPLIES,
+        CoilPair: COIL_PAIRS,
+        Shutter: SHUTTERS,
+        SUServoedBeam: SUSERVOED_BEAMS,
+        # Add other classes as needed
+    }
+)

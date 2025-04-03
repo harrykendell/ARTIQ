@@ -23,7 +23,7 @@ from submodules.oitg.oitg.fitting import exponential_decay
 
 from repository.fragments.read_adc import ReadSUServoADC
 from repository.fragments.current_supply_setter import SetAnalogCurrentSupplies
-from repository.models.devices import VDRIVEN_SUPPLIES
+from repository.models.devices import VDrivenSupply
 from device_db import server_addr
 
 logger = logging.getLogger(__name__)
@@ -38,7 +38,7 @@ class MOTPhotodiodeMeasurement(Fragment):
             "current",
             FloatParam,
             "The current of the X1 coil when the MOT is active",
-            default=VDRIVEN_SUPPLIES["X1"].default_current,
+            default=VDrivenSupply["X1"].default_current,
             min=0.0,
             max=2.0,
             unit="A",
@@ -48,7 +48,7 @@ class MOTPhotodiodeMeasurement(Fragment):
         self.setattr_fragment(
             "coil_setter",
             SetAnalogCurrentSupplies,
-            [VDRIVEN_SUPPLIES["X1"]],
+            [VDrivenSupply["X1"]],
             init=False,
         )
         self.coil_setter: SetAnalogCurrentSupplies

@@ -90,10 +90,10 @@ class SetBeamsToDefaults(Fragment):
             "red_beam_setter",
             make_set_beams_to_default(
                 suservo_beam_infos=[
-                    constants.SUSERVOED_BEAMS["red_mot_diagonal"],
-                    constants.SUSERVOED_BEAMS["red_mot_sigmaplus"],
-                    constants.SUSERVOED_BEAMS["red_mot_sigmaminus"],
-                    constants.SUSERVOED_BEAMS["red_up"],
+                    SUServoedBeam["red_mot_diagonal"],
+                    SUServoedBeam["red_mot_sigmaplus"],
+                    SUServoedBeam["red_mot_sigmaminus"],
+                    SUServoedBeam["red_up"],
                 ],
                 name="red_beam_setter",
             ),

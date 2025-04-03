@@ -7,7 +7,7 @@ from ndscan.experiment.entry_point import make_fragment_scan_exp
 from ndscan.experiment.parameters import FloatParamHandle
 
 from repository.fragments.current_supply_setter import SetAnalogCurrentSupplies
-from repository.models.devices import VDRIVEN_SUPPLIES
+from repository.models.devices import VDrivenSupply
 
 logger = logging.getLogger(__name__)
 
@@ -23,19 +23,16 @@ class SetAnalogCurrentSupplyExp(ExpFragment):
         self.setattr_device("core")
         self.core: Core
 
+        default = VDrivenSupply.keys()[0]
         self.setattr_argument(
-            "current_supply",
-            EnumerationValue(
-                list(VDRIVEN_SUPPLIES.keys()), default=list(VDRIVEN_SUPPLIES.keys())[0]
-            ),
+            "current_supply", EnumerationValue(VDrivenSupply.keys(), default=default)
         )
         self.current_supply: str
 
         if self.current_supply is not None:
-            current_config = VDRIVEN_SUPPLIES[self.current_supply]
-
+            current_config = VDrivenSupply[self.current_supply]
         else:
-            current_config = list(VDRIVEN_SUPPLIES.values())[0]
+            current_config = VDrivenSupply[default]
 
         self.setattr_fragment(
             "setter", SetAnalogCurrentSupplies, [current_config], init=False

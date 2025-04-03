@@ -14,7 +14,7 @@ from ndscan.experiment.parameters import (
 )
 
 from repository.fragments.suservo_frag import SUServoFrag
-from repository.models.devices import SUSERVOED_BEAMS, SUServoedBeam
+from repository.models.devices import SUServoedBeam, SUServoedBeam
 
 
 class TuneSUServoExpFrag(ExpFragment):
@@ -29,9 +29,9 @@ class TuneSUServoExpFrag(ExpFragment):
         self.setattr_device("core")
 
         suservo_channels = [
-            k for k in SUSERVOED_BEAMS.keys() if SUSERVOED_BEAMS[k].setpoint != 0.0
+            k for k in SUServoedBeam.keys() if SUServoedBeam[k].setpoint != 0.0
         ]
-        default: SUServoedBeam = SUSERVOED_BEAMS[suservo_channels[0]]
+        default: SUServoedBeam = SUServoedBeam[suservo_channels[0]]
 
         if not suservo_channels:
             raise ValueError("No suservo channels found in device_db")
@@ -105,7 +105,7 @@ class TuneSUServoExpFrag(ExpFragment):
         self.setattr_fragment(
             "SUServoFrag",
             SUServoFrag,
-            SUSERVOED_BEAMS[self.channel].suservo_device,
+            SUServoedBeam[self.channel].suservo_device,
         )
         self.SUServoFrag: SUServoFrag
 

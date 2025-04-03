@@ -9,7 +9,7 @@ from ndscan.experiment.parameters import FloatParamHandle
 from repository.imaging.PCO_Camera import PcoCamera
 from repository.fragments.current_supply_setter import SetAnalogCurrentSupplies
 from repository.fragments.beam_setter import ControlBeamsWithoutCoolingAOM
-from repository.models.devices import SUSERVOED_BEAMS, VDRIVEN_SUPPLIES
+from repository.models.devices import SUServoedBeam, VDrivenSupply
 
 
 class ODTImageExpFrag(ExpFragment):
@@ -22,7 +22,6 @@ class ODTImageExpFrag(ExpFragment):
         self.core: Core
 
         self.setattr_device("ccb")
-        self.setattr_device("scheduler")
 
         self.setattr_fragment("pco_camera", PcoCamera)
         self.pco_camera: PcoCamera
@@ -32,7 +31,7 @@ class ODTImageExpFrag(ExpFragment):
         self.setattr_fragment(
             "coil_setter",
             SetAnalogCurrentSupplies,
-            [VDRIVEN_SUPPLIES["X1"], VDRIVEN_SUPPLIES["X2"]],
+            VDrivenSupply["X1", "X2"],
             init=False,
         )
         self.coil_setter: SetAnalogCurrentSupplies
@@ -40,28 +39,28 @@ class ODTImageExpFrag(ExpFragment):
         self.setattr_fragment(
             "mot_beam_setter",
             ControlBeamsWithoutCoolingAOM,
-            beam_infos=[SUSERVOED_BEAMS["MOT"]],
+            beam_infos=[SUServoedBeam["MOT"]],
         )
         self.mot_beam_setter: ControlBeamsWithoutCoolingAOM
 
         self.setattr_fragment(
             "img_beam_setter",
             ControlBeamsWithoutCoolingAOM,
-            beam_infos=[SUSERVOED_BEAMS["IMG"]],
+            beam_infos=[SUServoedBeam["IMG"]],
         )
         self.img_beam_setter: ControlBeamsWithoutCoolingAOM
 
         self.setattr_fragment(
             "all_beam_setter",
             ControlBeamsWithoutCoolingAOM,
-            beam_infos=[SUSERVOED_BEAMS["MOT"], SUSERVOED_BEAMS["IMG"]],
+            beam_infos=SUServoedBeam["MOT", "IMG"],
         )
         self.all_beam_setter: ControlBeamsWithoutCoolingAOM
 
         self.setattr_fragment(
             "odt_beam_setter",
             ControlBeamsWithoutCoolingAOM,
-            beam_infos=[SUSERVOED_BEAMS["CDT2"]],
+            beam_infos=[SUServoedBeam["CDT2"]],
         )
         self.odt_beam_setter: ControlBeamsWithoutCoolingAOM
 
@@ -136,7 +135,7 @@ class ODTImageExpFrag(ExpFragment):
 
     @rpc(flags={"async"})
     def update_image(self):
-        name = f"Images.odt.{self.scheduler.rid}"
+        name = "Images.odt"
         images = self.pco_camera.retrieve_images(roi=self.pco_camera.WHOLE_CELL_ROI)
 
         for num, img_name in enumerate(["MOT", "TOF", "REF", "BG"]):
