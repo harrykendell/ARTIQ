@@ -4,7 +4,7 @@ GREEN='\033[0;32m'
 NC='\033[0m' # No Color
 
 #  PyQt5 and SO fix
-FIX=". ./scripts/nix-fix-pyqt.sh ; export LD_LIBRARY_PATH=$(find /nix/store -type d -wholename '/nix/store/*artiq-env/lib')"
+FIX=". ./scripts/nix-fix-pyqt.sh"
 
 # ThorlabsPM
 TLPM="(python ./ThorlabsPM/ThorlabsPM.py &)"
@@ -36,8 +36,7 @@ else
     echo -e "${RED}Not running on the ARTIQ server${NC}"
     (python repository/gui/ArtiqGUI.py) &
 
-    if command -v nix 2>&1 >/dev/null
-    then
+    if command -v nix 2>&1 >/dev/null; then
         nix shell --command bash -c "artiq_dashboard -v --server=\"$SERVER_ADDRESS\" -p=\"ndscan.dashboard_plugin\""
     else
         artiq_dashboard -v --server="$SERVER_ADDRESS" -p="ndscan.dashboard_plugin"
