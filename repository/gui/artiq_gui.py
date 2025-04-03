@@ -258,11 +258,17 @@ class PIDControl(QWidget):
         # if we are visible we want to update the ADC value
         def update_adc():
             if self.isVisible():
+                volt = self.manager.get_adc(ch)
+                pow = ""
+                g = self.manager.calib_gains[ch]
+                o = self.manager.calib_offsets[ch]
+                if g != 1.0 or o != 0.0:
+                    pow = f"{(g * volt + o):.2f} <b>mW</b> | "
                 self.adc_val.setText(
-                    f"ADC: {self.manager.get_adc(ch):.2f} <b>V</b> (y: {self.manager.get_y(ch):.2f})"
+                    f"{pow}{volt:.1f} <b>V</b>, y={self.manager.get_y(ch):.2f}"
                 )
 
-        self.adc_val = QLabel("ADC: 0.00 <b>V</b> (y: 0.00)")
+        self.adc_val = QLabel("0.00 <b>V</b>, y: 0.00")
         top.addStretch()
         top.addWidget(self.adc_val)
 

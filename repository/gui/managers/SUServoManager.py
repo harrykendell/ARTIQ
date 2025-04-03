@@ -47,6 +47,8 @@ class SUServoManager:  # {{{
             ("Is", [-200000.0] * 8, None),
             ("Gls", [-200.0] * 8, None),
             ("en_shutters", [0] * 3, None),
+            ("calib_gains", [1.0] * 8, None),
+            ("calib_offsets", [0.0] * 8, "V"),
         ]
 
         for dataset, default, unit in vals:
