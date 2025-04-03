@@ -14,8 +14,8 @@ from PyQt6.QtCore import QTimer
 import pco.logging
 import pyqtgraph as pg
 
-MOT_SIZE = 40
-MOT_X = 700
+MOT_SIZE = 35
+MOT_X = 695
 MOT_Y = 540
 MOT_ROI = (
     MOT_X - MOT_SIZE,
@@ -120,7 +120,7 @@ class CameraWidget(QWidget):
         if settings["recorder type"] == 0x0003:
             if status["dwProcImgCount"] == 0:
                 return
-        img, meta = self.cam.image(roi=WHOLE_CELL_ROI)
+        img, meta = self.cam.image(roi=MOT_ROI)
         self.im.setImage(
             img,
             autoHistogramRange=self.first,
