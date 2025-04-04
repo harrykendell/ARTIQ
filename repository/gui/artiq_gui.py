@@ -25,7 +25,7 @@ from managers.FastinoManager import FastinoManager, DeltaElektronikaManager
 
 from artiq.coredevice.core import Core
 
-from artiq.experiment import kernel
+from artiq.experiment import kernel, EnvExperiment
 from artiq.language import ms
 
 
@@ -236,16 +236,16 @@ class PIDControl(QWidget):
         def update_adc():
             if self.isVisible():
                 volt = self.manager.get_adc(ch)
-                pow = ""
+                pow = "??"
                 g = self.manager.calib_gains[ch]
                 o = self.manager.calib_offsets[ch]
                 if g != 1.0 or o != 0.0:
-                    pow = f"{(g * volt + o):.2f} <b>mW</b> | "
+                    pow = f"{(g * volt + o):.1f}"
                 self.adc_val.setText(
-                    f"{pow}{volt:.1f} <b>V</b> | {self.manager.get_y(ch)*100:.0f}%"
+                    f"{pow} <b>mW</b> | {volt:.2f} <b>V</b> | {self.manager.get_y(ch)*100:.0f}%"
                 )
 
-        self.adc_val = QLabel("0.00 <b>V</b> | 100%")
+        self.adc_val = QLabel("?? <b>mW</b> | ?? <b>V</b> | ??%")
         top.addStretch()
         top.addWidget(self.adc_val)
 
@@ -266,7 +266,7 @@ class PIDControl(QWidget):
         bottom.addWidget(self.P)
         I_label = QLabel("I")
         bottom.addWidget(I_label)
-        self.I = QLineEdit() # noqa: using 'I' makes sense in the context
+        self.I = QLineEdit()  # noqa: using 'I' makes sense in the context
         self.I.setText(str(self.manager.Is[ch]))
         self.I.setValidator(QDoubleValidator())
         self.I.editingFinished.connect(lambda: self.set())

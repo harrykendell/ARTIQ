@@ -3,6 +3,9 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 NC='\033[0m' # No Color
 
+SCRIPT_DIR="$(dirname "$(realpath "$0")")"
+cd $SCRIPT_DIR
+
 #  PyQt5 and SO fix
 FIX=". ./scripts/nix-fix-pyqt.sh"
 

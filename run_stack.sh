@@ -46,7 +46,8 @@ check_tmux() {
 
 # Run the full ARTIQ stack
 echo -e "${NC}Starting up the full stack${NC}"
-cat /dev/null >$SCRIPT_DIR/artiq.log
+cd $SCRIPT_DIR
+cat /dev/null > artiq.log
 check_tmux
 trap clean_up SIGCHLD
 artiq_stack
