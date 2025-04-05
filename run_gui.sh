@@ -7,7 +7,7 @@ SCRIPT_DIR="$(dirname "$(realpath "$0")")"
 cd $SCRIPT_DIR
 
 #  PyQt5 and SO fix
-FIX=". ./scripts/nix-fix-pyqt.sh"
+FIX=". ./scripts/nix-fix-pyqt.sh ; export LD_LIBRARY_PATH=$(find /nix/store -type d -wholename '/nix/store/*artiq-env/lib'); export DISPLAY=127.0.0.1:10.0"
 
 # ThorlabsPM
 TLPM="(python ./ThorlabsPM/ThorlabsPM.py &)"
