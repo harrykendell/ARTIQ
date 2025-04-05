@@ -208,6 +208,7 @@
             ps.pyqt5
             ps.pydantic
             ps.ifaddr
+            ps.pint
 
             ps.pyvisa
             windfreak
