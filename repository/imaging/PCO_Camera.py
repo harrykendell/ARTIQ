@@ -137,7 +137,8 @@ class PcoCamera(Fragment):
     @host_only
     def retrieve_images(self, timeout=5.0 * s, roi=WHOLE_CELL_ROI):
         """
-        Pulls all stored images off the camera and stores the first into the diagnostic dataset
+        Pulls all stored images off the camera and stores the first
+        into the diagnostic dataset
         """
 
         # spin for 5 secs hoping we get all the images we were promised
@@ -191,6 +192,13 @@ class PcoCameraExpFrag(ExpFragment):
 
         self.setattr_fragment("pco_camera", PcoCamera)
         self.pco_camera: PcoCamera
+
+        self.setattr_param_rebind(
+            "num_images",
+            self.pco_camera,
+            "num_images",
+            default=1,
+        )
 
     @kernel
     def run_once(self):
