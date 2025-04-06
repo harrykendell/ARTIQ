@@ -1,21 +1,21 @@
 """
-    Elypson/qt-collapsible-section
-    (c) 2016 Michael A. Voelkel - michael.alexander.voelkel@gmail.com
+Elypson/qt-collapsible-section
+(c) 2016 Michael A. Voelkel - michael.alexander.voelkel@gmail.com
 
-    This file is part of Elypson/qt-collapsible section.
+This file is part of Elypson/qt-collapsible section.
 
-    Elypson/qt-collapsible-section is free software: you can redistribute it and/or modify
-    it under the terms of the GNU Lesser General Public License as published by
-    the Free Software Foundation, version 3 of the License, or
-    (at your option) any later version.
+Elypson/qt-collapsible-section is free software: you can redistribute it and/or modify
+it under the terms of the GNU Lesser General Public License as published by
+the Free Software Foundation, version 3 of the License, or
+(at your option) any later version.
 
-    Elypson/qt-collapsible-section is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU Lesser General Public License for more details.
+Elypson/qt-collapsible-section is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Lesser General Public License for more details.
 
-    You should have received a copy of the GNU General Public License
-    along with Elypson/qt-collapsible-section. If not, see <http:#www.gnu.org/licenses/>.
+You should have received a copy of the GNU General Public License
+along with Elypson/qt-collapsible-section. If not, see <http:#www.gnu.org/licenses/>.
 """
 
 import PyQt5.QtCore as cr
@@ -26,11 +26,11 @@ import sys
 
 
 class Section(wd.QWidget):
-    def __init__(self, title="", animationDuration=100, parent=None):
+    def __init__(self, title="", animationDuration=50, parent=None):
         super().__init__(parent)
         self.animationDuration = animationDuration
         self.toggleButton = wd.QToolButton(self)
-        self.headerLine = wd.QFrame(self)
+        # self.headerLine = wd.QFrame(self)
         self.toggleAnimation = cr.QParallelAnimationGroup(self)
         self.contentArea = wd.QScrollArea(self)
         self.mainLayout = wd.QGridLayout(self)
@@ -41,10 +41,6 @@ class Section(wd.QWidget):
         self.toggleButton.setText(title)
         self.toggleButton.setCheckable(True)
         self.toggleButton.setChecked(False)
-
-        self.headerLine.setFrameShape(wd.QFrame.HLine)
-        self.headerLine.setFrameShadow(wd.QFrame.Sunken)
-        self.headerLine.setSizePolicy(wd.QSizePolicy.Expanding, wd.QSizePolicy.Maximum)
 
         # self.contentArea.setLayout(wd.QHBoxLayout())
         self.contentArea.setSizePolicy(wd.QSizePolicy.Expanding, wd.QSizePolicy.Fixed)
@@ -65,7 +61,7 @@ class Section(wd.QWidget):
 
         row = 0
         self.mainLayout.addWidget(self.toggleButton, row, 0, 1, 1, cr.Qt.AlignLeft)
-        self.mainLayout.addWidget(self.headerLine, row, 2, 1, 1)
+        # self.mainLayout.addWidget(self.headerLine, row, 2, 1, 1)
         self.mainLayout.addWidget(self.contentArea, row + 1, 0, 1, 3)
         self.setLayout(self.mainLayout)
 
@@ -104,7 +100,7 @@ if __name__ == "__main__":
     class Window(wd.QMainWindow):
         def __init__(self, parent=None):
             super().__init__(parent)
-            section = Section("Section", 100, self)
+            section = Section("Section", 50, self)
 
             anyLayout = wd.QVBoxLayout()
             anyLayout.addWidget(wd.QLabel("Some Text in Section", section))
@@ -114,7 +110,7 @@ if __name__ == "__main__":
 
             self.place_holder = (
                 wd.QWidget()
-            )  # placeholder widget, only used to get acces to wd.QMainWindow functionalities
+            )
             mainLayout = wd.QHBoxLayout(self.place_holder)
             mainLayout.addWidget(section)
             mainLayout.addStretch(1)

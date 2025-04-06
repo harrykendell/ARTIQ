@@ -25,8 +25,6 @@ SOFTWARE.
 from PyQt5.QtCore import (
     Qt,
     QPoint,
-    pyqtSlot,
-    pyqtProperty,
     QPropertyAnimation,
     QEasingCurve,
 )
@@ -61,6 +59,7 @@ class SwitchCircle(QWidget):
     def set_color(self, value):
         self.color = value
         self.update()
+
 
 class Switch(QCheckBox):
 
@@ -130,6 +129,7 @@ class Switch(QCheckBox):
 
     def mousePressEvent(self, event):
         self.start_animation(not self.isChecked())
+
 
 if __name__ == "__main__":
     from PyQt5.QtWidgets import QApplication, QVBoxLayout, QWidget

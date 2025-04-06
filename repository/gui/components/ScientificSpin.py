@@ -82,3 +82,31 @@ class ScientificSpin(QtWidgets.QDoubleSpinBox):
             v = self.value()
             v *= self._relative_step**(s/copysign(10., v))
             self.setValue(v)
+
+
+if __name__ == "__main__":
+    import sys
+    app = QtWidgets.QApplication(sys.argv)
+
+    # spin inside a layout explaining the item
+    spin = ScientificSpin()
+    spin.setDecimals(3)
+    spin.setRange(-10, 10)
+    spin.setSingleStep(0.1)
+    spin.setValue(1.23456)
+    spin.setSuffix(" mV")
+    spin.setPrefix("V: ")
+
+    layout = QtWidgets.QVBoxLayout()
+    layout.addWidget(spin)
+    layout.addWidget(QtWidgets.QLabel("An example of a ScientificSpinBox"))
+    layout.addStretch(1)
+
+    # add the layout to a widget
+    widget = QtWidgets.QWidget()
+    widget.setLayout(layout)
+    widget.setWindowTitle("ScientificSpin Example")
+    widget.resize(300, 100)
+    widget.show()
+
+    sys.exit(app.exec_())

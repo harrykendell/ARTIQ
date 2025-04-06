@@ -5,9 +5,16 @@
 #   - Signal emmited when the value changes
 #   - Units for the minimum and maximum labels
 
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel,QSlider, QDoubleSpinBox
+from PyQt5.QtWidgets import (
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLabel,
+    QSlider,
+    QDoubleSpinBox,
+)
 from PyQt5.QtCore import Qt, pyqtSignal as Signal
-from artiq.gui.scientific_spinbox import ScientificSpinBox
+from ScientificSpin import ScientificSpin
 from artiq.gui.tools import disable_scroll_wheel
 
 import logging
@@ -15,11 +22,14 @@ from math import floor, ceil, pi
 
 logger = logging.getLogger(__name__)
 
+
 # only inherit from QWidget as we need to keep state synced
 class SpinAndSlider(QWidget):
     valueChanged = Signal(float)
 
-    def __init__(self, parent=None, min= 0., max = 100., unit="", initialValue = None, label=""):
+    def __init__(
+        self, parent=None, min=0.0, max=100.0, unit="", initialValue=None, label=""
+    ):
         super().__init__(parent)
         # ensure min < max
         self.min, self.max = (min, max) if min < max else (max, min)
@@ -38,9 +48,12 @@ class SpinAndSlider(QWidget):
 
         self.title = QLabel(f"<b>{self.label}<b>")
 
-        self.spin = ScientificSpinBox()
+        self.spin = ScientificSpin()
         disable_scroll_wheel(self.spin)
         self.spin.setDecimals(3)
+        # disable arrow buttons and stepBy
+        self.spin.setButtonSymbols(QDoubleSpinBox.NoButtons)
+        self.spin.stepBy = lambda x: None
 
         self.spin.setMinimum(self.min)
         self.spin.setMaximum(self.max)
@@ -50,13 +63,17 @@ class SpinAndSlider(QWidget):
         self.spin.editingFinished.connect(lambda: self.spinChanged(self.spin.value()))
 
         self.slider = QSlider(Qt.Horizontal)
-        self.slider.setMinimum(floor(self.min*10**self.num_decimals))
-        self.slider.setMaximum(ceil(self.max*10**self.num_decimals))
-        self.slider.setValue(int(self.current_value*10**self.num_decimals))
+        self.slider.setMinimum(floor(self.min * 10**self.num_decimals))
+        self.slider.setMaximum(ceil(self.max * 10**self.num_decimals))
+        self.slider.setValue(int(self.current_value * 10**self.num_decimals))
         self.slider.valueChanged.connect(self.sliderChanged)
 
-        self.min_label = QLabel(f"{self.spin.textFromValue(self.min)} <b>{self.unit}</b>")
-        self.max_label = QLabel(f"{self.spin.textFromValue(self.max)} <b>{self.unit}</b>")
+        self.min_label = QLabel(
+            f"{self.spin.textFromValue(self.min)} <b>{self.unit}</b>"
+        )
+        self.max_label = QLabel(
+            f"{self.spin.textFromValue(self.max)} <b>{self.unit}</b>"
+        )
 
         vbox = QVBoxLayout()
         layout.addLayout(vbox)
@@ -76,13 +93,20 @@ class SpinAndSlider(QWidget):
         self.setLayout(layout)
 
     def spinChanged(self, value):
+        if value == self.current_value:
+            logger.debug("Spin value unchanged")
+            return
         logger.debug("Spin changed to %s", value)
         self.current_value = value
-        self.slider.setValue(int(value*10**self.num_decimals))
+        self.slider.setValue(int(value * 10**self.num_decimals))
         self.valueChanged.emit(value)
+        self.spin.clearFocus()
 
     def sliderChanged(self, value):
-        value = value/10**self.num_decimals
+        value = value / 10**self.num_decimals
+        if value == self.current_value:
+            logger.debug("Slider value unchanged")
+            return
         logger.debug("Slider changed to %s", value)
 
         # NB we could be out of range as the slider is integer only
@@ -103,24 +127,32 @@ class SpinAndSlider(QWidget):
 
     def setUnit(self, unit=""):
         self.unit = unit
-        self.min_label.setText(f"{self.spin.textFromValue(self.min)} <b>{self.unit}</b>")
-        self.max_label.setText(f"{self.spin.textFromValue(self.max)} <b>{self.unit}</b>")
+        self.min_label.setText(
+            f"{self.spin.textFromValue(self.min)} <b>{self.unit}</b>"
+        )
+        self.max_label.setText(
+            f"{self.spin.textFromValue(self.max)} <b>{self.unit}</b>"
+        )
 
     def setValue(self, value):
         self.current_value = value
         self.spin.setValue(value)
-        self.slider.setValue(int(value*10**self.num_decimals))
+        self.slider.setValue(int(value * 10**self.num_decimals))
 
     def setRange(self, min, max):
         self.min, self.max = (min, max) if min < max else (max, min)
 
         self.spin.setMinimum(min)
         self.spin.setMaximum(max)
-        self.slider.setMinimum(min*10**self.num_decimals)
-        self.slider.setMaximum(max*10**self.num_decimals)
+        self.slider.setMinimum(min * 10**self.num_decimals)
+        self.slider.setMaximum(max * 10**self.num_decimals)
 
-        self.min_label.setText(f"{self.spin.textFromValue(self.min)} <b>{self.unit}</b>")
-        self.max_label.setText(f"{self.spin.textFromValue(self.max)} <b>{self.unit}</b>")
+        self.min_label.setText(
+            f"{self.spin.textFromValue(self.min)} <b>{self.unit}</b>"
+        )
+        self.max_label.setText(
+            f"{self.spin.textFromValue(self.max)} <b>{self.unit}</b>"
+        )
 
         # clamp the current value to the new range
         self.setValue(min(max(self.current_value, min), max))
@@ -133,9 +165,9 @@ class SpinAndSlider(QWidget):
         self.spin.setDecimals(decimals)
 
         # update the slider range
-        self.slider.setMinimum(self.min*10**decimals)
-        self.slider.setMaximum(self.max*10**decimals)
-        self.slider.setValue(int(self.current_value*10**decimals))
+        self.slider.setMinimum(self.min * 10**decimals)
+        self.slider.setMaximum(self.max * 10**decimals)
+        self.slider.setValue(int(self.current_value * 10**decimals))
 
     def setStep(self, step):
         self.spin.setSingleStep(step)
@@ -162,6 +194,7 @@ class SpinAndSlider(QWidget):
 
     def setMaximum(self, max):
         self.setRange(self.min, max)
+
 
 if __name__ == "__main__":
     import sys
