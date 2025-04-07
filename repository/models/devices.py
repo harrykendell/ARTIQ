@@ -6,7 +6,7 @@ EOMS = [
     Eom(
         name="repump_eom",
         frequency=3285.0 * MHz,
-        attenuation=17.0 * dB,
+        attenuation=11.0 * dB,
         mirny_ch="mirny_eom_repump",
         almazny_ch="almazny_eom_repump",
         mirny_enabled=True,
