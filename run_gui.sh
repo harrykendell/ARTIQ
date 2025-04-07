@@ -7,7 +7,7 @@ SCRIPT_DIR="$(dirname "$(realpath "$0")")"
 cd $SCRIPT_DIR
 
 #  PyQt5 and SO fix
-FIX=". ./scripts/nix-fix-pyqt.sh ; export LD_LIBRARY_PATH=$(find /nix/store -type d -wholename '/nix/store/*artiq-env/lib'); export DISPLAY=127.0.0.1:10.0"
+FIX=". ./scripts/nix-fix-pyqt.sh ; export LD_LIBRARY_PATH=$(find /nix/store -type d -wholename '/nix/store/*artiq-env/lib')"
 
 # ThorlabsPM
 TLPM="(python ./ThorlabsPM/ThorlabsPM.py &)"
@@ -37,6 +37,7 @@ if on_server; then
     nix shell --command bash -c "$FIX ; $TLPM ; artiq_dashboard -v --server=\"$SERVER_ADDRESS\" -p ndscan.dashboard_plugin"
 else
     echo -e "${RED}Not running on the ARTIQ server${NC}"
+    export DISPLAY=127.0.0.1:10.0
     (python repository/gui/ArtiqGUI.py) &
 
     if command -v nix 2>&1 >/dev/null; then

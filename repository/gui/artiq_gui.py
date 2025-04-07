@@ -26,7 +26,7 @@ from managers.FastinoManager import FastinoManager, DeltaElektronikaManager
 from artiq.coredevice.core import Core
 
 from artiq.experiment import kernel, EnvExperiment
-from artiq.language import ms
+from artiq.language import ms, StringValue, BooleanValue
 
 
 class Switch(QWidget):
@@ -242,7 +242,8 @@ class PIDControl(QWidget):
                 if g != 1.0 or o != 0.0:
                     pow = f"{(g * volt + o):.1f}"
                 self.adc_val.setText(
-                    f"{pow} <b>mW</b> | {volt:.2f} <b>V</b> | {self.manager.get_y(ch)*100:.0f}%"
+                    f"{pow} <b>mW</b> | {volt:.2f} <b>V</b> | \
+                        {self.manager.get_y(ch)*100:.0f}%"
                 )
 
         self.adc_val = QLabel("?? <b>mW</b> | ?? <b>V</b> | ??%")
@@ -397,7 +398,8 @@ class SingleChannelSUServo(QWidget):
 
 class SingleChannelMirny(QWidget):
     """Class to control a single given Mirny channel
-    NB this is an on button for the channel and a freq/att/on off control much like the SUServo DDS panel
+    NB this is an on button for the channel and a
+    freq/att/on off control much like the SUServo DDS panel
     """
 
     def __init__(self, manager, channel=0):
@@ -739,6 +741,19 @@ class ArtiqGUIExperiment(EnvExperiment):
     def build(self):
         self.core: Core = self.get_device("core")
 
+        self.setattr_argument(
+            "remoteDisplay",
+            BooleanValue(False),
+            group="GUI",
+            tooltip="Enable remote X forwarded display",
+        )
+        self.setattr_argument(
+            "remoteDisplayAddress",
+            StringValue("127.0.0.1:10.0"),
+            group="GUI",
+            tooltip="Address for remote display",
+        )
+
         self.suservo = self.get_device("suservo")
         self.suservo_chs = [self.get_device(f"suservo_ch{i}") for i in range(8)]
         self.shutters = [
@@ -760,6 +775,9 @@ class ArtiqGUIExperiment(EnvExperiment):
     def run(self):
         # Startups run methods
         self.core.reset()
+
+        if self.remoteDisplay:
+            os.environ["DISPLAY"] = self.remoteDisplayAddress
 
         # SUServo
         self.suservoManager = SUServoManager(
