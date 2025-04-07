@@ -17,6 +17,7 @@ from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QDoubleValidator, QIcon
 from PyQt5.QtCore import QTimer
 
+import logging
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 from managers.SUServoManager import SUServoManager
 from managers.boosterTelemetry import BoosterTelemetry
@@ -25,7 +26,7 @@ from managers.FastinoManager import FastinoManager, DeltaElektronikaManager
 
 from artiq.coredevice.core import Core
 
-from artiq.experiment import kernel, EnvExperiment
+from artiq.experiment import kernel, EnvExperiment, rpc
 from artiq.language import ms, StringValue, BooleanValue
 
 
@@ -778,6 +779,9 @@ class ArtiqGUIExperiment(EnvExperiment):
 
         if self.remoteDisplay:
             os.environ["DISPLAY"] = self.remoteDisplayAddress
+        if not self.check_display():
+            logging.error("This is likely due to 'remoteDisplay' being set to True despite running on the server")
+            return
 
         # SUServo
         self.suservoManager = SUServoManager(
@@ -816,3 +820,23 @@ class ArtiqGUIExperiment(EnvExperiment):
             deltaGUI.show()
 
         app.exec_()
+
+    @rpc
+    def check_display(self):
+        """
+        Check if a QApplication can be opened without crashing.
+        This is done in a subprocess to isolate potential crashes.
+        """
+        import subprocess
+        # Run the script in a subprocess
+        result = subprocess.run(
+            [sys.executable, "-c", "from PyQt5.QtWidgets import QApplication;app = QApplication([])"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+
+        # Check the return code of the subprocess
+        if result.returncode != 0:
+            logging.error(f"Display check failed:\n{result.stderr.decode().strip()}")
+            return False
+        return True
