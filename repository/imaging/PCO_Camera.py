@@ -1,4 +1,5 @@
 import logging
+import logging.handlers
 import pco
 import time
 import numpy as np
@@ -19,7 +20,7 @@ from device_db import server_addr
 from ndscan.experiment.parameters import FloatParamHandle, IntParamHandle
 
 logger = logging.getLogger(__name__)
-logging.getLogger("pco").setLevel(logging.WARNING)
+logging.getLogger("pco").setLevel(logging.DEBUG)
 
 
 class PcoCamera(Fragment):
@@ -190,6 +191,7 @@ class PcoCameraExpFrag(ExpFragment):
 
         self.setattr_device("ccb")
 
+        logging.debug("Setting up PCO camera fragment")
         self.setattr_fragment("pco_camera", PcoCamera)
         self.pco_camera: PcoCamera
 
@@ -200,8 +202,18 @@ class PcoCameraExpFrag(ExpFragment):
             default=1,
         )
 
+        self.setattr_param_rebind(
+            "exposure_time",
+            self.pco_camera,
+            "exposure_time",
+            default=5 * ms,
+        )
+
+        logging.debug("PCO camera fragment setup complete")
+
     @kernel
     def run_once(self):
+        self.core.reset()
         self.core.break_realtime()
 
         self.pco_camera.capture_image()
