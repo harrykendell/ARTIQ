@@ -63,23 +63,21 @@ class MOTPhotodiodeMeasurement(Fragment):
         self.adc_reader: ReadSUServoADC
 
     @kernel
-    def reload_MOT(self, initial_delay_mu: TInt64):  # type: ignore
+    def unload_MOT(self, unload_time_mu: TInt64):  # type: ignore
         """
         Reload the MOT by turning off the coils, waiting, and then turning them back on.
 
         This writes the turn off into the past by the initial delay, and starts loading the MOT now.
         """
-        delay_mu(-initial_delay_mu)
         self.coil_setter.turn_off()
-        delay_mu(initial_delay_mu)
-        self.coil_setter.set_currents([self.current.get()])
+        delay_mu(unload_time_mu)
 
     @kernel
     def measure_MOT_fluorescence(
         self,
         num_points: TInt32,  # type: ignore
         delay_between_points_mu: TInt64,  # type: ignore
-        initial_delay_mu: TInt64,  # type: ignore
+        unload_time_mu: TInt64,  # type: ignore
         data: TList(TFloat),  # type: ignore
     ) -> None:
         """
@@ -87,9 +85,15 @@ class MOTPhotodiodeMeasurement(Fragment):
 
         You must pass an array of floats with size <num_points> to `data`.
         """
-        self.reload_MOT(initial_delay_mu)
+        self.unload_MOT(unload_time_mu)
 
-        for i in range(num_points):
+        for i in range(num_points // 20):
+            data[i] = self.adc_reader.read_adc()
+            delay_mu(delay_between_points_mu)
+
+        self.coil_setter.set_currents([self.current.get()])
+
+        for i in range(num_points // 20, num_points):
             data[i] = self.adc_reader.read_adc()
             delay_mu(delay_between_points_mu)
 
@@ -107,20 +111,21 @@ class MeasureMOTWithPDFrag(ExpFragment):
         self.setattr_device("scheduler")
 
         self.setattr_param(
-            "initial_delay",
+            "unload_time",
             FloatParam,
-            description="Time to clear out MOT beofre loading",
+            description="Time to clear out MOT before loading",
             default=100 * ms,
             unit="ms",
             min=1 * ms,
             step=1,
         )
+        self.unload_time: FloatParamHandle
 
         self.setattr_param(
             "total_loading_time",
             FloatParam,
             description="Total time to load the MOT",
-            default=1 * s,
+            default=60 * s,
             unit="s",
             min=1 * ms,
             step=0.001,
@@ -164,7 +169,7 @@ class MeasureMOTWithPDFrag(ExpFragment):
             delay_between_points_mu=self.core.seconds_to_mu(
                 self.total_loading_time.get() / num_points
             ),
-            initial_delay_mu=self.core.seconds_to_mu(self.initial_delay.get()),
+            unload_time_mu=self.core.seconds_to_mu(self.unload_time.get()),
             data=trace_data,
         )
 
