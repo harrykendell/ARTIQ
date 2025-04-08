@@ -141,7 +141,7 @@ class SetEOM(Fragment):
         self.channel.set_att(attenuation)
 
     @kernel
-    def pulse(self, on_duration=10 * ms, off_duration=1 * ms):
+    def pulse(self, on_duration=20 * ms, off_duration=1 * ms):
         """
         Pulse the Almazny channel for a given duration on/off
         """
@@ -149,3 +149,13 @@ class SetEOM(Fragment):
         delay(on_duration)
         self.disable()
         delay(off_duration)
+
+    @kernel
+    def pulse_off(self, on_duration=20 * ms, off_duration=1 * ms):
+        """
+        Pulse the Almazny channel for a given duration on/off
+        """
+        self.disable()
+        delay(off_duration)
+        self.enable()
+        delay(on_duration)
