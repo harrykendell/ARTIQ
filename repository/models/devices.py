@@ -6,7 +6,7 @@ EOMS = [
     Eom(
         name="repump_eom",
         frequency=3285.0 * MHz,
-        attenuation=11.0 * dB,
+        attenuation=10.0 * dB,
         mirny_ch="mirny_eom_repump",
         almazny_ch="almazny_eom_repump",
         mirny_enabled=True,
@@ -22,7 +22,7 @@ VDRIVEN_SUPPLIES = [
         ch=0,
         gain=2.0 * A / V,
         current_limit=3.0 * A,
-        default_current=1.0 * A,
+        default_current=0.9 * A,
     ),
     VDrivenSupply(
         name="X2",
@@ -30,7 +30,7 @@ VDRIVEN_SUPPLIES = [
         ch=1,
         gain=2.0 * A / V,
         current_limit=3.0 * A,
-        default_current=0.9 * A,
+        default_current=1.2 * A,
     ),
     VDrivenSupply(
         name="Y",
@@ -139,7 +139,7 @@ SUSERVOED_BEAMS = [
         name="LATY",
         suservo_device="suservo_aom_LATY",
         frequency=200.0 * MHz,
-        attenuation=17.5 * dB,
+        attenuation=18.5 * dB,
         shutter_device="shutter_LATTICE",
         shutter_delay=THORLABS_SHUTTER_DELAY,
     ),
