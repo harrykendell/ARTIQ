@@ -18,6 +18,7 @@ from PyQt5.QtGui import QDoubleValidator, QIcon
 from PyQt5.QtCore import QTimer
 
 import logging
+
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 from managers.SUServoManager import SUServoManager
 from managers.boosterTelemetry import BoosterTelemetry
@@ -725,7 +726,7 @@ class DeltaElektronikaGUI(QWidget):
                 getter=self.manager.get_current,
                 setter=self.manager.set_current,
                 min=0.0,
-                max=3.0,
+                max=2.0,
             )
             for i in range(4)
         ]
@@ -780,7 +781,9 @@ class ArtiqGUIExperiment(EnvExperiment):
         if self.remoteDisplay:
             os.environ["DISPLAY"] = self.remoteDisplayAddress
         if not self.check_display():
-            logging.error("This is likely due to 'remoteDisplay' being set to True despite running on the server")
+            logging.error(
+                "This is likely due to 'remoteDisplay' being set to True despite running on the server"
+            )
             return
 
         # SUServo
@@ -828,9 +831,14 @@ class ArtiqGUIExperiment(EnvExperiment):
         This is done in a subprocess to isolate potential crashes.
         """
         import subprocess
+
         # Run the script in a subprocess
         result = subprocess.run(
-            [sys.executable, "-c", "from PyQt5.QtWidgets import QApplication;app = QApplication([])"],
+            [
+                sys.executable,
+                "-c",
+                "from PyQt5.QtWidgets import QApplication;app = QApplication([])",
+            ],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
