@@ -30,19 +30,37 @@ on_server() {
     done
     return 1
 }
+on_ssh() {
+    if [[ $SSH_CONNECTION ]]; then
+        return 0
+    else
+        return 1
+    fi
+}
 
 # Run the ARTIQ dashboard with the target IP if found
-if on_server; then
-    echo -e "${GREEN}Running on the ARTIQ server${NC}"
+# client ssh into server (quite why you'd need this is unclear) - we run everything forwarded
+if on_server && on_ssh; then
+    echo -e "${GREEN}Running on the ARTIQ server via SSH${NC}"
+    DISPLAY=127.0.0.1:10.0
     nix shell --command bash -c "$FIX ; $TLPM ; artiq_dashboard -v --server=\"$SERVER_ADDRESS\" -p ndscan.dashboard_plugin"
-else
-    echo -e "${RED}Not running on the ARTIQ server${NC}"
-    export DISPLAY=127.0.0.1:10.0
-    (python repository/gui/ArtiqGUI.py) &
+    exit 0
+fi
 
-    if command -v nix 2>&1 >/dev/null; then
-        nix shell --command bash -c "artiq_dashboard -v --server=\"$SERVER_ADDRESS\" -p=\"ndscan.dashboard_plugin\""
-    else
-        artiq_dashboard -v --server="$SERVER_ADDRESS" -p="ndscan.dashboard_plugin"
-    fi
+# Running locally on server - we run everything locally
+if on_server; then
+    echo -e "${GREEN}Running locally on the ARTIQ server${NC}"
+    nix shell --command bash -c "$FIX ; $TLPM ; artiq_dashboard -v --server=\"$SERVER_ADDRESS\" -p ndscan.dashboard_plugin"
+    exit 0
+fi
+
+# running on client
+echo -e "${GREEN}Not running on the ARTIQ server${NC}"
+(python repository/gui/ArtiqGUI.py) &
+
+# who knows if they have nix installed
+if command -v nix 2>&1 >/dev/null; then
+    nix shell --command bash -c "artiq_dashboard -v --server=\"$SERVER_ADDRESS\" -p=\"ndscan.dashboard_plugin\""
+else
+    artiq_dashboard -v --server="$SERVER_ADDRESS" -p="ndscan.dashboard_plugin"
 fi
