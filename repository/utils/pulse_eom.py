@@ -67,12 +67,7 @@ class PulseEOMExpFrag(ExpFragment):
         self.core.break_realtime()
 
         while True:
-            self.setter.pulse(self.time_on.get(), self.time_off.get())
-
-    @kernel
-    def device_cleanup(self):
-        self.setter.enable()
-        self.device_cleanup_subfragments()
+            self.setter.pulse_off(self.time_on.get(), self.time_off.get())
 
 
 PulseEOMExp = make_fragment_scan_exp(PulseEOMExpFrag)

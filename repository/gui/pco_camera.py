@@ -16,13 +16,10 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QHBoxLayout,
     QLabel,
-    QDoubleSpinBox,
 )
 from PyQt6.QtCore import QTimer, Qt
 
-from components.ScientificSpin import ScientificSpin
 
-from artiq.gui.tools import disable_scroll_wheel
 import pco.logging
 import pyqtgraph as pg
 
@@ -36,6 +33,7 @@ WHOLE_CELL_ROI = (
     MOT_X + 100,
     MOT_Y + 150,
 )
+FULL_ROI = (1, 1, 1392, 1040)
 
 
 # logger.addHandler(pco.stream_handler)
@@ -70,7 +68,7 @@ def init_cam(cam: pco.Camera):
     cam.configuration = {
         "timestamp": "binary",
         "trigger": triggers[0],
-        "exposure time": 100e-6,
+        "exposure time": 200e-6,
     }
 
     print(f"{cam.camera_name} ({cam.camera_serial})")
@@ -120,6 +118,7 @@ class CameraWidget(QWidget):
         self.roi_combo = pg.ComboBox()
         self.roi_combo.addItem("MOT", MOT_ROI)
         self.roi_combo.addItem("Whole Cell", WHOLE_CELL_ROI)
+        self.roi_combo.addItem("Full Image", FULL_ROI)
         self.roi_combo.setCurrentIndex(0)
         self.roi_combo.currentIndexChanged.connect(self.reset_zoom)
         self.roi_combo.setToolTip("Select the ROI for the image")
@@ -155,7 +154,7 @@ class CameraWidget(QWidget):
         # Timer for updating the image
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_image)
-        self.timer.start(100)
+        self.timer.start(80)
 
     def update_image(self):
         settings = self.cam.rec.get_settings()

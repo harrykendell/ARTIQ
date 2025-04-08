@@ -94,7 +94,7 @@ class ODTImageExpFrag(ExpFragment):
         delay(300 * ms)
 
         self.odt_beam_setter.turn_beams_on()
-        delay(15 * ms)
+        delay(250 * ms)
 
         # release MOT and propagate cloud
         # we can't shutter as tof may be less than the delay

@@ -1,5 +1,5 @@
 from artiq.coredevice.core import Core
-from artiq.experiment import kernel, rpc, delay, parallel, now_mu, EnumerationValue
+from artiq.experiment import kernel, rpc, delay, parallel, now_mu
 from artiq.language.units import ms, us, s
 from device_db import server_addr
 
