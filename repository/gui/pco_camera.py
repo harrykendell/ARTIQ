@@ -8,21 +8,28 @@ import time
 import numpy as np
 import pco
 
-from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout
-from PyQt6.QtCore import QTimer
+from PyQt6.QtWidgets import (
+    QApplication,
+    QWidget,
+    QVBoxLayout,
+    QSplitter,
+    QPushButton,
+    QHBoxLayout,
+    QLabel,
+    QDoubleSpinBox,
+)
+from PyQt6.QtCore import QTimer, Qt
 
+from components.ScientificSpin import ScientificSpin
+
+from artiq.gui.tools import disable_scroll_wheel
 import pco.logging
 import pyqtgraph as pg
 
 MOT_SIZE = 35
 MOT_X = 695
 MOT_Y = 540
-MOT_ROI = (
-    MOT_X - MOT_SIZE,
-    MOT_Y - MOT_SIZE,
-    MOT_X + MOT_SIZE,
-    MOT_Y + MOT_SIZE
-)
+MOT_ROI = (MOT_X - MOT_SIZE, MOT_Y - MOT_SIZE, MOT_X + MOT_SIZE, MOT_Y + MOT_SIZE)
 WHOLE_CELL_ROI = (
     MOT_X - 100,
     MOT_Y - 150,
@@ -82,28 +89,70 @@ class CameraWidget(QWidget):
         self.first = True
 
     def initUI(self):
-        # actual image
+        # Configure pyqtgraph
         pg.setConfigOptions(imageAxisOrder="row-major")
-        self.layout = QVBoxLayout()
-        self.im = pg.ImageView()
 
-        meanplot = pg.PlotWidget(axisItems={"bottom": pg.DateAxisItem()})
-        meanplot.setLabel("left", "Mean pixel value")
-        meanplot.setLabel("bottom", "Time")
-        meanplot.showGrid(x=True, y=True)
+        # Create a splitter for draggable resizing
+        splitter = QSplitter(Qt.Orientation.Vertical)
+
+        # ImageView widget
+        self.im = pg.ImageView()
+        splitter.addWidget(self.im)
+
+        # PlotWidget for mean pixel values
+        self.meanplot = pg.PlotWidget(axisItems={"bottom": pg.DateAxisItem()})
+        self.meanplot.setLabel("left", "Mean pixel value")
+        self.meanplot.setLabel("bottom", "Time")
+        self.meanplot.showGrid(x=True, y=True)
         self.means = []
         self.times = []
-        self.meancurve = meanplot.plot(
+        self.meancurve = self.meanplot.plot(
             self.times,
             self.means,
             pen=pg.mkPen("y", width=2),
         )
+        splitter.addWidget(self.meanplot)
 
-        self.layout.addWidget(self.im)
-        self.layout.addWidget(meanplot)
+        # Set initial sizes for the widgets
+        splitter.setSizes([400, 200])  # Initial heights for ImageView and PlotWidget
 
-        self.setLayout(self.layout)
+        # combo box for selecting the ROI
+        self.roi_combo = pg.ComboBox()
+        self.roi_combo.addItem("MOT", MOT_ROI)
+        self.roi_combo.addItem("Whole Cell", WHOLE_CELL_ROI)
+        self.roi_combo.setCurrentIndex(0)
+        self.roi_combo.currentIndexChanged.connect(self.reset_zoom)
+        self.roi_combo.setToolTip("Select the ROI for the image")
+        # prefix the combo box with a label
+        self.roi_label = QLabel("ROI:")
+        self.roi_label.setBuddy(self.roi_combo)
+        self.roi_label.setToolTip("Select the ROI for the image")
 
+        # Button to reset zoom
+        self.reset_zoom_button = QPushButton("Reset Zoom")
+        self.reset_zoom_button.clicked.connect(self.reset_zoom)
+        self.reset_zoom_button.setToolTip("Reset the zoom level of the image")
+
+        # Button to reset data
+        self.reset_data_button = QPushButton("Reset Data")
+        self.reset_data_button.clicked.connect(self.reset_data)
+        self.reset_data_button.setToolTip("Reset the mean pixel values and time")
+
+        # Add the splitter to the layout
+        layout = QVBoxLayout()
+        layout.addWidget(splitter)
+
+        buttons = QHBoxLayout()
+        buttons.addWidget(self.roi_label)
+        buttons.addWidget(self.roi_combo)
+        buttons.addStretch()
+        buttons.addWidget(self.reset_zoom_button)
+        buttons.addWidget(self.reset_data_button)
+
+        layout.addLayout(buttons)
+        self.setLayout(layout)
+
+        # Timer for updating the image
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_image)
         self.timer.start(100)
@@ -112,15 +161,15 @@ class CameraWidget(QWidget):
         settings = self.cam.rec.get_settings()
         status = self.cam.rec.get_status()
 
-        # sequence mode
+        # Sequence mode
         if settings["recorder type"] == 0x0001:
             self.cam.wait_for_new_image()
 
-        # hardware trigger fifo mode
+        # Hardware trigger FIFO mode
         if settings["recorder type"] == 0x0003:
             if status["dwProcImgCount"] == 0:
                 return
-        img, meta = self.cam.image(roi=MOT_ROI)
+        img, meta = self.cam.image(roi=self.roi_combo.currentData())
         self.im.setImage(
             img,
             autoHistogramRange=self.first,
@@ -136,7 +185,30 @@ class CameraWidget(QWidget):
 
     def start_recording(self):
         self.cam.record(10, mode="fifo")
-        # self.cam.record(10, mode="fifo")
+
+    def reset_zoom(self):
+        self.first = True
+        self.meanplot.enableAutoRange()
+
+    def reset_data(self):
+        # Reset the mean pixel values and time lists
+        self.times = []
+        self.means = []
+
+    def set_exposure_time(self, time: float):
+        """
+        Set the exposure time of the camera.
+        :param time: Exposure time in seconds.
+
+        must stop recording before setting the exposure time
+        """
+        if time == self.cam.configuration["exposure time"]*1e6:
+            return
+
+        self.spin.clearFocus()
+        self.cam.stop()
+        self.cam.configuration["exposure time"] = time*1e-6
+        self.start_recording()
 
 
 def main_gui():
