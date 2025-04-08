@@ -14,7 +14,7 @@ from repository.models.devices import SUServoedBeam, VDrivenSupply
 
 class ODTImageExpFrag(ExpFragment):
     """
-    Dipole trap transfer - Fluorescence imaging of the ODT
+    Dipole trap transfer imaging
     """
 
     def build_fragment(self):
@@ -79,12 +79,14 @@ class ODTImageExpFrag(ExpFragment):
     def run_once(self):
         self.core.reset()
         self.core.break_realtime()
+        self.coil_setter.turn_off()  # make sure we unload MOT
         delay(100 * ms)
 
         # By ignoring shutters we don't drop the MOT for `shutter_delay` time if it was already loaded
-        self.mot_beam_setter.turn_beams_on(already_on=True)
+        self.mot_beam_setter.turn_beams_on()
         self.img_beam_setter.turn_beams_off(ignore_shutters=True)
         self.coil_setter.set_defaults()
+        delay(10 * s)
 
         # initial image of loaded MOT
         self.pco_camera.capture_image()
@@ -136,7 +138,7 @@ class ODTImageExpFrag(ExpFragment):
     @rpc(flags={"async"})
     def update_image(self):
         name = "Images.odt"
-        images = self.pco_camera.retrieve_images(roi=self.pco_camera.WHOLE_CELL_ROI)
+        images = self.pco_camera.retrieve_images(roi=self.pco_camera.MOT_ROI)
 
         for num, img_name in enumerate(["MOT", "TOF", "REF", "BG"]):
             # save for propsperity
@@ -144,23 +146,24 @@ class ODTImageExpFrag(ExpFragment):
 
             # save for applet
             self.set_dataset(f"Images.{img_name}", images[num], broadcast=True)
-            self.ccb.issue(
-                "create_applet",
-                img_name,
-                f"${{artiq_applet}}image Images.{img_name} --server {server_addr}",
-            )
 
         self.set_dataset("Images.MOT-REF", images[0] - images[2], broadcast=True)
+        self.set_dataset(
+            "Images.odt.MOT-REF", images[0] - images[2], broadcast=True
+        )
         self.ccb.issue(
             "create_applet",
-            "MOT-REF",
-            f"${{artiq_applet}}image Images.MOT-REF --server {server_addr}",
+            "MOT-REF o",
+            f"${{artiq_applet}}image Images.odt.MOT-REF --server {server_addr}",
         )
         self.set_dataset("Images.TOF-REF", images[1] - images[2], broadcast=True)
+        self.set_dataset(
+            "Images.odt.TOF-REF", images[1] - images[2], broadcast=True
+        )
         self.ccb.issue(
             "create_applet",
-            "TOF-REF",
-            f"${{artiq_applet}}image Images.TOF-REF --server {server_addr}",
+            "TOF-REF o",
+            f"${{artiq_applet}}image Images.odt.TOF-REF --server {server_addr}",
         )
 
 

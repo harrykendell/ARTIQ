@@ -1,6 +1,6 @@
 from artiq.coredevice.core import Core
-from artiq.experiment import kernel, rpc, delay, parallel, now_mu
-from artiq.language.units import ms, us
+from artiq.experiment import kernel, rpc, delay, parallel, now_mu, EnumerationValue
+from artiq.language.units import ms, us, s
 from device_db import server_addr
 
 from ndscan.experiment import ExpFragment, make_fragment_scan_exp, FloatParam
@@ -72,11 +72,14 @@ class FluorescenceImageExpFrag(ExpFragment):
     def run_once(self):
         self.core.reset()
         self.core.break_realtime()
+        self.coil_setter.turn_off()  # make sure we unload MOT
         delay(100 * ms)
 
         # By ignoring shutters we don't drop the MOT for `shutter_delay` time if it was already loaded
-        self.mot_beam_setter.turn_beams_on(already_on=True)
+        self.mot_beam_setter.turn_beams_on()
         self.img_beam_setter.turn_beams_off(ignore_shutters=True)
+        self.coil_setter.set_defaults()
+        delay(10 * s)
 
         # initial image of loaded MOT
         self.pco_camera.capture_image()
@@ -123,7 +126,7 @@ class FluorescenceImageExpFrag(ExpFragment):
     @rpc(flags={"async"})
     def update_image(self):
         name = "Images.fluorescence"
-        images = self.pco_camera.retrieve_images(roi=self.pco_camera.WHOLE_CELL_ROI)
+        images = self.pco_camera.retrieve_images(roi=self.pco_camera.MOT_ROI)
 
         for num, img_name in enumerate(["MOT", "TOF", "REF", "BG"]):
             # save for propsperity
@@ -131,23 +134,24 @@ class FluorescenceImageExpFrag(ExpFragment):
 
             # save for applet
             self.set_dataset(f"Images.{img_name}", images[num], broadcast=True)
-            self.ccb.issue(
-                "create_applet",
-                img_name,
-                f"${{artiq_applet}}image Images.{img_name} --server {server_addr}",
-            )
 
         self.set_dataset("Images.MOT-REF", images[0] - images[2], broadcast=True)
+        self.set_dataset(
+            "Images.fluorescence.MOT-REF", images[0] - images[2], broadcast=True
+        )
         self.ccb.issue(
             "create_applet",
-            "MOT-REF",
-            f"${{artiq_applet}}image Images.MOT-REF --server {server_addr}",
+            "MOT-REF f",
+            f"${{artiq_applet}}image Images.fluorescence.MOT-REF --server {server_addr}",
         )
         self.set_dataset("Images.TOF-REF", images[1] - images[2], broadcast=True)
+        self.set_dataset(
+            "Images.fluorescence.TOF-REF", images[1] - images[2], broadcast=True
+        )
         self.ccb.issue(
             "create_applet",
-            "TOF-REF",
-            f"${{artiq_applet}}image Images.TOF-REF --server {server_addr}",
+            "TOF-REF f",
+            f"${{artiq_applet}}image Images.fluorescence.TOF-REF --server {server_addr}",
         )
 
 
