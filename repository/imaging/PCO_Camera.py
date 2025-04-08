@@ -20,7 +20,7 @@ from device_db import server_addr
 from ndscan.experiment.parameters import FloatParamHandle, IntParamHandle
 
 logger = logging.getLogger(__name__)
-logging.getLogger("pco").setLevel(logging.DEBUG)
+logging.getLogger("pco").setLevel(logging.INFO)
 
 
 class PcoCamera(Fragment):
