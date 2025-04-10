@@ -34,17 +34,6 @@ class MOTPhotodiodeMeasurement(Fragment):
         self.setattr_device("core")
         self.core: Core
 
-        self.setattr_param(
-            "current",
-            FloatParam,
-            "The current of the X1 coil when the MOT is active",
-            default=VDrivenSupply["X1"].default_current,
-            min=0.0,
-            max=2.0,
-            unit="A",
-        )
-        self.current: FloatParamHandle
-
         self.setattr_fragment(
             "coil_setter",
             SetAnalogCurrentSupplies,
@@ -65,12 +54,21 @@ class MOTPhotodiodeMeasurement(Fragment):
     @kernel
     def unload_MOT(self, unload_time_mu: TInt64):  # type: ignore
         """
-        Reload the MOT by turning off the coils, waiting, and then turning them back on.
+        Unload the MOT by turning off the coils, waiting for the clearout time.
 
-        This writes the turn off into the past by the initial delay, and starts loading the MOT now.
+        This turns the current off now and delays for the unload time.
         """
         self.coil_setter.turn_off()
         delay_mu(unload_time_mu)
+
+    @kernel
+    def load_MOT(self):  # type: ignore
+        """
+        Reload the MOT by turning on the coils.
+
+        This starts loading the MOT now.
+        """
+        self.coil_setter.set_defaults()
 
     @kernel
     def measure_MOT_fluorescence(
@@ -85,13 +83,13 @@ class MOTPhotodiodeMeasurement(Fragment):
 
         You must pass an array of floats with size <num_points> to `data`.
         """
-        self.unload_MOT(unload_time_mu)
+        # self.unload_MOT(unload_time_mu)
 
         for i in range(num_points // 20):
             data[i] = self.adc_reader.read_adc()
             delay_mu(delay_between_points_mu)
 
-        self.coil_setter.set_currents([self.current.get()])
+        # self.load_MOT()
 
         for i in range(num_points // 20, num_points):
             data[i] = self.adc_reader.read_adc()
@@ -151,8 +149,6 @@ class MeasureMOTWithPDFrag(ExpFragment):
 
         self.setattr_fragment("mot_measurer", MOTPhotodiodeMeasurement)
         self.mot_measurer: MOTPhotodiodeMeasurement
-
-        self.setattr_param_rebind("current", self.mot_measurer)
 
         self.setattr_result("photodiode_voltage", OpaqueChannel)
         self.photodiode_voltage: OpaqueChannel

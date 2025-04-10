@@ -22,7 +22,7 @@ VDRIVEN_SUPPLIES = [
         ch=0,
         gain=2.0 * A / V,
         current_limit=3.0 * A,
-        default_current=0.9 * A,
+        default_current=1.0 * A,
     ),
     VDrivenSupply(
         name="X2",
@@ -30,7 +30,7 @@ VDRIVEN_SUPPLIES = [
         ch=1,
         gain=2.0 * A / V,
         current_limit=3.0 * A,
-        default_current=1.2 * A,
+        default_current=1.1 * A,
     ),
     VDrivenSupply(
         name="Y",
@@ -112,7 +112,7 @@ SUSERVOED_BEAMS = [
         attenuation=17.0 * dB,
         shutter_device="shutter_3DMOT",
         shutter_delay=THORLABS_SHUTTER_DELAY,
-        setpoint=2.5 * V,
+        setpoint=3.5 * V,
         servo_enabled=True,
         calib_gain=21.83,
         calib_offset=0.037,
@@ -120,8 +120,8 @@ SUSERVOED_BEAMS = [
     SUServoedBeam(
         name="IMG",
         suservo_device="suservo_aom_IMG",
-        frequency=219.0 * MHz,
-        attenuation=17.5 * dB,
+        frequency=198.0 * MHz,
+        attenuation=18.5 * dB,
     ),
     SUServoedBeam(
         name="PUMP",

@@ -23,17 +23,9 @@ from PyQt6.QtCore import QTimer, Qt
 import pco.logging
 import pyqtgraph as pg
 
-MOT_SIZE = 35
-MOT_X = 695
-MOT_Y = 540
-MOT_ROI = (MOT_X - MOT_SIZE, MOT_Y - MOT_SIZE, MOT_X + MOT_SIZE, MOT_Y + MOT_SIZE)
-WHOLE_CELL_ROI = (
-    MOT_X - 100,
-    MOT_Y - 150,
-    MOT_X + 100,
-    MOT_Y + 150,
-)
-FULL_ROI = (1, 1, 1392, 1040)
+import sys
+sys.path.append(__file__.split("artiq")[0] + "artiq")
+from repository.imaging.PCO_Camera import PcoCamera
 
 
 # logger.addHandler(pco.stream_handler)
@@ -116,9 +108,9 @@ class CameraWidget(QWidget):
 
         # combo box for selecting the ROI
         self.roi_combo = pg.ComboBox()
-        self.roi_combo.addItem("MOT", MOT_ROI)
-        self.roi_combo.addItem("Whole Cell", WHOLE_CELL_ROI)
-        self.roi_combo.addItem("Full Image", FULL_ROI)
+        self.roi_combo.addItem("MOT", PcoCamera.MOT_ROI)
+        self.roi_combo.addItem("Whole Cell", PcoCamera.WHOLE_CELL_ROI)
+        self.roi_combo.addItem("Full Image", PcoCamera.FULL_ROI)
         self.roi_combo.setCurrentIndex(0)
         self.roi_combo.currentIndexChanged.connect(self.reset_zoom)
         self.roi_combo.setToolTip("Select the ROI for the image")

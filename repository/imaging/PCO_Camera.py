@@ -20,14 +20,14 @@ from device_db import server_addr
 from ndscan.experiment.parameters import FloatParamHandle, IntParamHandle
 
 logger = logging.getLogger(__name__)
-logging.getLogger("pco").setLevel(logging.INFO)
+logging.getLogger("pco").setLevel(logging.WARNING)
 
 
 class PcoCamera(Fragment):
     FULL_ROI = (1, 1, 1392, 1040)
-    MOT_SIZE = 40
-    MOT_X = 700
-    MOT_Y = 540
+    MOT_SIZE = 35
+    MOT_X = 695
+    MOT_Y = 535
     MOT_ROI = (MOT_X - MOT_SIZE, MOT_Y - MOT_SIZE, MOT_X + MOT_SIZE, MOT_Y + MOT_SIZE)
     WHOLE_CELL_ROI = (
         MOT_X - 100,
@@ -35,6 +35,7 @@ class PcoCamera(Fragment):
         MOT_X + 100,
         MOT_Y + 150,
     )
+    BUSY_TIME = 140 * ms
 
     def build_fragment(self):
         self.setattr_device("core")

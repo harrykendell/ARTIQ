@@ -83,8 +83,6 @@ class TopticaDLCPro:
 
         hunt_down(self._dlcpro, "")
 
-        print("methods added to namespace")
-
     def open(self):
         logger.debug("Opening connection to %s", self.ip)
         self.get_dlcpro().open()
