@@ -15,6 +15,7 @@ clean_up() {
 artiq_stack() {
     # PyQt5 and .so fix
     FIX=". ${SCRIPT_DIR}/scripts/nix-fix-pyqt.sh ; export LD_LIBRARY_PATH=$(find /nix/store -type d -wholename '/nix/store/*artiq-env/lib')"
+    # FIX=". ${SCRIPT_DIR}/scripts/nix-fix-pyqt.sh ; export LD_LIBRARY_PATH=$(find /nix/store -type d -wholename '/nix/store/*artiq-env/lib') ; export DISPLAY=127.0.0.1:10.0"
 
     # ARTIQ
     SERVER_ADDRESS=137.222.69.28

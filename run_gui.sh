@@ -6,12 +6,6 @@ NC='\033[0m' # No Color
 SCRIPT_DIR="$(dirname "$(realpath "$0")")"
 cd $SCRIPT_DIR
 
-#  PyQt5 and SO fix
-FIX=". ./scripts/nix-fix-pyqt.sh ; export LD_LIBRARY_PATH=$(find /nix/store -type d -wholename '/nix/store/*artiq-env/lib')"
-
-# ThorlabsPM
-TLPM="(python ./ThorlabsPM/ThorlabsPM.py &)"
-
 # ARTIQ
 SERVER_ADDRESS=137.222.69.28
 
@@ -38,23 +32,24 @@ on_ssh() {
     fi
 }
 
-# Run the ARTIQ dashboard with the target IP if found
-# client ssh into server (quite why you'd need this is unclear) - we run everything forwarded
-if on_server && on_ssh; then
-    echo -e "${GREEN}Running on the ARTIQ server via SSH${NC}"
-    DISPLAY=127.0.0.1:10.0
-    nix shell --command bash -c "$FIX ; $TLPM ; artiq_dashboard -v --server=\"$SERVER_ADDRESS\" -p ndscan.dashboard_plugin"
-    exit 0
-fi
-
 # Running locally on server - we run everything locally
-if on_server; then
+if on_server && !on_ssh; then
     echo -e "${GREEN}Running locally on the ARTIQ server${NC}"
-    nix shell --command bash -c "$FIX ; $TLPM ; artiq_dashboard -v --server=\"$SERVER_ADDRESS\" -p ndscan.dashboard_plugin"
+    tmux new -d -s ThorlabsPM "nix shell --command bash -c \"python ./ThorlabsPM/ThorlabsPM.py\""
+    nix shell --command bash -c "artiq_dashboard -v --server=\"$SERVER_ADDRESS\" -p ndscan.dashboard_plugin"
     exit 0
 fi
 
-# running on client
+# Running remotely on server - we forward to the client
+if on_server; then
+    echo -e "${GREEN}Remotely running on the ARTIQ server${NC}"
+    #  PyQt5 and SO fix
+    FIX=". ./scripts/nix-fix-pyqt.sh ; export LD_LIBRARY_PATH=$(find /nix/store -type d -wholename '/nix/store/*artiq-env/lib')"
+    nix shell --command bash -c "$FIX ; artiq_dashboard -v --server=\"$SERVER_ADDRESS\" -p=\"ndscan.dashboard_plugin\""
+    exit 0
+fi
+
+# Running locally on a different machine - we run everything locally
 echo -e "${GREEN}Not running on the ARTIQ server${NC}"
 (python repository/gui/ArtiqGUI.py) &
 
