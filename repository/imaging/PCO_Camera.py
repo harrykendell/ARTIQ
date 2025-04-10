@@ -6,18 +6,17 @@ import numpy as np
 
 from artiq.coredevice.core import Core
 from artiq.coredevice.ttl import TTLInOut
-from artiq.experiment import kernel, rpc, host_only, delay, delay_mu
+from artiq.experiment import kernel, rpc, host_only, delay, delay_mu, at_mu, now_mu
 from artiq.language.units import ms, s, us
 from ndscan.experiment import (
     Fragment,
     ExpFragment,
     FloatParam,
-    IntParam,
     make_fragment_scan_exp,
 )
 from device_db import server_addr
 
-from ndscan.experiment.parameters import FloatParamHandle, IntParamHandle
+from ndscan.experiment.parameters import FloatParamHandle
 
 logger = logging.getLogger(__name__)
 logging.getLogger("pco").setLevel(logging.WARNING)
@@ -37,19 +36,11 @@ class PcoCamera(Fragment):
     )
     BUSY_TIME = 140 * ms
 
-    def build_fragment(self):
+    def build_fragment(self, num_images=1):
+        self.num_images = num_images
+
         self.setattr_device("core")
         self.core: Core
-
-        self.setattr_param(
-            "num_images",
-            IntParam,
-            "The number of images we will take",
-            default=4,
-            min=0,
-            max=10,
-        )
-        self.num_images: IntParamHandle
 
         self.setattr_param(
             "exposure_time",
@@ -63,7 +54,7 @@ class PcoCamera(Fragment):
         self.exposure_time: FloatParamHandle
 
         self.setattr_device("pco_camera")
-        self.pco_camera: TTLInOut
+        self.trigger: TTLInOut = self.pco_camera
 
         self.debug = logger.getEffectiveLevel() <= logging.INFO
 
@@ -81,16 +72,14 @@ class PcoCamera(Fragment):
             "exposure time": self.exposure_time.get(),
         }
 
-        self.cam.stop()
-
         if self.debug:
             logger.info(f"{self.cam.camera_name} ({self.cam.camera_serial})")
             logger.info(self.cam.configuration)
             logger.info("running in trigger_mode %s", self.cam.configuration["trigger"])
-        self.cam.record(self.num_images.get(), mode="sequence non blocking")
+        self.cam.record(self.num_images, mode="sequence non blocking")
 
         if self.debug:
-            logger.info(f"Recording {self.num_images.get()} images")
+            logger.info(f"Recording {self.num_images} images")
 
         super().host_setup()
 
@@ -109,7 +98,7 @@ class PcoCamera(Fragment):
         """
         self.cam.stop()
         self.cam.configuration = {"exposure time": exposure_time}
-        self.cam.record(self.num_images.get(), mode="sequence non blocking")
+        self.cam.record(self.num_images, mode="sequence non blocking")
 
     @kernel
     def device_setup(self):
@@ -118,9 +107,9 @@ class PcoCamera(Fragment):
         """
         self.core.break_realtime()
 
-        self.pco_camera.output()
+        self.trigger.output()
         delay_mu(10)
-        self.pco_camera.off()
+        self.trigger.off()
 
         if self.debug:
             logger.info("PCO Camera setup")
@@ -132,9 +121,9 @@ class PcoCamera(Fragment):
 
         Another image should not be captured until the previous one has been exposed
         """
-        self.pco_camera.on()
+        self.trigger.on()
         delay(1 * us)
-        self.pco_camera.off()
+        self.trigger.off()
 
     @host_only
     def retrieve_images(self, timeout=5.0 * s, roi=WHOLE_CELL_ROI):
@@ -149,18 +138,18 @@ class PcoCamera(Fragment):
             logger.info(
                 "Waiting for images %s / %s for %.1f / %.1f",
                 self.cam.recorded_image_count,
-                self.num_images.get(),
+                self.num_images,
                 time.time() - now,
                 timeout,
             )
-            if self.cam.recorded_image_count == self.num_images.get():
+            if self.cam.recorded_image_count == self.num_images:
                 break
             time.sleep(timeout / 10)
         else:
             logging.warning(
                 "Recieved %d images, expected %d",
                 self.cam.recorded_image_count,
-                self.num_images.get(),
+                self.num_images,
             )
             if self.cam.recorded_image_count == 0:
                 return None
@@ -172,7 +161,9 @@ class PcoCamera(Fragment):
         )
 
         if self.debug:
+            slack_mu = self.core.get_rtio_counter_mu() - now_mu()
             logger.info("Images retrieved")
+            at_mu(self.core.get_rtio_counter_mu() + slack_mu)
 
         return self.images
 
@@ -193,15 +184,8 @@ class PcoCameraExpFrag(ExpFragment):
         self.setattr_device("ccb")
 
         logging.debug("Setting up PCO camera fragment")
-        self.setattr_fragment("pco_camera", PcoCamera)
+        self.setattr_fragment("pco_camera", PcoCamera, num_images=1)
         self.pco_camera: PcoCamera
-
-        self.setattr_param_rebind(
-            "num_images",
-            self.pco_camera,
-            "num_images",
-            default=1,
-        )
 
         self.setattr_param_rebind(
             "exposure_time",

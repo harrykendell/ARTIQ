@@ -332,7 +332,9 @@
 #         """
 
 #         if self.debug_mode:
+#             slack_mu = now_mu() - self.core.get_rtio_counter_mu()
 #             logger.info("Enabling MOT fields")
+#             at_mu(self.core.get_rtio_counter_mu() + slack_mu)
 
 #         delay(50e-3)
 #         self.chamber_2_field_setter.set_bias_fields(

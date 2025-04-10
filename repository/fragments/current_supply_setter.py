@@ -8,7 +8,7 @@ from artiq.experiment import TInt32
 from artiq.experiment import TList
 from artiq.experiment import delay_mu
 from artiq.experiment import kernel
-from artiq.experiment import now_mu
+from artiq.experiment import now_mu, at_mu
 from artiq.experiment import portable
 from ndscan.experiment import Fragment
 
@@ -97,17 +97,20 @@ class SetAnalogCurrentSupplies(Fragment):
         self._currents_to_volts(currents, voltages)
 
         if self.debug_enabled:
+            slack_mu = now_mu() - self.core.get_rtio_counter_mu()
             logger.info(
                 "Setting currents = %s via voltages = %s on channels %s",
                 currents,
                 voltages,
                 self.fastino_channels,
             )
-            self.core.break_realtime()
+            at_mu(self.core.get_rtio_counter_mu() + slack_mu)
 
         for idx in range(len(self.fastino_channels)):
             self.fastino.set_dac(self.fastino_channels[idx], voltages[idx])
-            delay_mu(8)  # Nothing happens for multiple channels if we use a shorter delay?!
+            delay_mu(
+                8
+            )  # Nothing happens for multiple channels if we use a shorter delay?!
 
     @kernel
     def set_defaults(self):
@@ -192,7 +195,9 @@ class SetAnalogCurrentSupplies(Fragment):
             num_points (TInt32, optional): Number of samples
         """
         if self.debug_enabled:
+            slack_mu = now_mu() - self.core.get_rtio_counter_mu()
             logger.info("Starting ramp for %.3f ms", 1e3 * duration)
+            at_mu(self.core.get_rtio_counter_mu() + slack_mu)
 
         # Compute grid for writes
         actual_time_step_mu = self.actual_timestep_mu(duration, num_points)
@@ -225,12 +230,14 @@ class SetAnalogCurrentSupplies(Fragment):
             )
 
         if self.debug_enabled:
+            slack_mu = now_mu() - self.core.get_rtio_counter_mu()
             logger.info(
                 "Precomputation completed: %d points with steps of %s A = %s V",
                 num_points,
                 current_steps,
                 voltage_steps,
             )
+            at_mu(self.core.get_rtio_counter_mu() + slack_mu)
 
         # Queue the points, including an initial and final point
         for _ in range(num_points):
@@ -244,4 +251,6 @@ class SetAnalogCurrentSupplies(Fragment):
             delay_mu(actual_time_step_mu)
 
         if self.debug_enabled:
+            slack_mu = now_mu() - self.core.get_rtio_counter_mu()
             logger.info("RTIO events queued - now_mu() = %d", now_mu())
+            at_mu(self.core.get_rtio_counter_mu() + slack_mu)

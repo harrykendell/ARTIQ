@@ -6,7 +6,7 @@ from numpy import int64
 
 from artiq.coredevice.core import Core
 from artiq.coredevice.ttl import TTLOut
-from artiq.experiment import delay_mu, host_only, kernel, portable
+from artiq.experiment import delay_mu, host_only, kernel, portable, at_mu, now_mu
 from ndscan.experiment import Fragment
 from ndscan.experiment.parameters import FloatParam, FloatParamHandle
 
@@ -295,9 +295,11 @@ class SetBeamsToDefaults(Fragment):
         several suservo writes and ttl updates separated by 8mu each
         """
         if self.debug_mode:
+            slack_mu = now_mu() - self.core.get_rtio_counter_mu()
             logger.info(
                 "SetBeamsToDefault.turn_on_all(light_enabled=%s)", light_enabled
             )
+            at_mu(self.core.get_rtio_counter_mu() + slack_mu)
 
         self._turn_on_suservos(light_enabled=light_enabled)
         self._set_shutters(light_enabled=light_enabled)
@@ -305,8 +307,9 @@ class SetBeamsToDefaults(Fragment):
     @kernel
     def _turn_on_suservos(self, light_enabled):
         if self.debug_mode:
+            slack_mu = now_mu() - self.core.get_rtio_counter_mu()
             logger.info("SetBeamsToDefaults::_turn_on_suservos")
-            self.core.break_realtime()
+            at_mu(self.core.get_rtio_counter_mu() + slack_mu)
 
         for i in range(len(self.suservo_setters_and_info)):
             settings = self.suservo_setters_and_info[i]
@@ -318,6 +321,7 @@ class SetBeamsToDefaults(Fragment):
             en_out = light_enabled or (not light_enabled and settings.shutter_present)
 
             if self.debug_mode:
+                slack_mu = now_mu() - self.core.get_rtio_counter_mu()
                 logger.info(
                     "Enabling suservo (%s)\n- beam_info %s\n- setpoint %s\n- frequency %s\n- en_out %s\n- initial_amplitude %.3f",
                     settings.setter,
@@ -327,7 +331,7 @@ class SetBeamsToDefaults(Fragment):
                     en_out,
                     initial_amplitude,
                 )
-                self.core.break_realtime()
+                at_mu(self.core.get_rtio_counter_mu() + slack_mu)
 
             settings.setter.set_suservo(
                 frequency,

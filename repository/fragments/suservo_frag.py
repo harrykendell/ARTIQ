@@ -7,7 +7,8 @@ from artiq.coredevice.suservo import SUServo, T_CYCLE, COEFF_SHIFT, COEFF_WIDTH
 from artiq.coredevice.urukul import CPLD
 from artiq.experiment import (
     delay,
-    delay_mu,
+    at_mu,
+    now_mu,
     kernel,
     rpc,
     TBool,
@@ -268,13 +269,14 @@ class SUServoFrag(Fragment):
         attenuator_channel = self.suservo_channel.servo_channel % 4
 
         if self.debug_enabled:
+            slack_mu = now_mu() - self.core.get_rtio_counter_mu()
             logging.info(
                 "Setting the attenuator for %s (%s/4) to %f",
                 self.channel,
                 attenuator_channel,
                 attenuation,
             )
-            self.core.break_realtime()
+            at_mu(self.core.get_rtio_counter_mu() + slack_mu)
 
         cpld = self.suservo_channel.dds.cpld  # type: CPLD
         cpld.set_att(attenuator_channel, attenuation)
@@ -290,8 +292,9 @@ class SUServoFrag(Fragment):
         they have to be reset on each run.
         """
         if self.debug_enabled:
+            slack_mu = now_mu() - self.core.get_rtio_counter_mu()
             logging.warning("Setting the attenuator for all channels to their defaults")
-            self.core.break_realtime()
+            at_mu(self.core.get_rtio_counter_mu() + slack_mu)
 
         cpld = self.suservo_channel.dds.cpld  # type: CPLD
         cpld.get_att_mu()
@@ -354,6 +357,7 @@ class SUServoFrag(Fragment):
             offset (TFloat): IIR offset (negative setpoint) in units of full scale
         """
         if self.debug_enabled:
+            slack_mu = now_mu() - self.core.get_rtio_counter_mu()
             logging.info(
                 "Setting DDS for %s (profile=%s): frequency=%s, offset=%s, phase=%s",
                 self.channel,
@@ -362,7 +366,7 @@ class SUServoFrag(Fragment):
                 offset,
                 phase,
             )
-            self.core.break_realtime()
+            at_mu(self.core.get_rtio_counter_mu() + slack_mu)
 
         self.suservo_channel.set_dds(
             profile=profile,
@@ -379,12 +383,13 @@ class SUServoFrag(Fragment):
         See :meth:`artiq.coredevice.suservo.SUServo.set_pgia_mu` for details.
         """
         if self.debug_enabled:
+            slack_mu = now_mu() - self.core.get_rtio_counter_mu()
             logging.info(
                 "Setting PGIA gain for %s: %s",
                 self.sampler_channel,
                 gain_mu,
             )
-            self.core.break_realtime()
+            at_mu(self.core.get_rtio_counter_mu() + slack_mu)
 
         self.suservo.set_pgia_mu(self.sampler_channel, gain_mu)
 
@@ -400,6 +405,7 @@ class SUServoFrag(Fragment):
         offset = self.setpoint_to_offset(new_setpoint)
 
         if self.debug_enabled:
+            slack_mu = now_mu() - self.core.get_rtio_counter_mu()
             logging.info(
                 "Setting setpoint for %s (profile=%s): %s V -> %s",
                 self.channel,
@@ -407,7 +413,7 @@ class SUServoFrag(Fragment):
                 new_setpoint,
                 offset,
             )
-            self.core.break_realtime()
+            at_mu(self.core.get_rtio_counter_mu() + slack_mu)
 
         self.suservo_channel.set_dds_offset(profile=self.suservo_profile, offset=offset)
 
@@ -423,6 +429,7 @@ class SUServoFrag(Fragment):
         iir = 1 if enable_iir else 0
 
         if self.debug_enabled:
+            slack_mu = now_mu() - self.core.get_rtio_counter_mu()
             logging.info(
                 "Setting channel state for %s (profile=%s): en_out=%s, enable_iir=%s",
                 self.channel,
@@ -430,7 +437,7 @@ class SUServoFrag(Fragment):
                 out,
                 iir,
             )
-            self.core.break_realtime()
+            at_mu(self.core.get_rtio_counter_mu() + slack_mu)
 
         self.suservo_channel.set(
             en_out=out,
@@ -445,6 +452,7 @@ class SUServoFrag(Fragment):
         details. Note all of kp,ki,gain_limit should usually be negative.
         """
         if self.debug_enabled:
+            slack_mu = now_mu() - self.core.get_rtio_counter_mu()
             logging.info(
                 "Setting iir params for %s (profile= %s): sampler_channel=%s, kp=%s, ki=%s, gain_limit=%s, delay=%s",
                 self.channel,
@@ -455,7 +463,7 @@ class SUServoFrag(Fragment):
                 gain_limit,
                 delay,
             )
-            self.core.break_realtime()
+            at_mu(self.core.get_rtio_counter_mu() + slack_mu)
 
         self.set_y(0.0)  # clear integrator
         self.suservo_channel.set_iir(
@@ -466,12 +474,13 @@ class SUServoFrag(Fragment):
     def set_y(self, amplitude: TFloat):
         """Set the amplitude of the channel"""
         if self.debug_enabled:
+            slack_mu = now_mu() - self.core.get_rtio_counter_mu()
             logging.info(
                 "Setting y for %s (profile= %s): y=%s",
                 self.channel,
                 self.suservo_profile,
                 amplitude,
             )
-            self.core.break_realtime()
+            at_mu(self.core.get_rtio_counter_mu() + slack_mu)
 
         self.suservo_channel.set_y(profile=self.suservo_profile, y=amplitude)
