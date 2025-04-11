@@ -4,7 +4,7 @@ from artiq.language.units import s, ms, us
 from device_db import server_addr
 
 from ndscan.experiment import ExpFragment, make_fragment_scan_exp, FloatParam
-from ndscan.experiment.parameters import FloatParamHandle
+from ndscan.experiment.parameters import FloatParamHandle, IntParamHandle
 
 from repository.imaging.PCO_Camera import PcoCamera
 from repository.fragments.current_supply_setter import SetAnalogCurrentSupplies
@@ -23,7 +23,7 @@ class ODTImageExpFrag(ExpFragment):
 
         self.setattr_device("ccb")
 
-        self.setattr_fragment("pco_camera", PcoCamera)
+        self.setattr_fragment("pco_camera", PcoCamera, num_images=5)
         self.pco_camera: PcoCamera
         self.setattr_param_rebind("exposure_time", self.pco_camera, "exposure_time")
         self.exposure_time: FloatParamHandle
@@ -68,7 +68,7 @@ class ODTImageExpFrag(ExpFragment):
             "hold_time_in_ODT",
             FloatParam,
             "Hold time in ODT before imaging",
-            default=0.1 * ms,
+            default=6 * ms,
             min=1.0 * us,
             max=10.0 * s,
             unit="ms",
@@ -78,38 +78,44 @@ class ODTImageExpFrag(ExpFragment):
     @kernel
     def run_once(self):
         self.core.reset()
-        self.core.break_realtime()
-        self.coil_setter.turn_off()  # make sure we unload MOT
-        delay(100 * ms)
 
-        # By ignoring shutters we don't drop the MOT for `shutter_delay` time if it was already loaded
-        self.mot_beam_setter.turn_beams_on()
-        self.img_beam_setter.turn_beams_off(ignore_shutters=True)
-        self.coil_setter.set_defaults()
-        delay(10 * s)
+        for odt in [True, False]:
+            self.core.break_realtime()
+            self.coil_setter.turn_off()  # make sure we unload MOT
+            delay(100 * ms)
 
-        # initial image of loaded MOT
-        self.pco_camera.capture_image()
-        delay(self.exposure_time.get())
-        delay(300 * ms)
+            # By ignoring shutters we don't drop the MOT for `shutter_delay` time if it was already loaded
+            self.mot_beam_setter.turn_beams_on()
+            self.img_beam_setter.turn_beams_off(ignore_shutters=True)
+            self.coil_setter.set_defaults()
+            delay(10 * s)
 
-        self.odt_beam_setter.turn_beams_on()
-        delay(250 * ms)
+            # initial image of loaded MOT
+            if odt:
+                self.pco_camera.capture_image()
+            delay(self.exposure_time.get())
+            delay(200 * ms)
 
-        # release MOT and propagate cloud
-        # we can't shutter as tof may be less than the delay
-        with parallel:
-            self.coil_setter.turn_off()
+            if odt:
+                delay(0.1*us)
+                self.odt_beam_setter.turn_beams_on()
+            delay(100 * ms)
+
+            # release MOT and propagate cloud
+            # we can't shutter as tof may be less than the delay
+            with parallel:
+                self.coil_setter.turn_off()
+                self.mot_beam_setter.turn_beams_off(ignore_shutters=True)
+            delay(self.hold_time_in_ODT.get())
+
+            # image cloud
+            # don't shutter if using the mot beam to image as it interferes with the release stage
+            with parallel:
+                self.mot_beam_setter.turn_beams_on(ignore_shutters=True)
+                self.pco_camera.capture_image()
+            delay(self.exposure_time.get())
             self.mot_beam_setter.turn_beams_off(ignore_shutters=True)
-        delay(self.hold_time_in_ODT.get())
-
-        # image cloud
-        # don't shutter if using the mot beam to image as it interferes with the release stage
-        with parallel:
-            self.mot_beam_setter.turn_beams_on(ignore_shutters=True)
-            self.pco_camera.capture_image()
-        delay(self.exposure_time.get())
-        self.mot_beam_setter.turn_beams_off(ignore_shutters=True)
+            self.odt_beam_setter.turn_beams_off()
 
         delay(300 * ms)
 
@@ -140,30 +146,25 @@ class ODTImageExpFrag(ExpFragment):
         name = "Images.odt"
         images = self.pco_camera.retrieve_images(roi=self.pco_camera.MOT_ROI)
 
-        for num, img_name in enumerate(["MOT", "TOF", "REF", "BG"]):
+        for num, img_name in enumerate(["MOT", "TOF", "NO_ODT_TOF", "REF", "BG"]):
             # save for propsperity
             self.set_dataset(f"{name}.{img_name}", images[num], persist=True)
 
             # save for applet
             self.set_dataset(f"Images.{img_name}", images[num], broadcast=True)
 
-        self.set_dataset("Images.MOT-REF", images[0] - images[2], broadcast=True)
-        self.set_dataset(
-            "Images.odt.MOT-REF", images[0] - images[2], broadcast=True
-        )
+        self.set_dataset("Images.TOF-REF", images[1] - images[3], broadcast=True)
         self.ccb.issue(
             "create_applet",
-            "MOT-REF o",
-            f"${{artiq_applet}}image Images.odt.MOT-REF --server {server_addr}",
+            "TOF-REF",
+            f"${{artiq_applet}}image Images.TOF-REF --server {server_addr}",
         )
-        self.set_dataset("Images.TOF-REF", images[1] - images[2], broadcast=True)
-        self.set_dataset(
-            "Images.odt.TOF-REF", images[1] - images[2], broadcast=True
-        )
+
+        self.set_dataset("Images.TOF-NO_ODT_TOF", images[1] - images[2], broadcast=True)
         self.ccb.issue(
             "create_applet",
-            "TOF-REF o",
-            f"${{artiq_applet}}image Images.odt.TOF-REF --server {server_addr}",
+            "TOF-NO_ODT_TOF",
+            f"${{artiq_applet}}image Images.TOF-NO_ODT_TOF --server {server_addr}",
         )
 
 

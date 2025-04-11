@@ -21,23 +21,10 @@ class DEVICE:
 
     @classmethod
     def __class_getitem__(cls, name: str | list[str]):
-        """returns the initialized subclass(s) with the data from its dataset\
-            or defaults to devices.py"""
+        """returns the initialized subclass(s)from devices.py"""
         if type(name) is not str:
             return [cls.__class_getitem__(n) for n in name]
-        try:
-            # implicitly capture what we hope is the owning Experiment
-            hasEnv = sys._getframe(1).f_locals["self"]
-            ret = cls(name=name)
-            ret.update_from_dataset(hasEnv)
-            return ret
-        except Exception as e:
-            logging.debug(
-                f"Could not load from dataset {cls.__name__}.{name},\
-                defaulting to devices.py\n {e}"
-            )
-            # try to get it from devices.py instead
-            return device_arrays[cls][name]
+        return device_arrays[cls][name]
 
     @classmethod
     def keys(cls):

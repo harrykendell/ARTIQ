@@ -22,7 +22,7 @@ VDRIVEN_SUPPLIES = [
         ch=0,
         gain=2.0 * A / V,
         current_limit=3.0 * A,
-        default_current=1.0 * A,
+        default_current=.9 * A,
     ),
     VDrivenSupply(
         name="X2",
@@ -30,7 +30,7 @@ VDRIVEN_SUPPLIES = [
         ch=1,
         gain=2.0 * A / V,
         current_limit=3.0 * A,
-        default_current=1.1 * A,
+        default_current=0.9 * A,
     ),
     VDrivenSupply(
         name="Y",

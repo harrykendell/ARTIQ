@@ -34,7 +34,7 @@ class PcoCamera(Fragment):
         MOT_X + 100,
         MOT_Y + 150,
     )
-    BUSY_TIME = 140 * ms
+    BUSY_TIME = 150 * ms
 
     def build_fragment(self, num_images=1):
         self.num_images = num_images
@@ -62,8 +62,8 @@ class PcoCamera(Fragment):
         """
         Setup the host-side camera controls
         """
-
-        self.cam = pco.Camera(interface="USB 2.0")
+        # don't specify an interface or unclosed cameras cause indefinite hangs
+        self.cam = pco.Camera()
         self.cam.default_configuration()
 
         self.cam.configuration = {
@@ -71,7 +71,8 @@ class PcoCamera(Fragment):
             "trigger": "external exposure start & software trigger",
             "exposure time": self.exposure_time.get(),
         }
-
+        self.cam.auto_exposure_off()
+        
         if self.debug:
             logger.info(f"{self.cam.camera_name} ({self.cam.camera_serial})")
             logger.info(self.cam.configuration)
@@ -84,9 +85,10 @@ class PcoCamera(Fragment):
         super().host_setup()
 
     def host_cleanup(self):
-        self.cam.close()
-        if self.debug:
-            logger.info("PCO Camera closed")
+        if hasattr(self, "cam"):
+            self.cam.close()
+            if self.debug:
+                logger.info("PCO Camera closed")
         super().host_cleanup()
 
     @rpc(flags={"async"})
@@ -132,7 +134,7 @@ class PcoCamera(Fragment):
         into the diagnostic dataset
         """
 
-        # spin for 5 secs hoping we get all the images we were promised
+        # spin hoping we get all the images we were promised
         now = time.time()
         while time.time() - now < timeout:
             logger.info(
@@ -153,17 +155,16 @@ class PcoCamera(Fragment):
             )
             if self.cam.recorded_image_count == 0:
                 return None
-
+        logger.info("All images counted")
         self.images, _ = self.cam.images(roi=roi)
+        logger.info("Images retrieved")
         self.images = self.rotate_and_flip(self.images).astype(np.float64)
         self.set_dataset(
             "Images.Latest_image", self.images[-1], broadcast=True, persist=True
         )
 
         if self.debug:
-            slack_mu = self.core.get_rtio_counter_mu() - now_mu()
             logger.info("Images retrieved")
-            at_mu(self.core.get_rtio_counter_mu() + slack_mu)
 
         return self.images
 

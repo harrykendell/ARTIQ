@@ -33,7 +33,7 @@ on_ssh() {
 }
 
 # Running locally on server - we run everything locally
-if on_server && !on_ssh; then
+if on_server && ! on_ssh; then
     echo -e "${GREEN}Running locally on the ARTIQ server${NC}"
     tmux new -d -s ThorlabsPM "nix shell --command bash -c \"python ./ThorlabsPM/ThorlabsPM.py\""
     nix shell --command bash -c "artiq_dashboard -v --server=\"$SERVER_ADDRESS\" -p ndscan.dashboard_plugin"

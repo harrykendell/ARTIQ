@@ -50,5 +50,5 @@ echo -e "${NC}Starting up the full stack${NC}"
 cd $SCRIPT_DIR
 cat /dev/null > artiq.log
 check_tmux
-trap clean_up SIGCHLD
+trap clean_up 0
 artiq_stack

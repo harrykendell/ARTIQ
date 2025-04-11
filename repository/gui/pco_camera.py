@@ -19,7 +19,10 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import QTimer, Qt
 
+from artiq.language.units import ms
 
+
+import pco.camera_exception
 import pco.logging
 import pyqtgraph as pg
 
@@ -60,8 +63,9 @@ def init_cam(cam: pco.Camera):
     cam.configuration = {
         "timestamp": "binary",
         "trigger": triggers[0],
-        "exposure time": 200e-6,
+        "exposure time": 0.1*ms,
     }
+    cam.auto_exposure_off()
 
     print(f"{cam.camera_name} ({cam.camera_serial})")
     print(cam.configuration)
@@ -111,9 +115,9 @@ class CameraWidget(QWidget):
         self.roi_combo.addItem("MOT", PcoCamera.MOT_ROI)
         self.roi_combo.addItem("Whole Cell", PcoCamera.WHOLE_CELL_ROI)
         self.roi_combo.addItem("Full Image", PcoCamera.FULL_ROI)
-        self.roi_combo.setCurrentIndex(0)
+        self.roi_combo.setCurrentIndex(2)
         self.roi_combo.currentIndexChanged.connect(self.reset_zoom)
-        self.roi_combo.setToolTip("Select the ROI for the image")
+        self.roi_combo.setToolTip("whole cell")
         # prefix the combo box with a label
         self.roi_label = QLabel("ROI:")
         self.roi_label.setBuddy(self.roi_combo)
@@ -154,7 +158,7 @@ class CameraWidget(QWidget):
 
         # Sequence mode
         if settings["recorder type"] == 0x0001:
-            self.cam.wait_for_new_image()
+            self.cam.wait_for_new_image(timeout=1)
 
         # Hardware trigger FIFO mode
         if settings["recorder type"] == 0x0003:
@@ -204,17 +208,23 @@ class CameraWidget(QWidget):
 
 def main_gui():
     app = QApplication([])
+    # don't specify an interface or unclosed cameras cause indefinite hangs
+    try:
+        with pco.Camera() as cam:
+            init_cam(cam)
 
-    with pco.Camera(interface="USB 2.0") as cam:
-        init_cam(cam)
+            widget = CameraWidget(cam)
+            widget.show()
 
-        widget = CameraWidget(cam)
-        widget.show()
+            widget.setWindowTitle(f"{cam.camera_name} ({cam.camera_serial})")
+            widget.setGeometry(100, 100, 800, 600)
 
-        widget.setWindowTitle(f"{cam.camera_name} ({cam.camera_serial})")
-        widget.setGeometry(100, 100, 800, 600)
-
-        app.exec()
+            app.exec()
+    except pco.camera_exception.CameraException as e:
+        print("If you can't connect... kill any process owning the camera:")
+        print("\tkill -9 $(awk '/pco_device/ {print $2}' < <(lsof))")
+        print(f"Camera error: {e}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
