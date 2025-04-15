@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import QTimer, Qt
 
-from artiq.language.units import ms
+from artiq.language.units import ms, us
 
 
 import pco.camera_exception
@@ -63,7 +63,7 @@ def init_cam(cam: pco.Camera):
     cam.configuration = {
         "timestamp": "binary",
         "trigger": triggers[0],
-        "exposure time": 0.1*ms,
+        "exposure time": 1*ms,
     }
     cam.auto_exposure_off()
 

@@ -121,7 +121,11 @@ SUSERVOED_BEAMS = [
         name="IMG",
         suservo_device="suservo_aom_IMG",
         frequency=198.0 * MHz,
-        attenuation=27.0 * dB,
+        attenuation=21.0 * dB,
+        setpoint=0.75 * V,
+        servo_enabled=True,
+        calib_gain=36.64e-3,
+        calib_offset=-0.87e-3,
     ),
     SUServoedBeam(
         name="PUMP",

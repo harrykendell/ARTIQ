@@ -268,7 +268,7 @@ class MainWindow(QWidget):
         np.save("dataset.npy", data)
 
 
-def main():
+if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
 
     app = QApplication(sys.argv)
@@ -280,14 +280,9 @@ def main():
     client = GUIClient(server)
     main_window = MainWindow(client)
 
-    app.aboutToQuit.connect(lambda: loop.create_task(client.disconnect()))
-
     # Start connections
     loop.create_task(client.connect())
+    app.aboutToQuit.connect(lambda: loop.create_task(client.disconnect()))
 
     main_window.show()
     loop.run_forever()
-
-
-if __name__ == "__main__":
-    main()

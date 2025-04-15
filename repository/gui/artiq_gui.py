@@ -238,13 +238,14 @@ class PIDControl(QWidget):
         def update_adc():
             if self.isVisible():
                 volt = self.manager.get_adc(ch)
-                pow = "??"
+                pow = "?? <b>mW</b>"
                 g = self.manager.calib_gains[ch]
                 o = self.manager.calib_offsets[ch]
                 if g != 1.0 or o != 0.0:
-                    pow = f"{(g * volt + o):.1f}"
+                    power = g * volt + o
+                    pow = f"{power if power >= 0.1 else power*1e3:.1f} <b>{'mW' if power >= 0.1 else 'uW'}</b>"
                 self.adc_val.setText(
-                    f"{pow} <b>mW</b> | {volt:.2f} <b>V</b> | \
+                    f"{pow} | {volt:.2f} <b>V</b> | \
                         {self.manager.get_y(ch)*100:.0f}%"
                 )
 
