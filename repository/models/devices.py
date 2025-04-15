@@ -5,11 +5,11 @@ from artiq.language.units import ms, dB, MHz, V, A
 EOMS = [
     Eom(
         name="repump_eom",
-        frequency=3285.0 * MHz,
-        attenuation=10.0 * dB,
+        frequency=3289.0 * MHz,
+        attenuation=12.0 * dB,
         mirny_ch="mirny_eom_repump",
         almazny_ch="almazny_eom_repump",
-        mirny_enabled=True,
+        almazny_enabled=True,
     )
 ]
 # Convert to dict for ease of use
@@ -22,7 +22,7 @@ VDRIVEN_SUPPLIES = [
         ch=0,
         gain=2.0 * A / V,
         current_limit=3.0 * A,
-        default_current=.9 * A,
+        default_current=1.0 * A,
     ),
     VDrivenSupply(
         name="X2",
@@ -30,7 +30,7 @@ VDRIVEN_SUPPLIES = [
         ch=1,
         gain=2.0 * A / V,
         current_limit=3.0 * A,
-        default_current=0.9 * A,
+        default_current=1.2 * A,
     ),
     VDrivenSupply(
         name="Y",
@@ -121,12 +121,12 @@ SUSERVOED_BEAMS = [
         name="IMG",
         suservo_device="suservo_aom_IMG",
         frequency=198.0 * MHz,
-        attenuation=18.5 * dB,
+        attenuation=27.0 * dB,
     ),
     SUServoedBeam(
         name="PUMP",
         suservo_device="suservo_aom_PUMP",
-        frequency=86.0 * MHz,
+        frequency=64.7 * MHz,
         attenuation=19 * dB,
     ),
     SUServoedBeam(

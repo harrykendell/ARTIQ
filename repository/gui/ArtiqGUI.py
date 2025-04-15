@@ -62,7 +62,7 @@ class GUIClient:
 
         logging.info("Connecting to services...")
 
-    async def connect_subscriber(self, name, db, callbacks, port=None, server=None):
+    async def connect_subscriber(self, name, db: dict, callbacks, port=None, server=None):
         port = self.port_notify if port is None else port
         server = self.server if server is None else server
 
