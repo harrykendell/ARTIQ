@@ -160,7 +160,7 @@ class PcoCamera(Fragment):
         logger.info("Images retrieved")
         self.images = self.rotate_and_flip(self.images).astype(np.float64)
         self.set_dataset(
-            "Images.Latest_image", self.images[-1], broadcast=True, persist=True
+            "Images.Latest_image", self.images[-1], broadcast=True
         )
 
         if self.debug:

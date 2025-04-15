@@ -124,7 +124,7 @@ class FluorescenceImageExpFrag(ExpFragment):
 
         for num, img_name in enumerate(["MOT", "TOF", "REF", "BG"]):
             # save for propsperity
-            self.set_dataset(f"{name}.{img_name}", images[num], persist=True)
+            self.set_dataset(f"{name}.{img_name}", images[num], broadcast=True)
 
             # save for applet
             self.set_dataset(f"Images.{img_name}", images[num], broadcast=True)

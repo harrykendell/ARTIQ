@@ -220,6 +220,7 @@ class AbsImage:
         linewidth=6.065 * MHz,
         pixel_size=6.45 * um,
         magnification=None,
+        fit_downsample=5,
     ):
         """AbsImage class for processing absorption images.
 
@@ -240,7 +241,9 @@ class AbsImage:
 
         self.height = data.shape[0]
         self.width = data.shape[1]
+        # numpy images are y, x
         self.xy = np.mgrid[0 : self.height, 0 : self.width]
+        self.fit_downsample = fit_downsample
 
         self.wavelength = wavelength
         self.detuning = detuning
@@ -270,12 +273,12 @@ class AbsImage:
 
     @functools.cached_property
     def transmission(self):
-        """Returns the beam and dark-field compensated transmission image. Dark-field is subtracted
-        from both the atom image and the beam image, and the atom image is divided by the beam
-        image, giving the transmission t^2. The values should optimally lie in the range of [0, 1]
-        but can realistically be in the range of [-0.1, 1.5] due to noise and beam variation across
-        images."""
-        logging.info("Performing background subtraction")
+        """Returns the beam and dark-field compensated transmission image.
+        Dark-field is subtracted from both the atom image and the beam image,
+        and the atom image is divided by the beam image, giving the transmission t^2.
+        The values should optimally lie in the range of [0, 1] but can realistically be
+        in the range of [-0.1, 1.5] due to noise and beam variation across images."""
+
         atoms = np.subtract(self.data_image, self.bg_image)
         light = np.subtract(self.ref_image, self.bg_image)
 
@@ -316,31 +319,29 @@ class AbsImage:
 
     @functools.cached_property
     def peak(self):
-        """Returns x, y, z of brightest pixel in absorption"""
+        """Returns y, x, z of brightest pixel in absorption"""
         y, x = np.unravel_index(
             np.argmax(self.optical_density), self.optical_density.shape
         )
-        z = self.optical_density[x, y]
-
-        print(f"Peak: {x}, {y}, {z}")
-        return x, y, z
+        z = self.optical_density[y, x]
+        return y, x, z
 
     @functools.cached_property
     def centroid(self):
-        """Returns x, y, z of the centroid of the absorption image"""
+        """Returns y, x, z of the centroid of the absorption image"""
         y, x = self.xy
         A = np.sum(self.optical_density)
-        x_c = int(np.sum(x * self.optical_density) / A)
         y_c = int(np.sum(y * self.optical_density) / A)
+        x_c = int(np.sum(x * self.optical_density) / A)
         z_c = self.optical_density[y_c, x_c]
-        print(f"Centroid: {x_c}, {y_c}, {z_c}")
-        return x_c, y_c, z_c
+        return y_c, x_c, z_c
 
     @functools.cached_property
     def sigma_mask(self):
-        """Returns a numpy mask of pixels within the 2-sigma limit of the model (no ROI)"""
+        """Returns a numpy mask of pixels within the 2-sigma limit of the model (no ROI)
+        """
         bp_2D = self.best_values
-        x0, y0, a, b, theta = (bp_2D[k] for k in ("x0", "y0", "sx", "sy", "theta"))
+        y0, x0, a, b, theta = (bp_2D[k] for k in ("y0", "x0", "sy", "sx", "theta"))
         y, x = np.ogrid[0 : self.height, 0 : self.width]
 
         # https://math.stackexchange.com/a/434482
@@ -349,7 +350,7 @@ class AbsImage:
         bound = 4.343  # chi2.ppf(0.886, df=2)
 
         array = np.zeros(self.data_image.shape, dtype="bool")
-        array[maj_axis / np.square(a) + min_axis / np.square(b) <= bound] = True
+        array[maj_axis / np.square(b) + min_axis / np.square(a) <= bound] = True
         return array
 
     @functools.cached_property
@@ -357,25 +358,28 @@ class AbsImage:
         """Fits a 2D Gaussian against the absorption."""
         logging.info("Running 2D fit...")
 
-        x_mg, y_mg = self.xy
+        y_mg, x_mg = self.xy
         model = Model(ravel(gaussian_2D), independent_vars=["x", "y"])
 
-        x_c, y_c, A = self.centroid
+        y_c, x_c, A = self.centroid
         model.set_param_hint("A", value=A, min=0, max=6)
-        model.set_param_hint("x0", value=x_c, min=0, max=self.width)
-        model.set_param_hint("y0", value=y_c, min=0, max=self.height)
+        model.set_param_hint(
+            "x0", value=x_c, min=-0.1 * self.width, max=1.1 * self.width
+        )
+        model.set_param_hint(
+            "y0", value=y_c, min=-0.1 * self.width, max=1.1 * self.height
+        )
 
         model.set_param_hint("sx", value=self.width / 4, min=1, max=self.width)
         model.set_param_hint("sy", value=self.height / 4, min=1, max=self.height)
-        model.set_param_hint("theta", value=0, min=-np.pi / 4, max=np.pi / 4, vary=True)
-        model.set_param_hint("z0", value=0, min=-1, max=1, vary=True)
+        model.set_param_hint("theta", value=0, min=-np.pi / 2, max=np.pi / 2, vary=True)
+        model.set_param_hint("z0", value=0, vary=False)
 
         result = model.fit(
-            np.ravel(self.optical_density[::5]),
-            x=x_mg[::5],
-            y=y_mg[::5],
+            np.ravel(self.optical_density[:: self.fit_downsample]),
+            x=x_mg[:: self.fit_downsample],
+            y=y_mg[:: self.fit_downsample],
             max_nfev=1000,
-            # scale_covar=False,
             fit_kws={"xtol": 1e-7},
         )
         logging.info(result.fit_report())
@@ -397,8 +401,8 @@ class AbsImage:
         return self.eval(x=self.xy[1], y=self.xy[0]).reshape(self.height, self.width)
 
     def eval(self, *, x, y):
-        """Evaluates the fit at the given coordinates (proxy for ModelResult)."""
-        return self.fit.eval(x=y, y=x)
+        """Evaluates the fit at the given coordinates."""
+        return self.fit.eval(x=x, y=y)
 
     def plot(self):
         """Plots the optical density and the best fit in real space units."""
@@ -406,7 +410,7 @@ class AbsImage:
         from matplotlib.ticker import FuncFormatter
 
         # Create figure with two subplots sharing x and y axes
-        fig, ax = plt.subplots(1, 2, figsize=(10, 5), sharex=True, sharey=True)
+        fig, ax = plt.subplots(1, 2, figsize=(8, 5))
 
         # Convert to real space units (mm)
         scale_mm = self.physical_scale * 1e3
@@ -429,8 +433,8 @@ class AbsImage:
         }
 
         # Convert points to real space
-        centroid_mm = (self.centroid[0] * scale_mm, self.centroid[1] * scale_mm)
-        peak_mm = (self.peak[0] * scale_mm, self.peak[1] * scale_mm)
+        centroid_mm = (self.centroid[1] * scale_mm, self.centroid[0] * scale_mm)
+        peak_mm = (self.peak[1] * scale_mm, self.peak[0] * scale_mm)
 
         # Get fit center coordinates in real space
         fit_center_mm = (
@@ -445,24 +449,23 @@ class AbsImage:
         # Plot both images with appropriate markers
         # Left plot: Optical Density with measured centroid/peak
         ax[0].imshow(self.optical_density, **plot_params)
-        ax[0].contour(
-            x_contour, y_contour, self.sigma_mask, colors="green", linewidths=0.5
-        )
-        ax[0].scatter(centroid_mm[0], centroid_mm[1], color="red", label="Centroid")
-        ax[0].scatter(peak_mm[0], peak_mm[1], color="blue", label="Peak")
         ax[0].set_title("Optical Density")
 
         # Right plot: Best Fit with fit center
         im1 = ax[1].imshow(self.best_fit, **plot_params)
-        ax[1].contour(
-            x_contour, y_contour, self.sigma_mask, colors="green", linewidths=0.5
-        )
-        ax[1].scatter(
-            fit_center_mm[0], fit_center_mm[1], color="red", label="Fit Center"
-        )
         ax[1].set_title("Best Fit")
 
         for i in (0, 1):
+            ax[i].contour(
+                x_contour, y_contour, self.sigma_mask, colors="red", linewidths=0.5
+            )
+            ax[i].scatter(
+                centroid_mm[0], centroid_mm[1], color="red", label="Centroid -> 2σ"
+            )
+            ax[i].scatter(peak_mm[0], peak_mm[1], color="blue", label="Peak")
+            ax[i].scatter(
+                fit_center_mm[0], fit_center_mm[1], color="green", label="Fit Center"
+            )
             ax[i].legend()
             ax[i].set_xlabel("x position (mm)")
             ax[i].set_ylabel("y position (mm)")
@@ -470,53 +473,52 @@ class AbsImage:
             ax[i].yaxis.set_major_formatter(formatter)
 
         # Add shared colorbar
-        cbar_ax = fig.add_axes([0.92, 0.15, 0.02, 0.7])
-        cbar = fig.colorbar(im1, cax=cbar_ax)
+        fig.subplots_adjust(bottom=0.25)
+        cbar_ax = fig.add_axes([0.15, 0.1, 0.7, 0.03])  # [left, bottom, width, height]
+        cbar = fig.colorbar(im1, cax=cbar_ax, orientation="horizontal")
         cbar.set_label("Optical Density")
 
         plt.show()
         return fig, ax
 
     @staticmethod
-    def fake():
+    def fake(num_gaussians=1):
         """
         Creates a randomised fake AbsImage object for testing purposes.
-
-        Large gaussian imaging beam multiplied by a smaller (sum of gaussians) atom shadow
         """
-        height, width = 1000, 1300
-        posx = np.random.uniform(width / 3, width * 2 / 3)
-        posy = np.random.uniform(height / 3, height * 2 / 3)
-        print(f"Fake atom cloud at {posx}, {posy}")
+        height, width = 1392, 1040
+        posy = np.random.uniform(width / 3, width * 2 / 3)
+        posx = np.random.uniform(height / 3, height * 2 / 3)
+
         x, y = np.mgrid[0:height, 0:width]
         fake_ref = gaussian_2D(
             x,
             y,
-            A=np.random.uniform(1000, 16000),
+            A=np.random.uniform(10000, 16000),
             x0=posx,
             y0=posy,
-            sx=np.random.uniform(width / 2, width / 4),
-            sy=np.random.uniform(height / 2, height / 4),
+            sx=np.random.uniform(width / 4, width / 2),
+            sy=np.random.uniform(height / 4, height / 2),
             theta=np.random.uniform(0, np.pi),
         )
 
         sx = np.random.uniform(width / 20, width / 5)
         sy = np.random.uniform(height / 20, height / 5)
         atom_cloud = fake_ref * 0
-        for _ in range(1):
+        for num in range(1, num_gaussians + 1):
             atom_cloud += gaussian_2D(
                 x,
                 y,
-                A=np.random.uniform(-0.9, -0.1),
-                x0=posx * (1 + np.random.uniform(-0.2, 0.2)),
-                y0=posy * (1 + np.random.uniform(-0.2, 0.2)),
-                sx=sx * (1 + np.random.uniform(-0.2, 0.2)),
-                sy=sy * (1 + np.random.uniform(-0.2, 0.2)),
+                A=np.random.uniform(-0.99, -0.5) / num_gaussians,
+                x0=posx * (1 + np.random.uniform(-0.3, 0.3) / num),
+                y0=posy * (1 + np.random.uniform(-0.3, 0.3) / num),
+                sx=sx * (1 + np.random.uniform(-0.35, 0.35) / num),
+                sy=sy * (1 + np.random.uniform(-0.35, 0.35) / num),
                 theta=np.random.uniform(0, np.pi),
-                z0=1,
+                z0=1 / num_gaussians,
             )
 
-        fake_data = np.multiply(fake_ref, atom_cloud / 1)
+        fake_data = gaussian_filter(np.multiply(fake_ref, atom_cloud), width//20)
 
         # add some noise
         noise = 20
