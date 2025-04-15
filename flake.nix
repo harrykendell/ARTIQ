@@ -209,6 +209,7 @@
             ps.pydantic
             ps.ifaddr
             ps.pint
+            ps.lmfit
 
             ps.pyvisa
             windfreak
