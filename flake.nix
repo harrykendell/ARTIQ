@@ -129,17 +129,6 @@
           sha256 = "3mFhw1spvuo2+GDyv09NASetnFa3MLRh2OwJTHy3X0M=";
         };
         };
-
-      # Toptica Lasers
-      toptica = pkgs.python3Packages.buildPythonPackage rec {
-        pname = "toptica_lasersdk";
-        version = "3.2.0";
-        doCheck = false;
-        src = pkgs.python3Packages.fetchPypi {
-          inherit pname version;
-          sha256 = "UNazng4Za3CZeG7eDq0b+l7gmESEXIU8WMLWGGysmBg=";
-        };
-        };
       
       # ndscan packages
       oxart-devices = pkgs.python3Packages.buildPythonPackage {
@@ -210,12 +199,12 @@
             ps.ifaddr
             ps.pint
             ps.lmfit
-
+            ps.toptica-lasersdk
             ps.pyvisa
+
             windfreak
             booster
             pco
-            toptica
 
             oxart-devices
             ndscan
