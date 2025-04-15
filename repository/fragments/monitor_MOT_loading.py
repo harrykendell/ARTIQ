@@ -83,13 +83,13 @@ class MOTPhotodiodeMeasurement(Fragment):
 
         You must pass an array of floats with size <num_points> to `data`.
         """
-        # self.unload_MOT(unload_time_mu)
+        self.unload_MOT(unload_time_mu)
 
         for i in range(num_points // 20):
             data[i] = self.adc_reader.read_adc()
             delay_mu(delay_between_points_mu)
 
-        # self.load_MOT()
+        self.load_MOT()
 
         for i in range(num_points // 20, num_points):
             data[i] = self.adc_reader.read_adc()
@@ -178,7 +178,7 @@ class MeasureMOTWithPDFrag(ExpFragment):
 
     @rpc(flags={"async"})
     def update_data(self, data):
-        self.name = f"MOT_loading.{self.scheduler.rid}"
+        self.name = f"MOT_loading"
         data = np.asarray(data)
 
         xs = np.linspace(0, self.total_loading_time.get(), self.num_trace_points.get())
