@@ -750,12 +750,6 @@ class ArtiqGUIExperiment(EnvExperiment):
             group="GUI",
             tooltip="Enable remote X forwarded display",
         )
-        self.setattr_argument(
-            "remoteDisplayAddress",
-            StringValue("127.0.0.1:10.0"),
-            group="GUI",
-            tooltip="Address for remote display",
-        )
 
         self.suservo = self.get_device("suservo")
         self.suservo_chs = [self.get_device(f"suservo_ch{i}") for i in range(8)]
@@ -780,12 +774,7 @@ class ArtiqGUIExperiment(EnvExperiment):
         self.core.reset()
 
         if self.remoteDisplay:
-            os.environ["DISPLAY"] = self.remoteDisplayAddress
-        if not self.check_display():
-            logging.error(
-                "This is likely due to 'remoteDisplay' being set to True despite running on the server"
-            )
-            return
+            self.find_working_display()
 
         # SUServo
         self.suservoManager = SUServoManager(
@@ -826,26 +815,26 @@ class ArtiqGUIExperiment(EnvExperiment):
         app.exec_()
 
     @rpc
-    def check_display(self):
-        """
-        Check if a QApplication can be opened without crashing.
-        This is done in a subprocess to isolate potential crashes.
-        """
+    def find_working_display(self):
         import subprocess
+        os.environ.pop("XAUTHORITY", None)
 
-        # Run the script in a subprocess
-        result = subprocess.run(
-            [
-                sys.executable,
-                "-c",
-                "from PyQt5.QtWidgets import QApplication;app = QApplication([])",
-            ],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+        for num in range(10, 15):
+            os.environ["DISPLAY"] = f"localhost:{num}"
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    "-c",
+                    "from PyQt5.QtWidgets import QApplication;app = QApplication([])",
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            if result.returncode == 0:
+                print(f"Connected to display localhost:{num}")
+                return True
+        raise RuntimeError(
+            "Could not find a working display localhost:10 to localhost:15"
+            " - check your X forwarding settings"
+            " - if you are running locally, set remoteDisplay to False"
         )
-
-        # Check the return code of the subprocess
-        if result.returncode != 0:
-            logging.error(f"Display check failed:\n{result.stderr.decode().strip()}")
-            return False
-        return True

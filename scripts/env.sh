@@ -38,10 +38,9 @@ pip install -e "git+https://github.com/m-labs/artiq-comtools.git#egg=artiq-comto
 # ndscan
 pip install -e "git+https://github.com/OxfordIonTrapGroup/ndscan.git#egg=ndscan"
 
-# pydantic
+# generic
+pip install matplotlib
 pip install pydantic
-
-# pyserial
 pip install pyvisa-py
 pip install pyserial
 

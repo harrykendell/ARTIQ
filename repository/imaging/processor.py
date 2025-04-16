@@ -41,7 +41,7 @@ def ravel(func):
 class AbsImage:
     nm = 1e-9
     um = 1e-6
-    threshold = 100
+    threshold = 200
 
     def __init__(
         self,

@@ -31,10 +31,24 @@ on_ssh() {
         return 1
     fi
 }
+check_localhost() {
+    local ips
+    ips=$(getent ahostsv4 localhost | awk '{print $1}' | sort -u)
+
+    if echo "$ips" | grep -q '127.0.0.1'; then
+        return 0
+    fi
+    return 1
+}
+
 
 # Running locally on server - we run everything locally
 if on_server && ! on_ssh; then
     echo -e "${GREEN}Running locally on the ARTIQ server${NC}"
+    if check_localhost; then
+        echo -e "${RED}WARNING: /etc/hosts has localhost set for remote use.\nThis may cause issues in the system\nPlease reset it to 127.0.1.1${NC}"
+        exit 1
+    fi
     tmux new -d -s ThorlabsPM "nix shell --command bash -c \"python ./ThorlabsPM/ThorlabsPM.py\""
     nix shell --command bash -c "artiq_dashboard -v --server=\"$SERVER_ADDRESS\" -p ndscan.dashboard_plugin"
     exit 0
@@ -42,6 +56,10 @@ fi
 
 # Running remotely on server - we forward to the client
 if on_server; then
+    if ! check_localhost; then
+        echo -e "${RED}WARNING: /etc/hosts has localhost set to 127.0.1.1.\nThis will prevent X-forwarding.\nPlease set it to 127.0.0.1${NC}"
+        exit 1
+    fi
     echo -e "${GREEN}Remotely running on the ARTIQ server${NC}"
     #  PyQt5 and SO fix
     FIX=". ./scripts/nix-fix-pyqt.sh ; export LD_LIBRARY_PATH=$(find /nix/store -type d -wholename '/nix/store/*artiq-env/lib')"

@@ -140,8 +140,8 @@ class AbsorptionImageExpFrag(ExpFragment):
 
         self.ccb.issue(
             "create_applet",
-            f"AbsorptionImage",
-            f"${{python}} -m repository.imaging.applet --server {server_addr} --title 'Absorption Image after MOT Expansion ({self.load_time.get()/s:.1f}s load, {self.expansion_time.get()/ms:.1f}ms expansion)'"  # noqa: E501,
+            "AbsorptionImage",
+            f"${{python}} -m repository.imaging.applet --server {server_addr}"  # noqa: E501,
         )
 
 

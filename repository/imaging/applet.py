@@ -27,7 +27,7 @@ class AbsorptionView(QtWidgets.QWidget):
         self.req = req
         self.absimg = None
 
-        #set size
+        # set size
         self.setMinimumSize(800, 600)
 
         # Create the main layout
