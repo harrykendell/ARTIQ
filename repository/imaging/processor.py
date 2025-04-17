@@ -41,7 +41,7 @@ def ravel(func):
 class AbsImage:
     nm = 1e-9
     um = 1e-6
-    threshold = 200
+    threshold = 50
 
     def __init__(
         self,
@@ -203,7 +203,7 @@ a 50mm lens at 150mm focuses to 75mm away, so set to 0.5"
 
         model.set_param_hint("sx", value=self.width / 4, min=1, max=self.width)
         model.set_param_hint("sy", value=self.height / 4, min=1, max=self.height)
-        model.set_param_hint("theta", value=0, min=-np.pi / 2, max=np.pi / 2, vary=True)
+        model.set_param_hint("theta", value=0, min=-np.pi / 2, max=np.pi / 2, vary=False)
         model.set_param_hint("z0", value=0, vary=False)
 
         result = model.fit(
@@ -215,8 +215,6 @@ a 50mm lens at 150mm focuses to 75mm away, so set to 0.5"
         )
         logging.info(result.fit_report())
 
-        if abs(result.summary()["rsquared"]) < 0.9:
-            logging.warning(f"Poor fit: r^2 = {result.summary()['rsquared']}")
         return result
 
     @functools.cached_property
@@ -330,7 +328,7 @@ a 50mm lens at 150mm focuses to 75mm away, so set to 0.5"
                 vmin=input_min,
                 vmax=input_max,
                 origin="lower",
-                aspect="auto",
+                aspect="equal",
             )
             ax.set(xticks=[], yticks=[], xlabel="", ylabel="")
             ax.set_title(title, fontweight="bold")
@@ -365,7 +363,7 @@ a 50mm lens at 150mm focuses to 75mm away, so set to 0.5"
             "extent": extent,
             "vmin": vmin,
             "vmax": vmax,
-            "aspect": "auto",
+            "aspect": "equal",
         }
 
         centroid_mm = (self.centroid[1] * scale_mm, self.centroid[0] * scale_mm)

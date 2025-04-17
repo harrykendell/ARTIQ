@@ -93,6 +93,7 @@ class ODTAbsorptionImageExpFrag(ExpFragment):
         # load the MOT
         self.mot_beam_setter.turn_beams_on()
         self.img_beam_setter.turn_beams_off()
+        self.odt_beam_setter.turn_beams_off()
         self.coil_setter.set_defaults()
         delay(self.load_time.get())
 
@@ -144,39 +145,16 @@ class ODTAbsorptionImageExpFrag(ExpFragment):
         if images is None:
             raise RuntimeError("Failed to retrieve images from camera")
 
-        # remove the background
-        atoms = np.subtract(images[0], images[2])
-        light = np.subtract(images[1], images[2])
-        # normalize and threshold transmission based on the mode of the background
-        threshold = mode(images[2]).mode[0] / 2.0
-        transmission = np.divide(atoms, light, where=light > threshold)
-        transmission[light <= threshold] = 1
-        np.clip(transmission, a_min=0, a_max=1, out=transmission)
-        # find the OD
-        smoothed_transmission = gaussian_filter(transmission, sigma=1)
-        od = -np.log(smoothed_transmission, where=smoothed_transmission > 0)
-        self.set_dataset("Images.odt.OD", od, broadcast=True)
-        self.ccb.issue(
-            "create_applet",
-            "Optical Density",
-            f"${{artiq_applet}}image Images.odt.OD --server {server_addr}",
-        )
-
         for num, img_name in enumerate(["TOF", "REF", "BG"]):
             # save for applet
-            self.set_dataset(f"Images.odt.{img_name}", images[num], broadcast=True)
-
-            self.ccb.issue(
-                "create_applet",
-                f"{img_name}",
-                f"${{artiq_applet}}image Images.odt.{img_name} --server {server_addr}",
+            self.set_dataset(
+                f"Images.absorption.{img_name}", images[num], broadcast=True
             )
 
-        non_odt = self.get_dataset("Images.absorption.OD")
-        self.set_dataset(
-            "Images.OD_difference",
-            np.subtract(od, non_odt),
-            broadcast=True,
+        self.ccb.issue(
+            "create_applet",
+            "ODTImage",
+            f"${{python}} -m repository.imaging.applet --server {server_addr}",  # noqa: E501,
         )
 
 

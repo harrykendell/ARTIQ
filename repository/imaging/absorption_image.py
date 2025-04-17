@@ -86,10 +86,10 @@ class AbsorptionImageExpFrag(ExpFragment):
         self.coil_setter.set_defaults()
         delay(self.load_time.get())
 
-        # release MOT and propagate cloud - we can't shutter as tof may be less than the delay
+        # release MOT and propagate cloud
         with parallel:
             self.coil_setter.turn_off()
-            self.mot_beam_setter.turn_beams_off(ignore_shutters=True)
+            self.mot_beam_setter.turn_beams_off()
         delay(self.expansion_time.get())
 
         # image cloud
@@ -137,6 +137,11 @@ class AbsorptionImageExpFrag(ExpFragment):
             self.set_dataset(
                 f"Images.absorption.{img_name}", images[num], broadcast=True
             )
+        self.set_dataset(
+            "Images.absorption.expansion_time",
+            self.expansion_time.get(),
+            broadcast=True,
+        )
 
         self.ccb.issue(
             "create_applet",

@@ -63,7 +63,7 @@ def init_cam(cam: pco.Camera):
     cam.configuration = {
         "timestamp": "binary",
         "trigger": triggers[0],
-        "exposure time": 1*ms,
+        "exposure time": 0.1*ms,
     }
     cam.auto_exposure_off()
 
