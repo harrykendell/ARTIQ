@@ -68,7 +68,7 @@ class TelemetryWorker(QObject):
             async with aiomqtt.Client(self.server) as client:
                 await client.publish(
                     f"dt/sinara/booster/fc-0f-e7-23-77-30/settings/channel/{ch}/state",
-                    str(state),
+                    f"\"{state}\"",
                 )
         except aiomqtt.exceptions.MqttError as e:
             logging.error(f"Booster: Setting state failed: {e}")
@@ -101,21 +101,26 @@ class BoosterTelemetry(QThread):
         asyncio.run(self.worker.set_interlock(ch, db))
 
     def enable_channel(self, ch):
-        asyncio.run(self.worker.set_state(ch, "Powered"))
+        print(f"Enabling channel {ch}")
+        # asyncio.run(self.worker.set_state(ch, "Powered"))
+        # asyncio.sleep(0.5)
         asyncio.run(self.worker.set_state(ch, "Enabled"))
 
     def disable_channel(self, ch):
         asyncio.run(self.worker.set_state(ch, "Off"))
 
-
-
 if __name__ == "__main__":
+    import sys
+    from PyQt5.QtWidgets import QApplication
 
-    def callback(ch, data):
-        logging.info(f"Booster: Received telemetry from channel {ch}: {data}")
+    app = QApplication(sys.argv)
+    telemetry = BoosterTelemetry(lambda ch, data: print(ch, data))
 
-    worker = BoosterTelemetry(callback)
-    worker.set_telem_period(1)
-    worker.run()
-    while True:
-        pass
+    telemetry.set_telem_period(1)
+
+    for i in range(8):
+        telemetry.enable_channel(i)
+
+    telemetry.start()
+
+    sys.exit(app.exec_())
