@@ -332,6 +332,7 @@ aliases = {
     "almazny_eom_repump": "almazny_ch0",
     "shutter_2DMOT": "ttl0",
     "shutter_3DMOT": "ttl1",
+    "shutter_IMG": "ttl3",
     # 852 Lattice
     "suservo_aom_LATX": "suservo_ch4",
     "suservo_aom_LATY": "suservo_ch5",

@@ -30,7 +30,7 @@ VDRIVEN_SUPPLIES = [
         ch=1,
         gain=2.0 * A / V,
         current_limit=3.0 * A,
-        default_current=1.2 * A,
+        default_current=1.1 * A,
     ),
     VDrivenSupply(
         name="Y",
@@ -83,6 +83,9 @@ COIL_PAIRS = [
 COIL_PAIRS = {pair.name: pair for pair in COIL_PAIRS}
 
 THORLABS_SHUTTER_DELAY = 35.0 * ms
+EBAY_SHUTTER_DELAY = (
+    25.0 * ms
+)  # the switch on time is actually quick fast. The limit is the dislike of short pulses
 SHUTTERS = [
     Shutter(
         name="MOT2D",
@@ -122,7 +125,9 @@ SUSERVOED_BEAMS = [
         suservo_device="suservo_aom_IMG",
         frequency=198.0 * MHz,
         attenuation=21.0 * dB,
-        setpoint=0.75 * V,
+        # shutter_device="shutter_IMG",
+        # shutter_delay=EBAY_SHUTTER_DELAY,
+        setpoint=1.0 * V,
         servo_enabled=True,
         calib_gain=36.64e-3,
         calib_offset=-0.87e-3,
@@ -136,7 +141,7 @@ SUSERVOED_BEAMS = [
     SUServoedBeam(
         name="LATX",
         suservo_device="suservo_aom_LATX",
-        frequency=200.0 * MHz,
+        frequency=193.9 * MHz,
         attenuation=17.0 * dB,
     ),
     SUServoedBeam(
@@ -151,13 +156,13 @@ SUSERVOED_BEAMS = [
         name="CDT1",
         suservo_device="suservo_aom_CDT1",
         frequency=110.0 * MHz,
-        attenuation=19.0 * dB,
+        attenuation=18.0 * dB,
     ),
     SUServoedBeam(
         name="CDT2",
         suservo_device="suservo_aom_CDT2",
         frequency=110.0 * MHz,
-        attenuation=19.0 * dB,
+        attenuation=18.0 * dB,
     ),
 ]
 # Convert to dict for ease of use
