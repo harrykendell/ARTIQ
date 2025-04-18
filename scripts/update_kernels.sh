@@ -9,6 +9,6 @@ cd $SCRIPT_DIR/..
 
 echo -e "${RED}This script must be run in a nix shell\n${GREEN}Compiling and flashing kernels...${NC}"
 for TYPE in idle startup; do
-    artiq_compile $SCRIPT_DIR/../repository/kernels/$TYPE\_kernel.py
-    artiq_coremgmt config write -f $TYPE\_kernel $SCRIPT_DIR/../repository/kernels/$TYPE\_kernel.elf
+    artiq_compile $SCRIPT_DIR/../repository/Kernels/$TYPE\_kernel.py
+    artiq_coremgmt config write -f $TYPE\_kernel $SCRIPT_DIR/../repository/Kernels/$TYPE\_kernel.elf
 done
