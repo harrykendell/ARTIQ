@@ -3,7 +3,7 @@ The startup sequence for the experiment.
 """
 
 from artiq.experiment import EnvExperiment, kernel
-from artiq.language.core import delay, now_mu
+from artiq.language.core import delay, now_mu, delay_mu
 from artiq.language.units import us, ms
 from artiq.coredevice.ttl import TTLOut, TTLInOut
 from artiq.coredevice.core import Core
@@ -66,6 +66,11 @@ class Startup(EnvExperiment):
 
         # Fastino
         self.fastino.init()
+        delay(10 * ms)
+        for fch in range(32):
+            self.fastino.set_dac(fch, 0.0)
+            delay_mu(self.fastino.t_frame * 2)
+        self.fastino.set_continuous(0xFFFFFFFF)
         delay(100 * ms)
 
         # SUServo
