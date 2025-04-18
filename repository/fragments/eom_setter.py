@@ -3,18 +3,11 @@ import logging
 from artiq.coredevice.core import Core
 from artiq.coredevice.almazny import AlmaznyChannel
 from artiq.coredevice.adf5356 import ADF5356
-from artiq.coredevice.mirny import Mirny
 from artiq.language.units import us, ms
 from artiq.experiment import (
     TFloat,
-    TInt32,
-    TList,
-    TBool,
-    delay_mu,
     delay,
     kernel,
-    now_mu,
-    portable,
 )
 from ndscan.experiment import Fragment
 

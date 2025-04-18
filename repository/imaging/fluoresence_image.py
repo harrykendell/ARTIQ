@@ -68,7 +68,8 @@ class FluorescenceImageExpFrag(ExpFragment):
         self.coil_setter.turn_off()  # make sure we unload MOT
         delay(100 * ms)
 
-        # By ignoring shutters we don't drop the MOT for `shutter_delay` time if it was already loaded
+        # By ignoring shutters we don't drop the MOT for `shutter_delay`
+        # if it was already loaded
         self.mot_beam_setter.turn_beams_on()
         self.img_beam_setter.turn_beams_off(ignore_shutters=True)
         self.coil_setter.set_defaults()
@@ -87,7 +88,8 @@ class FluorescenceImageExpFrag(ExpFragment):
         delay(self.expansion_time.get())
 
         # image cloud
-        # don't shutter if using the mot beam to image as it interferes with the release stage
+        # don't shutter if using the mot beam to image as it
+        # interferes with the release stage
         with parallel:
             self.mot_beam_setter.turn_beams_on(ignore_shutters=True)
             self.pco_camera.capture_image()

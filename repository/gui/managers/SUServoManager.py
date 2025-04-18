@@ -1,19 +1,18 @@
-from artiq.experiment import *
-from artiq.language import us, ms, MHz, dB, delay, TInt64
+from artiq.language import kernel, EnvExperiment, us, ms, MHz, delay
 
 from artiq.coredevice.core import Core
-from artiq.coredevice.suservo import SUServo, Channel as SUServoChannel, COEFF_WIDTH
+from artiq.coredevice.suservo import SUServo, Channel as SUServoChannel
 from artiq.coredevice.ttl import TTLInOut
 
 import numpy as np
-import logging
 
 
 class SUServoManager:  # {{{
     """
     Manages a single SUServo device with 8 channels
 
-    It tries to load the state from the dataset provided, if it doesn't exist it will create a new one
+    It tries to load the state from the dataset provided
+    if it doesn't exist it will create a new one
     """
 
     def __init__(
@@ -46,7 +45,7 @@ class SUServoManager:  # {{{
             ("Ps", [-1.0] * 8, None),
             ("Is", [-200000.0] * 8, None),
             ("Gls", [-200.0] * 8, None),
-            ("en_shutters", [0] * 3, None),
+            ("en_shutters", [0] * 4, None),
             ("calib_gains", [1.0] * 8, None),
             ("calib_offsets", [0.0] * 8, "V"),
         ]
@@ -78,7 +77,7 @@ class SUServoManager:  # {{{
         # self.suservo.set_config(self.enabled)
         # delay(50 * us)
         return v
-    
+
     @kernel
     def get_y(self, ch: np.int64):
         """
@@ -97,7 +96,8 @@ class SUServoManager:  # {{{
     @kernel
     def _mutate_and_set_float(self, dataset, variable, index, value):
         """Mutate the dataset and change our internal store of the value
-        We have to pass both the dataset reference and local variable as __dict__ access is illegal on kernel
+        We have to pass both the dataset reference and local variable
+        as __dict__ access is illegal on kernel
         """
         self.experiment.mutate_dataset(self.name + "." + dataset, index, value)
         variable[index] = value
@@ -106,7 +106,8 @@ class SUServoManager:  # {{{
     @kernel
     def _mutate_and_set_int(self, dataset, variable, index, value):
         """Mutate the dataset and change our internal store of the value
-        We have to pass both the dataset reference and local variable as __dict__ access is illegal on kernel
+        We have to pass both the dataset reference and local variable
+        as __dict__ access is illegal on kernel
         """
         self.experiment.mutate_dataset(self.name + "." + dataset, index, value)
         variable[index] = value
@@ -154,7 +155,8 @@ class SUServoManager:  # {{{
     def set_att(self, ch, att):
         self._mutate_and_set_float("atts", self.atts, ch, att)
 
-        # We have to write all 4 channels at once - so convert each to mu and accumulate into reg
+        # We have to write all 4 channels at once -
+        # so convert each to mu and accumulate into reg
         reg = 0
         for i in range(4):
             reg += self.suservo.cplds[0].att_to_mu(
@@ -212,7 +214,7 @@ class SUServoManager:  # {{{
         self.channels[ch].set_y(profile=ch, y=y)
 
     @kernel
-    def set_iir(self, ch: np.int32, adc, P, I, Gl):
+    def set_iir(self, ch: np.int32, adc, P, I, Gl):  # noqa: E741
         self._mutate_and_set_float("Ps", self.Ps, ch, P)
         self._mutate_and_set_float("Is", self.Is, ch, I)
         self._mutate_and_set_float("Gls", self.Gls, ch, Gl)
@@ -299,7 +301,8 @@ class SUServoManager:  # {{{
             self.channels[ch].set_y(profile=ch, y=self.ys[ch])
 
         for ch in range(8):
-            # set attenuation on all 4 channels - we set all from the dataset then overwrite the one we want
+            # set attenuation on all 4 channels -
+            # we set all from the dataset then overwrite the one we want
             self.suservo.cplds[ch // 4].set_att(ch % 4, self.atts[ch])
             self.channels[ch].set(
                 en_out=self.en_outs[ch], en_iir=self.en_iirs[ch], profile=ch

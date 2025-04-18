@@ -9,7 +9,6 @@ models act as normal python classes and so are fully compatible with ARTIQ
 kernels.
 """
 
-import sys
 from pydantic.dataclasses import dataclass
 from repository.models.Device import DEVICE
 
@@ -38,7 +37,8 @@ class SUServoedBeam(DEVICE):
     shutter_device: Optional[str] = None
     shutter_delay: float = 0.0
 
-    # A setpoint in volts which should always be attainable, else the experiment has permission to misbehave
+    # A setpoint in volts which should always be attainable,
+    # else the experiment has permission to misbehave
     setpoint: float = 0.0
     servo_enabled: bool = False
     initial_amplitude: float = 1.0

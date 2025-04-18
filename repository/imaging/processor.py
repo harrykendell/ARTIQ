@@ -8,8 +8,8 @@ from artiq.language.units import MHz
 
 
 def gaussian_2D(x, y, A, x0, y0, sx, sy, theta=0, z0=0):
-    """Takes a meshgrid of x, y and returns the gaussian computed across all values.
-    See https://en.wikipedia.org/wiki/Gaussian_function#Two-dimensional_Gaussian_function
+    """Takes a meshgrid of x, y and returns the gaussian computed across all values. See
+    https://en.wikipedia.org/wiki/Gaussian_function#Two-dimensional_Gaussian_function
     """
     cos_sq = np.square(np.cos(theta))
     sin_sq = np.square(np.sin(theta))
@@ -170,7 +170,8 @@ a 50mm lens at 150mm focuses to 75mm away, so set to 0.5"
 
     @functools.cached_property
     def sigma_mask(self):
-        """Returns a numpy mask of pixels within the 2-sigma limit of the model (no ROI)"""
+        """Returns a numpy mask of pixels within the
+        2-sigma limit of the model (no ROI)"""
         bp_2D = self.best_values
         y0, x0, a, b, theta = (bp_2D[k] for k in ("y0", "x0", "sy", "sx", "theta"))
         y, x = np.ogrid[0 : self.height, 0 : self.width]
@@ -203,7 +204,9 @@ a 50mm lens at 150mm focuses to 75mm away, so set to 0.5"
 
         model.set_param_hint("sx", value=self.width / 4, min=1, max=self.width)
         model.set_param_hint("sy", value=self.height / 4, min=1, max=self.height)
-        model.set_param_hint("theta", value=0, min=-np.pi / 2, max=np.pi / 2, vary=False)
+        model.set_param_hint(
+            "theta", value=0, min=-np.pi / 2, max=np.pi / 2, vary=False
+        )
         model.set_param_hint("z0", value=0, vary=False)
 
         result = model.fit(

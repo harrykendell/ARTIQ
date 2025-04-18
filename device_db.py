@@ -194,8 +194,8 @@ for i in range(8):
         }
     )
 
-# SU Servo is an 8-channel ADC (Sampler) and two 4-channel DDS (Urukuls) with a DSP engine
-# connecting the ADC data and the DDS output amplitudes to enable feedback.
+# SU Servo is an 8-channel ADC (Sampler) and two 4-channel DDS (Urukuls) with a DSP
+# engine connecting the ADC data and the DDS output amplitudes to enable feedback.
 # It can be used to implement intensity stabilization of laser beams
 # with an amplifier and AOM driven by Urukul and a photodetector connected to Sampler.
 

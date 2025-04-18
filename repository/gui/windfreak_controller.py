@@ -5,7 +5,6 @@ from PyQt5.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
-    QPushButton,
     QSlider,
     QCheckBox,
 )
@@ -67,7 +66,7 @@ class TextSliderControl(QWidget):
     def setval(self, val):
         try:
             val = float(val)
-        except:
+        except ValueError:
             self.setval(self.get())
             return
         if val == self.val:
@@ -83,7 +82,8 @@ class TextSliderControl(QWidget):
 
 
 class SynthController(QWidget):
-    # we hold state for the synth temperature and each channel's enable and frequency/power
+    # we hold state for the synth temperature and each channel's
+    # enable and frequency/power
     def __init__(self, port="/dev/ttyACM0"):
         super().__init__()
         self.synth = SynthHD(port)
@@ -129,10 +129,11 @@ class SynthController(QWidget):
             channel_layout = QHBoxLayout()
 
             # Frequency controls
-            set_f = lambda val, channel=self.synth[ch]: setattr(
-                channel, "frequency", val * 1e6
-            )
-            get_f = lambda channel=self.synth[ch]: channel.frequency / 1e6
+            def set_f(val, channel=self.synth[ch]):
+                setattr(channel, "frequency", val * 1e6)
+
+            def get_f(channel=self.synth[ch]):
+                return channel.frequency / 1e6
 
             freq_control = TextSliderControl(
                 "Frequency",
@@ -146,8 +147,12 @@ class SynthController(QWidget):
             channel_layout.addWidget(freq_control)
 
             # Power control
-            set_p = lambda val, channel=self.synth[ch]: setattr(channel, "power", val)
-            get_p = lambda channel=self.synth[ch]: channel.power
+            def set_p(val, channel=self.synth[ch]):
+                setattr(channel, "power", val)
+
+            def get_p(channel=self.synth[ch]):
+                return channel.power
+
             power_control = TextSliderControl(
                 "Power",
                 "dBm",
@@ -206,13 +211,16 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"Failed to open Windfreak device: {e}")
         print(
-            "Permission denied errors  -> try running with sudo or adding user to dialout group"
+            "Permission denied errors "
+            "-> try running with sudo or adding user to dialout group"
         )
         print(
-            "Port not found errors -> check the port is correct and that the device is connected"
+            "Port not found errors"
+            "-> check the port is correct and that the device is connected"
         )
         print(
-            "Formatting/terminator value errors -> check the port isn't a different device"
+            "Formatting/terminator value errors"
+            "-> check the port isn't a different device"
         )
         exit(1)
     controller.show()

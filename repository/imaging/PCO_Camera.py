@@ -1,12 +1,11 @@
 import logging
-import logging.handlers
 import pco
 import time
 import numpy as np
 
 from artiq.coredevice.core import Core
 from artiq.coredevice.ttl import TTLInOut
-from artiq.experiment import kernel, rpc, host_only, delay, delay_mu, at_mu, now_mu
+from artiq.experiment import kernel, rpc, host_only, delay, delay_mu
 from artiq.language.units import ms, s, us
 from ndscan.experiment import (
     Fragment,
@@ -72,7 +71,7 @@ class PcoCamera(Fragment):
             "exposure time": self.exposure_time.get(),
         }
         self.cam.auto_exposure_off()
-        
+
         if self.debug:
             logger.info(f"{self.cam.camera_name} ({self.cam.camera_serial})")
             logger.info(self.cam.configuration)

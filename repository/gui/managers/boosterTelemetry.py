@@ -1,4 +1,5 @@
-import asyncio, aiomqtt
+import asyncio
+import aiomqtt
 from PyQt5.QtCore import QThread, pyqtSignal, QObject
 import logging
 
@@ -19,7 +20,6 @@ class TelemetryWorker(QObject):
             client._on_message = self.handle_message
             async for message in client.messages:
                 self.handle_message(message)
-
 
     def handle_message(self, message: aiomqtt.Message):
         """Handle a message from the MQTT broker
@@ -56,7 +56,8 @@ class TelemetryWorker(QObject):
         try:
             async with aiomqtt.Client(self.server) as client:
                 await client.publish(
-                    f"dt/sinara/booster/fc-0f-e7-23-77-30/settings/channel/{ch}/output_interlock_threshold",
+                    f"dt/sinara/booster/fc-0f-e7-23-77-30/settings/channel\
+                        /{ch}/output_interlock_threshold",
                     str(db),
                 )
         except aiomqtt.exceptions.MqttError as e:
@@ -108,6 +109,7 @@ class BoosterTelemetry(QThread):
 
     def disable_channel(self, ch):
         asyncio.run(self.worker.set_state(ch, "Off"))
+
 
 if __name__ == "__main__":
     import sys

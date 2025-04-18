@@ -11,8 +11,6 @@ from repository.fragments.current_supply_setter import SetAnalogCurrentSupplies
 from repository.fragments.beam_setter import ControlBeamsWithoutCoolingAOM
 from repository.models.devices import SUServoedBeam, VDrivenSupply
 
-import logging
-
 
 class AbsorptionImageExpFrag(ExpFragment):
     """

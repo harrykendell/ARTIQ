@@ -37,7 +37,8 @@ class ReadSamplerADC(ReadADC):
     """
     Reads the voltage on a Sampler input channel
 
-    The device and channel to be read are passed as arguments to :meth:`.build_fragment`, e.g.::
+    The device and channel to be read are passed as arguments to
+    :meth:`.build_fragment`, e.g.::
 
         self.setattr_fragment(
             "ReadSamplerADC", ReadSamplerADC, "sampler0", 2,
@@ -48,13 +49,14 @@ class ReadSamplerADC(ReadADC):
         self,
         sampler_device: Optional[Sampler] = None,
         sampler_channel: Optional[int] = None,
-        sampler_pgia_gain: Optional[int] = None,  #  0,1,2 or 3
+        sampler_pgia_gain: Optional[int] = None,  # 0,1,2 or 3
     ):
         """
         Build this (sub)fragment
 
-        If sampler_device and sampler_channel are provided then this fragment will have no parameters.
-        Otherwise, it will expose these as ndscan parameters instead.
+        If sampler_device and sampler_channel are provided then this fragment
+        will have no parameters. Otherwise, it will expose these as ndscan
+        parameters instead.
         """
         if sampler_channel is not None:
             self.sampler_channel: int = sampler_channel

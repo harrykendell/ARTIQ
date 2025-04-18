@@ -53,10 +53,6 @@ class DummyAD9910:
         pass
 
     @kernel
-    def init(self):
-        pass
-
-    @kernel
     def set(self, frequency: TFloat = 0.0, amplitude: TFloat = 1.0) -> TFloat:
         return 0.0
 

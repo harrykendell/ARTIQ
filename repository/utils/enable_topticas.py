@@ -1,7 +1,7 @@
 import logging
-from typing import *
+from typing import List
 
-from artiq.experiment import *
+from artiq.experiment import EnvExperiment, BooleanValue
 from submodules.topticadlcpro.toptica_wrapper.driver import TopticaDLCPro
 from repository.utils.get_local_devices import get_local_devices
 
@@ -15,8 +15,8 @@ class SetTopticaState(EnvExperiment):
     """
 
     def build(self) -> None:
-        self.toptica_device_names = get_local_devices(self,TopticaDLCPro)
-        
+        self.toptica_device_names = get_local_devices(self, TopticaDLCPro)
+
         self.topticas: List[TopticaDLCPro] = [
             self.get_device(d) for d in self.toptica_device_names
         ]

@@ -14,7 +14,7 @@ from ndscan.experiment.parameters import (
 )
 
 from repository.fragments.suservo_frag import SUServoFrag
-from repository.models.devices import SUServoedBeam, SUServoedBeam
+from repository.models.devices import SUServoedBeam
 
 
 class TuneSUServoExpFrag(ExpFragment):

@@ -161,7 +161,7 @@ class MSO24:
         """Basic plot of a trace from a channel."""
         if names is None:
             names = {ch: f"Channel {ch}" for ch in voltage_traces.keys()}
-            
+
         plt.figure()
         for ch in voltage_traces.keys():
             plt.plot(time_axis, voltage_traces[ch], label=names[ch])

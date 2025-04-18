@@ -1,8 +1,7 @@
-from artiq.experiment import *
+from artiq.experiment import EnvExperiment, kernel
 from artiq.language.units import ms
 from artiq.language.core import now_mu, delay, parallel
 
-import logging
 
 class Idle(EnvExperiment):
     # The idle sequence for the experiment.
@@ -28,4 +27,3 @@ class Idle(EnvExperiment):
             delay(125*ms)
             self.led1.pulse(125*ms)
             delay(250*ms)
-

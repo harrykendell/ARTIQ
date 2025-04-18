@@ -1,4 +1,4 @@
-from artiq.experiment import *
+from artiq.experiment import EnvExperiment, kernel
 from artiq.coredevice.suservo import Channel as SUServoChannel
 from artiq.coredevice.core import Core
 

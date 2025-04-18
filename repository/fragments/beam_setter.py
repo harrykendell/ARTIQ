@@ -40,8 +40,8 @@ class ControlBeamsWithoutCoolingAOM(Fragment):
     -------------
 
     This example just turns on and off one beam, but you could (and should) pass
-    several. This is a :class:`~ndscan.experiment.fragment.Fragment` and so needs to be called from another
-    fragment.::
+    several. This is a :class:`~ndscan.experiment.fragment.Fragment`
+    and so needs to be called from another fragment.::
 
         from ndscan.experiment import *
 
@@ -166,7 +166,7 @@ class ControlBeamsWithoutCoolingAOM(Fragment):
         This method advances the timeline cursor by a few RTIO events ~ 100ns
 
         If ignore_shutters == True, Shutters are not touched
-        
+
         If already_on == True, The AOMs don't turn off transiently for a hard edge
 
         Event queueing behaviour:

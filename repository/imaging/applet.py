@@ -1,18 +1,16 @@
 #!/usr/bin/env python3
 
-import PyQt5  # make sure pyqtgraph imports Qt5
+import PyQt5  # noqa: F401 # make sure pyqtgraph imports Qt5
 from PyQt5 import QtWidgets, QtCore
 
 import matplotlib
 
 matplotlib.use("Qt5Agg")
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
-from matplotlib.figure import Figure
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg  # noqa: E402
+from matplotlib.figure import Figure  # noqa: E402
 
-from artiq.applets.simple import TitleApplet
-from repository.imaging.processor import AbsImage
-
-import logging
+from artiq.applets.simple import TitleApplet  # noqa: E402
+from repository.imaging.processor import AbsImage  # noqa: E402
 
 
 class MatplotlibCanvas(FigureCanvasQTAgg):
@@ -73,12 +71,19 @@ class AbsorptionView(QtWidgets.QWidget):
             os.makedirs(save_dir, exist_ok=True)
 
             # Save the raw images
-            np.save(os.path.join(save_dir, f"{timestamp}_tof.npy"), self.absimg.data_image)
-            np.save(os.path.join(save_dir, f"{timestamp}_ref.npy"), self.absimg.ref_image)
+            np.save(
+                os.path.join(save_dir, f"{timestamp}_tof.npy"), self.absimg.data_image
+            )
+            np.save(
+                os.path.join(save_dir, f"{timestamp}_ref.npy"), self.absimg.ref_image
+            )
             np.save(os.path.join(save_dir, f"{timestamp}_bg.npy"), self.absimg.bg_image)
 
             # Save the optical density
-            np.save(os.path.join(save_dir, f"{timestamp}_od.npy"), self.absimg.optical_density)
+            np.save(
+                os.path.join(save_dir, f"{timestamp}_od.npy"),
+                self.absimg.optical_density,
+            )
 
             # Save the visualization
             fig_path = os.path.join(save_dir, f"{timestamp}_plot.png")
@@ -161,7 +166,8 @@ class AbsorptionView(QtWidgets.QWidget):
                     # Enable the button
                     self.save_button.setEnabled(True)
 
-                    # Update status - atom number, r-squared, sigma_x, sigma_y, expansion time
+                    # Update status - atom number, r-squared, sigma_x, sigma_y,
+                    # expansion time
                     atom_number = self.absimg.atom_number
                     r_squared = self.absimg.fit.summary()["rsquared"]
                     self.expansion_time = (
@@ -179,10 +185,14 @@ class AbsorptionView(QtWidgets.QWidget):
                     )
                     self.status_label.setText(
                         f"""<div style="text-align:center; margin:0; padding:0">
-                          <span style="font-weight:bold">Atom number:</span> {atom_number:.2e} &nbsp;
-                          <span style="font-weight:bold">Expansion time:</span> {self.expansion_time:.2f} ms &nbsp;
-                          <span style="font-weight:bold">Sigma:</span> ({sigmax:.2f}, {sigmay:.2f}) mm<br>
-                          <span style="color:#CCC"><b>R-squared:</b> {r_squared:.2f}</span>
+                          <span style="font-weight:bold">Atom number:</span>\
+                            {atom_number:.2e} &nbsp;
+                          <span style="font-weight:bold">Expansion time:</span>\
+                            {self.expansion_time:.2f} ms &nbsp;
+                          <span style="font-weight:bold">Sigma:</span>\
+                            ({sigmax:.2f}, {sigmay:.2f}) mm<br>
+                          <span style="color:#CCC"><b>R-squared:</b>\
+                          {r_squared:.2f}</span>
                         </div>"""
                     )
 

@@ -12,8 +12,6 @@ kernels.
 from typing import Optional
 from pydantic.dataclasses import dataclass
 from repository.models.Device import DEVICE
-from artiq.experiment import HasEnvironment
-import logging
 
 
 @dataclass

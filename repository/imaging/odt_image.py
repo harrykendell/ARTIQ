@@ -11,10 +11,6 @@ from repository.fragments.current_supply_setter import SetAnalogCurrentSupplies
 from repository.fragments.beam_setter import ControlBeamsWithoutCoolingAOM
 from repository.models.devices import SUServoedBeam, VDrivenSupply
 
-import numpy as np
-from scipy.ndimage import gaussian_filter
-from scipy.stats import mode
-
 
 class ODTAbsorptionImageExpFrag(ExpFragment):
     """
@@ -101,7 +97,8 @@ class ODTAbsorptionImageExpFrag(ExpFragment):
         self.odt_beam_setter.turn_beams_on()
         delay(100 * ms)  # allow it to settle
 
-        # release MOT and propagate cloud - we can't shutter as tof may be less than the delay
+        # release MOT and propagate cloud -
+        # we can't shutter as tof may be less than the delay
         with parallel:
             self.coil_setter.turn_off()
             self.mot_beam_setter.turn_beams_off(ignore_shutters=True)

@@ -1,4 +1,6 @@
-import sys, os, json
+import sys
+import os
+import json
 from PyQt5.QtWidgets import (
     QWidget,
     QGroupBox,
@@ -17,9 +19,10 @@ from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QDoubleValidator, QIcon
 from PyQt5.QtCore import QTimer
 
-import logging
 
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
+# disable formatting
+# flake8: noqa
 from managers.SUServoManager import SUServoManager
 from managers.boosterTelemetry import BoosterTelemetry
 from managers.MirnyManager import MirnyManager
@@ -28,8 +31,7 @@ from managers.FastinoManager import FastinoManager, DeltaElektronikaManager
 from artiq.coredevice.core import Core
 
 from artiq.experiment import kernel, EnvExperiment, rpc
-from artiq.language import ms, StringValue, BooleanValue
-
+from artiq.language import ms, BooleanValue
 
 class Switch(QWidget):
     def __init__(self, default: bool, turn_on, turn_off, on_text="ON", off_text="OFF"):
@@ -243,7 +245,8 @@ class PIDControl(QWidget):
                 o = self.manager.calib_offsets[ch]
                 if g != 1.0 or o != 0.0:
                     power = g * volt + o
-                    pow = f"{power if power >= 0.1 else power*1e3:.1f} <b>{'mW' if power >= 0.1 else 'uW'}</b>"
+                    pow = f"{power if power >= 0.1 else power*1e3:.1f} \
+                        <b>{'mW' if power >= 0.1 else 'uW'}</b>"
                 self.adc_val.setText(
                     f"{pow} | {volt:.2f} <b>V</b> | \
                         {self.manager.get_y(ch)*100:.0f}%"
@@ -500,7 +503,7 @@ class SUServoGUI(QWidget):
         shutterlabel = QLabel("Shutters")
         shutterlabel.setStyleSheet("font: bold 14pt")
         hbox.addWidget(shutterlabel)
-        for ch, name in enumerate(["2DMOT", "3DMOT", "LATTICE"]):
+        for ch, name in enumerate(["2DMOT", "3DMOT", "IMG", "LATTICE"]):
             self.shutter_button = Switch(
                 default=self.manager.en_shutters[ch],
                 turn_on=lambda channel=ch: self.manager.open_shutter(channel),
@@ -756,6 +759,7 @@ class ArtiqGUIExperiment(EnvExperiment):
         self.shutters = [
             self.get_device("shutter_2DMOT"),
             self.get_device("shutter_3DMOT"),
+            self.get_device("shutter_IMG"),
             self.get_device("shutter_LATTICE"),
         ]
         self.suservoManager: SUServoManager
@@ -817,6 +821,7 @@ class ArtiqGUIExperiment(EnvExperiment):
     @rpc
     def find_working_display(self):
         import subprocess
+
         os.environ.pop("XAUTHORITY", None)
 
         for num in range(10, 15):

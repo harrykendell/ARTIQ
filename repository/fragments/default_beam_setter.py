@@ -10,7 +10,11 @@ from artiq.experiment import delay_mu, host_only, kernel, portable, at_mu, now_m
 from ndscan.experiment import Fragment
 from ndscan.experiment.parameters import FloatParam, FloatParamHandle
 
-from repository.utils.dummy_devices import *
+from repository.utils.dummy_devices import (
+    DummyTTL,
+    DummySUServoFrag,
+    DummyFloatParameterHandle,
+)
 from repository.fragments.suservo_frag import SUServoFrag
 from repository.models import SUServoedBeam
 
@@ -58,7 +62,8 @@ def make_set_beams_to_default(
     if not name:
         name = "SetBeamsToDefaults"
         logging.warning(
-            "No name provided for default beam setter. Consider providing one to improve ndscan fragment naming"
+            "No name provided for default beam setter."
+            "Consider providing one to improve ndscan fragment naming"
         )
 
     SetBeamsToDefaultsCustomised.__name__ = name
@@ -108,7 +113,8 @@ class SetBeamsToDefaults(Fragment):
     def build_fragment(self):
         self.default_suservo_beam_infos = self.default_suservo_beam_infos or []
 
-        # automatic_setup and automatic_turnon are class variables, but add them to kernel invariants anyway
+        # automatic_setup and automatic_turnon are class variables,
+        # but add them to kernel invariants anyway
         self.kernel_invariants = getattr(self, "kernel_invariants", set())
         self.kernel_invariants.add("automatic_setup")
         self.kernel_invariants.add("automatic_turnon")
@@ -120,8 +126,9 @@ class SetBeamsToDefaults(Fragment):
 
         if self.default_suservo_beam_infos is []:
             raise TypeError(
-                "You must construct this class using the factory function make_set_beams_to_default"
-                " or by subclassing this class and defining default_suservo_beam_infos or default_urukul_beam_infos"
+                "You must construct this class using the factory function"
+                "make_set_beams_to_default or by subclassing this class "
+                "and defining default_suservo_beam_infos or default_urukul_beam_infos"
             )
 
         self.setattr_device("core")
@@ -249,7 +256,8 @@ class SetBeamsToDefaults(Fragment):
     @host_only
     def get_setpoints_beaminfo_setters(self):
         """
-        Get a dict of beam name -> (:class:`~SUServoedBeam` beam info, :class:`~SUServoSettings` object)
+        Get a dict of beam name ->
+        (:class:`~SUServoedBeam` beam info, :class:`~SUServoSettings` object)
         """
         out = {}
         for beam_info, settings in zip(
@@ -323,7 +331,8 @@ class SetBeamsToDefaults(Fragment):
             if self.debug_mode:
                 slack_mu = now_mu() - self.core.get_rtio_counter_mu()
                 logger.info(
-                    "Enabling suservo (%s)\n- beam_info %s\n- setpoint %s\n- frequency %s\n- en_out %s\n- initial_amplitude %.3f",
+                    "Enabling suservo (%s)\n- beam_info %s\n- setpoint %s\n- \
+                        frequency %s\n- en_out %s\n- initial_amplitude %.3f",
                     settings.setter,
                     beam_info,
                     setpoint,

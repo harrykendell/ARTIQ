@@ -1,5 +1,5 @@
-from artiq.experiment import *
-from artiq.language import us, ms, MHz, dB, delay
+from artiq.experiment import EnvExperiment, kernel
+from artiq.language import ms, MHz, dB, delay
 
 from artiq.coredevice.core import Core, rtio_get_counter, at_mu
 from artiq.coredevice.almazny import AlmaznyChannel
@@ -56,7 +56,8 @@ class MirnyManager:  # {{{
     @kernel
     def _mutate_and_set_float(self, dataset, variable, index, value):
         """Mutate the dataset and change our internal store of the value
-        We have to pass both the dataset reference and local variable as __dict__ access is illegal on kernel
+        We have to pass both the dataset reference and local variable as
+        __dict__ access is illegal on kernel
         """
         self.experiment.mutate_dataset(self.name + "." + dataset, index, value)
         variable[index] = value
@@ -65,7 +66,8 @@ class MirnyManager:  # {{{
     @kernel
     def _mutate_and_set_int(self, dataset, variable, index, value):
         """Mutate the dataset and change our internal store of the value
-        We have to pass both the dataset reference and local variable as __dict__ access is illegal on kernel
+        We have to pass both the dataset reference and local variable as
+        __dict__ access is illegal on kernel
         """
         self.experiment.mutate_dataset(self.name + "." + dataset, index, value)
         variable[index] = value

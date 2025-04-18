@@ -39,7 +39,7 @@ class ScientificSpin(QtWidgets.QDoubleSpinBox):
     def setRelativeStep(self, s=None):
         if s is None:
             s = 1 + self.singleStep()
-        self._relative_step = max(1 + 10**-self.decimals(), float(s))
+        self._relative_step = max(1 + 10 ** -self.decimals(), float(s))
 
     def relativeStep(self):
         return self._relative_step
@@ -80,12 +80,13 @@ class ScientificSpin(QtWidgets.QDoubleSpinBox):
             super().stepBy(s)
         else:  # accelerated PageUp/Down or CTRL-wheel
             v = self.value()
-            v *= self._relative_step**(s/copysign(10., v))
+            v *= self._relative_step ** (s / copysign(10.0, v))
             self.setValue(v)
 
 
 if __name__ == "__main__":
     import sys
+
     app = QtWidgets.QApplication(sys.argv)
 
     # spin inside a layout explaining the item

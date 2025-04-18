@@ -2,7 +2,7 @@
 The startup sequence for the experiment.
 """
 
-from artiq.experiment import *
+from artiq.experiment import EnvExperiment, kernel
 from artiq.language.core import delay, now_mu
 from artiq.language.units import us, ms
 from artiq.coredevice.ttl import TTLOut, TTLInOut

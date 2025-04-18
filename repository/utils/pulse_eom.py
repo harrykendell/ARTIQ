@@ -1,7 +1,7 @@
 import logging
 
 from artiq.coredevice.core import Core
-from artiq.experiment import EnumerationValue, delay, kernel
+from artiq.experiment import EnumerationValue, kernel
 from artiq.language.units import ms
 from ndscan.experiment import ExpFragment, FloatParam
 from ndscan.experiment.entry_point import make_fragment_scan_exp

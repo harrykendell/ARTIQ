@@ -5,9 +5,11 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 class TopticaDLCPro:
     """
-    Thin wrapper for the Toptica SDK, to match the format that ARTIQ expects for initialisation
+    Thin wrapper for the Toptica SDK,
+    to match the format that ARTIQ expects for initialisation
 
     To use this object, either use it in a context manager::
 
@@ -49,15 +51,15 @@ class TopticaDLCPro:
             self.bring_methods_into_namespace()
 
     def bring_methods_into_namespace(self):
-        # to work in RPCs we need all member variables to be accessible directly on this class as methods
-        # so we hunt down the chain.
+        # to work in RPCs we need all member variables to be accessible directly
+        # on this class as methods so we hunt down the chain to find them.
 
         """find all callables on the object
         - if its not a property add it to our class
-        - if it is a property, check the type hint and if its a *Decop* type, add the .get and if available .set
+        - if it is a property, check the type hint and if its a *Decop* type
+            add the .get and if available .set
         - otherwise recurse
         """
-        from typing import get_type_hints
 
         def hunt_down(obj, path):
 

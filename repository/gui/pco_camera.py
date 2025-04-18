@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import QTimer, Qt
 
-from artiq.language.units import ms, us
+from artiq.language.units import ms
 
 
 import pco.camera_exception
@@ -27,15 +27,16 @@ import pco.logging
 import pyqtgraph as pg
 
 import sys
+
 sys.path.append(__file__.split("artiq")[0] + "artiq")
-from repository.imaging.PCO_Camera import PcoCamera
+from repository.imaging.PCO_Camera import PcoCamera  # noqa
 
 
 # logger.addHandler(pco.stream_handler)
 
 triggers = [
     "auto sequence",  # just keeps imaging
-    "software trigger",  # waits for a software signal from either a blocking record call or cam.sdk.force_trigger()
+    "software trigger",  # waits for a software signal or cam.sdk.force_trigger()
     "external exposure start & software trigger",  # takes a picture when Trig goes high
     "external exposure control",  # seems to just always immediately take a picture?
 ]
@@ -63,7 +64,7 @@ def init_cam(cam: pco.Camera):
     cam.configuration = {
         "timestamp": "binary",
         "trigger": triggers[0],
-        "exposure time": 0.1*ms,
+        "exposure time": 0.1 * ms,
     }
     cam.auto_exposure_off()
 
@@ -197,12 +198,12 @@ class CameraWidget(QWidget):
 
         must stop recording before setting the exposure time
         """
-        if time == self.cam.configuration["exposure time"]*1e6:
+        if time == self.cam.configuration["exposure time"] * 1e6:
             return
 
         self.spin.clearFocus()
         self.cam.stop()
-        self.cam.configuration["exposure time"] = time*1e-6
+        self.cam.configuration["exposure time"] = time * 1e-6
         self.start_recording()
 
 

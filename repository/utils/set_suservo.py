@@ -5,7 +5,7 @@ from ndscan.experiment.entry_point import make_fragment_scan_exp
 from ndscan.experiment.parameters import BoolParamHandle, FloatParamHandle
 
 from repository.fragments.suservo_frag import SUServoFrag
-from repository.models.devices import SUServoedBeam, SUServoedBeam
+from repository.models.devices import SUServoedBeam
 
 import logging
 

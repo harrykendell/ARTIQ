@@ -178,7 +178,7 @@ class MeasureMOTWithPDFrag(ExpFragment):
 
     @rpc(flags={"async"})
     def update_data(self, data):
-        self.name = f"MOT_loading"
+        self.name = "MOT_loading"
         data = np.asarray(data)
 
         xs = np.linspace(0, self.total_loading_time.get(), self.num_trace_points.get())
@@ -209,7 +209,8 @@ class MeasureMOTWithPDFrag(ExpFragment):
         self.ccb.issue(
             "create_applet",
             "MOT Photodiode Voltage",
-            f"${{artiq_applet}}plot_xy {self.name}.voltage --title 'tau = {fit_results['tau']: .3f}s'"
+            f"${{artiq_applet}}plot_xy {self.name}.voltage --title\
+                'tau = {fit_results['tau']: .3f}s'"
             f" --x {self.name}.time --fit {self.name}.fit --server {server_addr}",
         )
 

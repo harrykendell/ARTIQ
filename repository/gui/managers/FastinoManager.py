@@ -1,7 +1,7 @@
-from artiq.experiment import *
-from artiq.language import us, ms, MHz, dB, delay, TInt64
+from artiq.experiment import EnvExperiment, kernel
+from artiq.language import us, ms, delay
 
-from artiq.coredevice.core import Core, rtio_get_counter, at_mu
+from artiq.coredevice.core import Core
 from artiq.coredevice.fastino import Fastino
 
 
@@ -24,7 +24,9 @@ class FastinoManager:  # {{{
         self.fastino = fastino
         self.name = name
 
-        # numbers from inverting the voltage_to_mu for fastino NB these can be extended as round allows +-0.5 but as the inequality is strict we can't reach the limit anyway
+        # numbers from inverting the voltage_to_mu for fastino NB these can be extended
+        # as round allows +-0.5 but as the inequality is strict we can't reach the
+        # limit anyway
         self.MIN = (-0x8000) / (0x8000 / 10.0)
         self.MAX = (0xFFFF - 0x8000) / (0x8000 / 10.0)
 
@@ -49,7 +51,8 @@ class FastinoManager:  # {{{
     @kernel
     def _mutate_and_set_float(self, dataset, variable, index, value):
         """Mutate the dataset and change our internal store of the value
-        We have to pass both the dataset reference and local variable as __dict__ access is illegal on kernel
+        We have to pass both the dataset reference and local variable as
+        __dict__ access is illegal on kernel
         """
         self.experiment.mutate_dataset(self.name + "." + dataset, index, value)
         variable[index] = value

@@ -4,7 +4,7 @@ from typing import Set
 from artiq.coredevice.core import Core
 from artiq.coredevice.suservo import Channel
 from artiq.coredevice.suservo import SUServo, T_CYCLE, COEFF_SHIFT, COEFF_WIDTH
-from artiq.coredevice.urukul import CPLD
+from artiq.coredevice.urukul import CPLD  # noqa F401
 from artiq.experiment import (
     delay,
     at_mu,
@@ -74,12 +74,14 @@ class SUServoFrag(Fragment):
         self.suservo_channel: Channel = self.get_device(self.channel)
         self.suservo: SUServo = self.suservo_channel.servo
 
-        # We pull default atts on this cpld to avoid clobbering their atts in reset_all_attenuations
-        # We assume that all suservo_chs are ordered properly by channel# so that for each set of 4 they share a cpld
+        # We pull default atts on this cpld to avoid clobbering their atts
+        # in reset_all_attenuations. We assume that all suservo_chs are ordered
+        # properly by channel# so that for each set of 4 they share a cpld
 
         # Find the default attenuations from SUServoedBeams
         beams = [
-            (dev.name, dev.suservo_device, dev.attenuation) for dev in SUServoedBeam.all().values()
+            (dev.name, dev.suservo_device, dev.attenuation)
+            for dev in SUServoedBeam.all().values()
         ]
         minch = min([self.get_device(dev[1]).channel for dev in beams])
         # Assume cplds are logically chunked by channel number
@@ -228,7 +230,8 @@ class SUServoFrag(Fragment):
             status >> 8,
         )
         logging.info(
-            "Profile %s (y=%s): freq=%s, phase=%s, sampler_channel=%s, delay=%s, offset=%s, kp=%s, ki=%s, gain_limit=%s",
+            "Profile %s (y=%s): freq=%s, phase=%s, sampler_channel=%s, delay=%s, \
+                offset=%s, kp=%s, ki=%s, gain_limit=%s",
             profile_num,
             y,
             freq / MHz,
@@ -319,9 +322,11 @@ class SUServoFrag(Fragment):
         Args:
             freq (TFloat): Frequency in Hz
             amplitude (TFloat): Amplitude from 0 to 1 when 1 is 100% output.
-            attenuation (TFloat, optional): Attenuation on the variable attenuator. Defaults to 16.5.
+            attenuation (TFloat, optional): Attenuation on the variable attenuator.
+                Defaults to 16.5.
             en_out (TBool, optional): State of the RF switch. Defaults to on.
-            setpoint_v (TFloat, optional): SUServo setpoint. Only relevant if enable_IRR=True. Defaults to 0.0.
+            setpoint_v (TFloat, optional): SUServo setpoint. Only relevant if
+                enable_IRR=True. Defaults to 0.0.
             enable_iir (TBool, optional): Enable the servo loop. Defaults to False.
         """
         # Set the attenuator for this channel
@@ -397,7 +402,8 @@ class SUServoFrag(Fragment):
     def set_setpoint(self, new_setpoint: TFloat):
         """Set the SUServo setpoint
 
-        Updates only the SUServo setpoint. Does not enable the SUServo / RF switch or change any other parameters.
+        Updates only the SUServo setpoint. Does not enable the SUServo /
+        RF switch or change any other parameters.
 
         Args:
             new_offset (TFloat): The new offset in volts
@@ -454,7 +460,8 @@ class SUServoFrag(Fragment):
         if self.debug_enabled:
             slack_mu = now_mu() - self.core.get_rtio_counter_mu()
             logging.info(
-                "Setting iir params for %s (profile= %s): sampler_channel=%s, kp=%s, ki=%s, gain_limit=%s, delay=%s",
+                "Setting iir params for %s (profile= %s): sampler_channel=%s,\
+                    kp=%s, ki=%s, gain_limit=%s, delay=%s",
                 self.channel,
                 self.suservo_profile,
                 self.sampler_channel,
