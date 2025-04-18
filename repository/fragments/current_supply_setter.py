@@ -3,13 +3,17 @@ from typing import List
 
 from artiq.coredevice.core import Core
 from artiq.coredevice.fastino import Fastino
-from artiq.experiment import TFloat
-from artiq.experiment import TInt32
-from artiq.experiment import TList
-from artiq.experiment import delay_mu
-from artiq.experiment import kernel
-from artiq.experiment import now_mu, at_mu
-from artiq.experiment import portable
+from artiq.experiment import (
+    TFloat,
+    TInt32,
+    TList,
+    delay_mu,
+    kernel,
+    now_mu,
+    at_mu,
+    portable,
+)
+from artiq.language.units import ms
 from ndscan.experiment import Fragment
 
 from repository.models import VDrivenSupply
@@ -254,3 +258,80 @@ class SetAnalogCurrentSupplies(Fragment):
             slack_mu = now_mu() - self.core.get_rtio_counter_mu()
             logger.info("RTIO events queued - now_mu() = %d", now_mu())
             at_mu(self.core.get_rtio_counter_mu() + slack_mu)
+
+    @kernel
+    def smooth_voltage_ramp(
+        self,
+        dac_channel,
+        start_v=1.0,
+        end_v=2.0,
+        duration=20 * ms,
+        max_step_duration=20 * ms,
+        steps=None,
+    ):
+        """Create a voltage ramp of arbitrary duration with smooth transitions.
+
+        This function combines CIC interpolation with timeline-based programming to
+        create smooth voltage transitions of any duration.
+
+        Args:
+            dac_channel: DAC channel number (0-31)
+            start_v: Starting voltage in volts
+            end_v: Ending voltage in volts
+            duration: Total ramp duration
+            max_step_duration: Maximum duration for a single CIC interpolation step
+            steps: Optional number of steps to use (overrides max_step_duration)
+        """
+        # Calculate how many steps we need
+        if steps is None:
+            # Each CIC interpolation can handle up to ~25ms
+            # Using 80% of theoretical max for safety margin
+            num_steps = int(duration / (max_step_duration * 0.8)) + 1
+        else:
+            num_steps = steps
+
+        step_time = duration / num_steps
+        voltage_step = (end_v - start_v) / num_steps
+
+        # Configure the CIC interpolator for each step
+        # Calculate appropriate interpolation rate based on step_time
+        frames_per_step = step_time / self.core.mu_to_seconds(self.t_frame)
+
+        # Select a reasonable rate that's below the maximum (65536)
+        # but still provides good smoothness
+        rate = min(int(frames_per_step / 4), 65530)
+        if rate < 2:
+            rate = 2  # Ensure at least some interpolation
+
+        # Setup the CIC interpolator
+        self.stage_cic(rate)
+
+        # Enable continuous updates on this channel
+        self.set_continuous(1 << dac_channel)
+
+        # Apply the interpolator setting to the channel
+        self.apply_cic(1 << dac_channel)
+
+        # Wait for interpolator to stabilize
+        delay_mu(4 * self.t_frame)
+
+        # Set initial voltage
+        self.set_dac(dac_channel, start_v)
+        delay_mu(4 * self.t_frame)
+
+        # Record start time for precise timeline control
+        t_start = now_mu()
+
+        # For very short durations, just do a single CIC interpolation
+        if num_steps == 1:
+            self.set_dac(dac_channel, end_v)
+            # Wait for completion
+            at_mu(t_start + self.core.seconds_to_mu(duration))
+            return
+
+        # For longer durations, schedule each step with precise timing
+        for i in range(1, num_steps + 1):
+            step_voltage = start_v + i * voltage_step
+            # Schedule this voltage update at the precise time
+            at_mu(t_start + self.core.seconds_to_mu(i * step_time))
+            self.set_dac(dac_channel, step_voltage)

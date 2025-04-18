@@ -1,5 +1,5 @@
 import logging
-from typing import *
+from typing import List, Dict, Tuple
 
 from artiq.coredevice.ad9910 import AD9910
 from artiq.coredevice.core import Core
