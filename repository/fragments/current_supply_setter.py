@@ -7,14 +7,12 @@ from artiq.experiment import (
     TFloat,
     TInt32,
     TList,
-    delay,
     delay_mu,
     kernel,
     now_mu,
     at_mu,
     portable,
 )
-from artiq.language.units import ms
 from ndscan.experiment import Fragment
 
 from repository.models import VDrivenSupply
@@ -33,7 +31,9 @@ class SetAnalogCurrentSupplies(Fragment):
         self.core: Core
 
         self.current_configs: list[VDrivenSupply] = current_configs
-
+        self.defaults = [
+            dev.default_current for dev in self.current_configs
+        ]
         assert all(
             [c.fastino == self.current_configs[0].fastino for c in self.current_configs]
         ), "All current drivers must use the same Fastino"
@@ -121,7 +121,10 @@ class SetAnalogCurrentSupplies(Fragment):
             )  # Nothing happens for multiple channels if we use a shorter delay?!
 
     @kernel
-    def set_defaults(self):
+    def set_to_defaults(self):
+        """
+        Set the currents to the default values defined in the current_configs
+        """
         self.set_currents([dev.default_current for dev in self.current_configs])
 
     @kernel
@@ -129,7 +132,7 @@ class SetAnalogCurrentSupplies(Fragment):
         self.set_currents([0.0] * len(self.current_configs))
 
     @kernel
-    def set_currents_ramping(
+    def set_ramping(
         self,
         currents_start: TList(TFloat),
         currents_end: TList(TFloat),

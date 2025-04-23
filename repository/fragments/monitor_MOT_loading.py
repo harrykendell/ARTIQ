@@ -68,7 +68,7 @@ class MOTPhotodiodeMeasurement(Fragment):
 
         This starts loading the MOT now.
         """
-        self.coil_setter.set_defaults()
+        self.coil_setter.set_to_defaults()
 
     @kernel
     def measure_MOT_fluorescence(

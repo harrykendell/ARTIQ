@@ -1,6 +1,6 @@
 from artiq.coredevice.core import Core
-from artiq.experiment import kernel, rpc, delay, parallel, now_mu
-from artiq.language.units import s, ms, us
+from artiq.experiment import kernel, rpc
+from artiq.language import delay, parallel, now_mu, s, ms, us, MHz
 from device_db import server_addr
 
 from ndscan.experiment import ExpFragment, make_fragment_scan_exp, FloatParam
@@ -39,6 +39,14 @@ class AbsorptionImageExpFrag(ExpFragment):
         self.coil_setter: SetAnalogCurrentSupplies
 
         self.setattr_fragment(
+            "z_coil_setter",
+            SetAnalogCurrentSupplies,
+            VDrivenSupply[["Z"]],
+            init=False,
+        )
+        self.z_coil_setter: SetAnalogCurrentSupplies
+
+        self.setattr_fragment(
             "mot_beam_setter",
             ControlBeamsWithoutCoolingAOM,
             beam_infos=[SUServoedBeam["MOT"]],
@@ -75,14 +83,29 @@ class AbsorptionImageExpFrag(ExpFragment):
     def run_once(self):
         self.core.reset()
 
-        self.coil_setter.turn_off()  # make sure we unload MOT
-        delay(100 * ms)
+        self.z_coil_setter.set_currents([1.5])  # make sure we unload MOT
+        delay(50 * ms)
+        self.z_coil_setter.set_to_defaults()
 
         # load the MOT
         self.mot_beam_setter.turn_beams_on()
         self.img_beam_setter.turn_beams_off()
-        self.coil_setter.set_defaults()
+        self.coil_setter.set_to_defaults()
         delay(self.load_time.get())
+
+        # compress the MOT - higher field, further detuned
+        DURATION = 50 * ms
+        with parallel:
+            self.coil_setter.set_ramping(
+                self.coil_setter.defaults,
+                [v * 2 for v in self.coil_setter.defaults],
+                DURATION,
+            )
+            self.mot_beam_setter.set_ramping(
+                [self.mot_beam_setter.beam_infos[0].frequency],
+                [self.mot_beam_setter.beam_infos[0].frequency - 10*MHz],
+                DURATION,
+            )
 
         # release MOT and propagate cloud
         with parallel:
@@ -96,10 +119,12 @@ class AbsorptionImageExpFrag(ExpFragment):
             self.pco_camera.capture_image()
         delay(self.exposure_time.get())
         self.img_beam_setter.turn_beams_off()
-        delay(self.pco_camera.BUSY_TIME)
+        delay(self.pco_camera.BUSY_TIME - self.exposure_time.get())
 
         # make sure the mot has cleared
-        delay(100 * ms)
+        self.z_coil_setter.set_currents([1.5])  # make sure we unload MOT
+        delay(50 * ms)
+        self.z_coil_setter.set_to_defaults()
 
         # reference image
         with parallel:
@@ -107,20 +132,20 @@ class AbsorptionImageExpFrag(ExpFragment):
             self.pco_camera.capture_image()
         delay(self.exposure_time.get())
         self.img_beam_setter.turn_beams_off()
-        delay(self.pco_camera.BUSY_TIME)
+        delay(self.pco_camera.BUSY_TIME - self.exposure_time.get())
 
         # background image
         self.pco_camera.capture_image()
-        delay(self.exposure_time.get())
         delay(self.pco_camera.BUSY_TIME)
 
         # leave the MOT to reload
-        self.coil_setter.set_defaults()
+        self.coil_setter.set_to_defaults()
         self.mot_beam_setter.turn_beams_on()
         self.img_beam_setter.turn_beams_off()
 
         self.core.wait_until_mu(now_mu())
         self.update_images()
+
 
     @rpc(flags={"async"})
     def update_images(self):
@@ -144,7 +169,7 @@ class AbsorptionImageExpFrag(ExpFragment):
         self.ccb.issue(
             "create_applet",
             "AbsorptionImage",
-            f"${{python}} -m repository.imaging.applet --server {server_addr}"  # noqa: E501,
+            f"${{python}} -m repository.imaging.applet --server {server_addr}",  # noqa: E501,
         )
 
 

@@ -3,11 +3,13 @@ from typing import List
 
 import numpy as np
 from artiq.coredevice.core import Core
-from artiq.coredevice.suservo import Channel as SUServoChannel
+from artiq.coredevice.suservo import Channel as SUServoChannel, T_CYCLE as t_frame
 from artiq.coredevice.ttl import TTLOut
-from artiq.experiment import at_mu, delay, delay_mu, kernel, now_mu, portable
+from artiq.language import delay, delay_mu, now_mu, at_mu, ns
+from artiq.experiment import kernel, portable, TList, TInt32, TFloat
 from ndscan.experiment import Fragment
 
+from repository.fragments.suservo_frag import SUServoFrag
 from repository.utils.get_local_devices import get_local_devices
 from repository.models import SUServoedBeam
 
@@ -114,13 +116,14 @@ class ControlBeamsWithoutCoolingAOM(Fragment):
         # in the loops
         dummy_beaminfo = SUServoedBeam(
             name="dummy",
-            frequency=0,
-            attenuation=0.0,
+            frequency=-1.0,
+            attenuation=-1.0,
             shutter_device=get_local_devices(self, TTLOut)[0],
             suservo_device=get_local_devices(self, SUServoChannel)[0],
             shutter_delay=0,
         )
-        self.beam_infos.insert(0, dummy_beaminfo)
+        if len(self.beam_infos) == 0:
+            self.beam_infos.insert(0, dummy_beaminfo)
 
         for beam_info in self.beam_infos:
             self.beam_suservos.append(self.get_device(beam_info.suservo_device))
@@ -139,6 +142,7 @@ class ControlBeamsWithoutCoolingAOM(Fragment):
                         beam_info.shutter_device,
                     )
 
+        self.num_beams = len(self.beam_infos)
         self.longest_beam_delay = max([info.shutter_delay for info in self.beam_infos])
 
         # Kernel invariants
@@ -146,6 +150,7 @@ class ControlBeamsWithoutCoolingAOM(Fragment):
         self.kernel_invariants = kernel_invariants | {
             "debug_enabled",
             "longest_beam_delay",
+            "num_beams",
         }
 
     def host_setup(self):
@@ -176,7 +181,7 @@ class ControlBeamsWithoutCoolingAOM(Fragment):
         """
 
         if not ignore_shutters:
-            for i in range(len(self.beam_infos) - 1, 0, -1):
+            for i in range(self.num_beams - 1, -1, -1):
                 beam_info = self.beam_infos[i]
                 if beam_info.shutter_device == "None":
                     continue
@@ -206,7 +211,7 @@ class ControlBeamsWithoutCoolingAOM(Fragment):
 
                 delay(beam_info.shutter_delay)
 
-        for i in range(len(self.beam_infos) - 1, 0, -1):
+        for i in range(self.num_beams - 1, -1, -1):
             suservo = self.beam_suservos[i]
             beam_info = self.beam_infos[i]
 
@@ -251,7 +256,7 @@ class ControlBeamsWithoutCoolingAOM(Fragment):
         * 0 < t < longest_beam_delay: AOMs turned back on to stay warm
         """
 
-        for i in range(1, len(self.beam_infos)):
+        for i in range(self.num_beams):
             suservo = self.beam_suservos[i]
             beam_info = self.beam_infos[i]
 
@@ -289,7 +294,7 @@ class ControlBeamsWithoutCoolingAOM(Fragment):
                 delay_mu(self.t_rtio_cycle_mu)
 
         if not ignore_shutters:
-            for i in range(1, len(self.beam_infos)):
+            for i in range(self.num_beams):
                 beam_info = self.beam_infos[i]
                 if beam_info.shutter_device == "None":
                     continue
@@ -321,7 +326,7 @@ class ControlBeamsWithoutCoolingAOM(Fragment):
 
     @kernel
     def _set_shutters(self, state=True, ignore_delay=False):
-        for i in range(len(self.beam_infos) - 1, 0, -1):
+        for i in range(self.num_beams - 1, -1, -1):
             beam_info = self.beam_infos[i]
             if beam_info.shutter_device == "None":
                 continue
@@ -382,3 +387,85 @@ class ControlBeamsWithoutCoolingAOM(Fragment):
     @portable
     def get_longest_shutter_delay(self):
         return self.longest_beam_delay
+
+    @kernel
+    def set_ramping(
+        self,
+        freqs_start: TList(TFloat),  # type: ignore
+        freqs_end: TList(TFloat),  # type: ignore
+        duration: TFloat,  # type: ignore
+        num_steps: TInt32 = 100,  # type: ignore
+    ):
+        """
+        Queue a linear ramp of the beams controlled by this object
+
+        This method will write lots of RTIO events for the `duration` of the
+        ramp and will advance the timeline until the end of the ramp. It will
+        also require quite a lot of time to compute and queue the ramp, so users
+        should consider DMA if performance is limiting.
+
+        Args:
+            freqs_start (TList): List of starting frequencies / Hz
+            freqs_end (TList): List of ending frequencies / Hz
+            duration (TFloat): Time to perform the ramp for
+        """
+        if self.debug_enabled:
+            slack_mu = now_mu() - self.core.get_rtio_counter_mu()
+            logger.info(
+                "Starting ramp for %.3f ms for beams: %s",
+                1e3 * duration,
+                [beam_info.name for beam_info in self.beam_infos[1:]],
+            )
+            at_mu(self.core.get_rtio_counter_mu() + slack_mu)
+
+        # work out time steps - we want to limit rtio channels so space each write by t_frame ~ 1.168us
+        # this means we need at least t_frame * num_beams per timestep or they collide again
+        time_step = duration / num_steps
+        if time_step < (t_frame * self.num_beams):  # avoid collisions
+            time_step = t_frame / self.num_beams
+            num_steps = max(1, int(duration / time_step))
+            logger.error(
+                "Requested steps occur too fast. Decreased steps to %d", num_steps
+            )
+        time_per_step = self.core.seconds_to_mu(time_step)
+
+        # Do the ramping
+        start_of_ramp = now_mu()
+        for i in range(num_steps):
+            for i_beam in range(self.num_beams):
+                suservo = self.beam_suservos[i_beam]
+                beam_info = self.beam_infos[i_beam]
+                offset = self.setpoint_to_offset(beam_info.setpoint)
+
+                suservo.set_dds(
+                    suservo.servo_channel,
+                    freqs_start[i_beam]
+                    + (freqs_end[i_beam] - freqs_start[i_beam]) * i / num_steps,
+                    offset,
+                )
+            at_mu(start_of_ramp + time_per_step * (i + 1))
+
+        # Set the final values
+        for i_beam in range(self.num_beams):
+            suservo = self.beam_suservos[i_beam]
+            beam_info = self.beam_infos[i_beam]
+            offset = self.setpoint_to_offset(beam_info.setpoint)
+
+            suservo.set_dds(
+                suservo.servo_channel,
+                freqs_end[i_beam],
+                offset,
+            )
+
+    @kernel
+    def setpoint_to_offset(self, setpoint_v: TFloat) -> TFloat:
+        """Convert a setpoint in volts to a SUServo offset
+
+        Args:
+            setpoint_v (TFloat): Setpoint in volts
+
+        Returns:
+            TFloat: Offset in SUServo units
+        """
+        # Setpoints are stored in units of full scale, where 1.0 -> +10V, -1.0 -> -10V
+        return -1.0 * setpoint_v / 10.0

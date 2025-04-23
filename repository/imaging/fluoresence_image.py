@@ -72,7 +72,7 @@ class FluorescenceImageExpFrag(ExpFragment):
         # if it was already loaded
         self.mot_beam_setter.turn_beams_on()
         self.img_beam_setter.turn_beams_off(ignore_shutters=True)
-        self.coil_setter.set_defaults()
+        self.coil_setter.set_to_defaults()
         delay(10 * s)
 
         # initial image of loaded MOT
@@ -112,7 +112,7 @@ class FluorescenceImageExpFrag(ExpFragment):
         delay(150 * ms)
 
         # leave the MOT to reload
-        self.coil_setter.set_defaults()
+        self.coil_setter.set_to_defaults()
         self.mot_beam_setter.turn_beams_on()
         self.img_beam_setter.turn_beams_off()
 

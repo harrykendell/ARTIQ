@@ -20,7 +20,7 @@ class ODTAbsorptionImageExpFrag(ExpFragment):
     def build_fragment(self):
         self.setattr_device("core")
         self.core: Core
-
+        
         self.setattr_device("ccb")
 
         self.setattr_fragment("pco_camera", PcoCamera, num_images=3)
@@ -90,7 +90,7 @@ class ODTAbsorptionImageExpFrag(ExpFragment):
         self.mot_beam_setter.turn_beams_on()
         self.img_beam_setter.turn_beams_off()
         self.odt_beam_setter.turn_beams_off()
-        self.coil_setter.set_defaults()
+        self.coil_setter.set_to_defaults()
         delay(self.load_time.get())
 
         # turn on the ODT
@@ -127,7 +127,7 @@ class ODTAbsorptionImageExpFrag(ExpFragment):
         delay(self.pco_camera.BUSY_TIME)
 
         # leave the MOT to reload
-        self.coil_setter.set_defaults()
+        self.coil_setter.set_to_defaults()
         self.mot_beam_setter.turn_beams_on()
         self.img_beam_setter.turn_beams_off()
 
@@ -150,7 +150,7 @@ class ODTAbsorptionImageExpFrag(ExpFragment):
 
         self.ccb.issue(
             "create_applet",
-            "ODTImage",
+            "AbsorptionImage",
             f"${{python}} -m repository.imaging.applet --server {server_addr}",  # noqa: E501,
         )
 

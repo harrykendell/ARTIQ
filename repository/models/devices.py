@@ -21,7 +21,7 @@ VDRIVEN_SUPPLIES = [
         fastino="fastino",
         ch=0,
         gain=2.0 * A / V,
-        current_limit=3.0 * A,
+        current_limit=2.0 * A,
         default_current=1.0 * A,
     ),
     VDrivenSupply(
@@ -29,7 +29,7 @@ VDRIVEN_SUPPLIES = [
         fastino="fastino",
         ch=1,
         gain=2.0 * A / V,
-        current_limit=3.0 * A,
+        current_limit=2.0 * A,
         default_current=1.1 * A,
     ),
     VDrivenSupply(
@@ -37,7 +37,7 @@ VDRIVEN_SUPPLIES = [
         fastino="fastino",
         ch=2,
         gain=2.0 * A / V,
-        current_limit=3.0 * A,
+        current_limit=2.0 * A,
         default_current=0.0 * A,
     ),
     VDrivenSupply(
@@ -45,7 +45,7 @@ VDRIVEN_SUPPLIES = [
         fastino="fastino",
         ch=3,
         gain=2.0 * A / V,
-        current_limit=3.0 * A,
+        current_limit=2.0 * A,
         default_current=0.0 * A,
     ),
     VDrivenSupply(
@@ -124,7 +124,7 @@ SUSERVOED_BEAMS = [
         name="IMG",
         suservo_device="suservo_aom_IMG",
         frequency=198.0 * MHz,
-        attenuation=21.0 * dB,
+        attenuation=22.0 * dB,
         # shutter_device="shutter_IMG",
         # shutter_delay=EBAY_SHUTTER_DELAY,
         setpoint=1.0 * V,
@@ -163,6 +163,8 @@ SUSERVOED_BEAMS = [
         suservo_device="suservo_aom_CDT2",
         frequency=110.0 * MHz,
         attenuation=18.0 * dB,
+        calib_gain=95.42,
+        calib_offset=0.0723,
     ),
 ]
 # Convert to dict for ease of use

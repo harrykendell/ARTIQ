@@ -4,24 +4,18 @@ from typing import List, Dict, Tuple
 from artiq.coredevice.ad9910 import AD9910
 from artiq.coredevice.core import Core
 from artiq.coredevice.dma import CoreDMA
-from artiq.experiment import at_mu
-from artiq.experiment import delay
-from artiq.experiment import delay_mu
-from artiq.experiment import kernel
-from artiq.experiment import now_mu
-from artiq.experiment import portable
-from artiq.experiment import TFloat
-from artiq.experiment import TInt32
-from artiq.experiment import TList
+
+from artiq.language.core import at_mu, delay, delay_mu, now_mu
+from artiq.experiment import kernel, host_only, portable, TFloat, TInt32, TList
 from ndscan.experiment import Fragment
-from ndscan.experiment.parameters import FloatParam
-from ndscan.experiment.parameters import FloatParamHandle
-from numpy import int32
-from numpy import int64
+from ndscan.experiment.parameters import FloatParam, FloatParamHandle
+from numpy import int32, int64
 
 from repository.utils.dummy_devices import DummyAD9910
 from repository.utils.dummy_devices import DummySUServoChannel
 from repository.fragments.suservo_frag import SUServoFrag
+
+from repository.fragments.default_beam_setter import SetBeamsToDefaults
 
 logger = logging.getLogger(__name__)
 
@@ -851,3 +845,107 @@ class GeneralRampingPhase(Fragment):
             self.bind_param(
                 param_name=setpoint_nominal_handle.name, source=target_handle
             )
+
+
+class GeneralRampingPhaseWithBinding(GeneralRampingPhase):
+    """
+    Template fragment for a phase of the experiment using a ramp with bound SUServo setpoints.
+
+    This adds to the functionality
+    of :class:`~GeneralRampingPhase` with a method binding the ramp SUServo setpoints
+    to the default setpoints in an instance of :class:`~SetBeamsToDefaults`, or a list of instances of :class:`~SetBeamsToDefaults`. This is useful
+    for having a common reference "default" setpoint used in both the ramp and other
+    stages in the sequence, while exposing that default as a parameter in ndscan.
+
+    See the docs for :class:`~GeneralRampingPhase` for more information.
+    """
+
+    def build_fragment(self, enforce_binding_to_defaults=True):
+        self.enforce_binding_to_defaults = enforce_binding_to_defaults
+        self.__binding_completed = False
+        return super().build_fragment()
+
+    def host_setup(self):
+        if self.enforce_binding_to_defaults and not self.__binding_completed:
+            raise TypeError(
+                "bind_suservo_setpoint_params_to_default_beam_setter has not been called\n"
+                "This must be called from the Fragment which initiates this phase to rebind the red beam setpoints"
+            )
+        return super().host_setup()
+
+    @host_only
+    def bind_suservo_setpoint_params_to_default_beam_setter(
+        self, beam_setter: SetBeamsToDefaults | list[SetBeamsToDefaults]
+    ):
+        """
+        Use the GeneralRampingPhase's :meth:`~.bind_suservo_setpoint_params`
+        method to bind all this GeneralRampingPhase's suservo setpoint
+        parameters to those defined by a `SetBeamsToDefaults`, or a list of `SetBeamsToDefaults`.
+
+        This binding method can be used to create a single place in the ndscan
+        parameter tree where a global multiple for all the setpoints for a set of related beams are defined,
+        e.g. for the red 689 nm beams, all setpoints are tied to the nominal setpoint in the SetBeamsToDefaults, owned by the red_beam_controller.
+
+        Some envisaged use cases of nominal setpoint binding:
+
+        1. Bind nominal setpoints to a `SetBeamsToDefaults` using this
+           `bind_suservo_setpoint_params_to_default_beam_setter` method. This
+           should be used to bind a ramp to a common reference in the case where
+           beams have been set up using a previous
+           SetBeamsToDefaults.turn_on_all().
+
+        2. Bind nominal setpoints to the previous adjacent ramping phase using
+           :meth:`~.daisy_chain_with_previous_phase`. This should be used when
+           one ramp follows another and they should share the same nominal
+           setpoints (and, optionally, end/start points).
+
+        3. Don't bind nominal setpoints. The ramping phase nominal setpoint will
+           then be free to tune independently of other phases (often not
+           advisable if coordination between phases is useful).
+        """
+        # For the SUServo setpoints, bind these to the FloatParameters defined
+        # by the DefaultBeamSetter so that this is the only place which defines
+        # SUServo setpoints
+        if isinstance(beam_setter, SetBeamsToDefaults):
+            info_and_settings = list(
+                beam_setter.get_setpoints_beaminfo_setters().values()
+            )
+            handles = []
+            for suservo_device_name in self.suservos:
+                for info, settings in info_and_settings:
+                    if info.suservo_device == suservo_device_name:
+                        handles.append(settings.setpoint_handle)
+                        break
+                else:
+                    raise ValueError(
+                        f"SUServo {suservo_device_name} not found in all_beam_default_setter"
+                    )
+            self.bind_suservo_setpoint_params(handles)
+            self.__binding_completed = True
+        else:
+            handles = []
+            for suservo_device_name in self.suservos:
+                _found = False
+                for beam_setter_instance in beam_setter:
+                    if _found:
+                        break
+                    else:
+                        info_and_settings = list(
+                            beam_setter_instance.get_setpoints_beaminfo_setters().values()
+                        )
+                        for info, settings in info_and_settings:
+                            if info.suservo_device == suservo_device_name:
+                                handles.append(settings.setpoint_handle)
+                                _found = True
+                                break
+                if not _found:
+                    if self.enforce_binding_to_defaults:
+                        raise ValueError(
+                            f"SUServo {suservo_device_name} not found in all_beam_default_setters"
+                        )
+            if len(handles) != len(set(handles)):
+                raise ValueError(
+                    "Duplicate default SUServo setpoints in different beam_setters encountered"
+                )
+            self.bind_suservo_setpoint_params(handles)
+            self.__binding_completed = True
