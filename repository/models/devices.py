@@ -1,4 +1,4 @@
-from repository.models import CoilPair, Eom, Shutter, SUServoedBeam, VDrivenSupply
+from repository.models import Eom, Shutter, SUServoedBeam, VDrivenSupply
 from repository.models.Device import device_arrays
 from artiq.language.units import ms, dB, MHz, V, A
 
@@ -49,6 +49,14 @@ VDRIVEN_SUPPLIES = [
         default_current=0.0 * A,
     ),
     VDrivenSupply(
+        name="780_modulation",
+        fastino="fastino",
+        ch=4,
+        gain=222 * MHz / V,
+        current_limit=222 * MHz,
+        default_current=0.0 * MHz,
+    ),
+    VDrivenSupply(
         name="GreenTA",
         fastino="fastino",
         ch=6,
@@ -69,18 +77,6 @@ VDRIVEN_SUPPLIES = [
 ]
 # Convert to dict for ease of use
 VDRIVEN_SUPPLIES = {supply.name: supply for supply in VDRIVEN_SUPPLIES}
-
-COIL_PAIRS = [
-    CoilPair(
-        name="X",
-        coil1="X1",
-        coil2="X2",
-        default_current_comm=1.0 * A,
-        default_current_diff=1.0 * A,
-    ),
-]
-# Convert to dict for ease of use
-COIL_PAIRS = {pair.name: pair for pair in COIL_PAIRS}
 
 THORLABS_SHUTTER_DELAY = 35.0 * ms
 EBAY_SHUTTER_DELAY = (
@@ -175,7 +171,6 @@ device_arrays.update(
     {
         Eom: EOMS,
         VDrivenSupply: VDRIVEN_SUPPLIES,
-        CoilPair: COIL_PAIRS,
         Shutter: SHUTTERS,
         SUServoedBeam: SUSERVOED_BEAMS,
         # Add other classes as needed

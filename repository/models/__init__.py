@@ -9,7 +9,6 @@
 """
 
 # from repository.models.Device import *
-from repository.models.Coil import *
 from repository.models.Eom import *
 from repository.models.Shutter import *
 from repository.models.SUServoedBeam import *
