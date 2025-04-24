@@ -7,12 +7,10 @@ from artiq.experiment import (
     TFloat,
     TInt32,
     TList,
-    delay_mu,
     kernel,
-    now_mu,
-    at_mu,
     portable,
 )
+from artiq.language import delay_mu, now_mu, at_mu
 from ndscan.experiment import Fragment
 
 from repository.models import VDrivenSupply
@@ -78,7 +76,7 @@ class SetAnalogCurrentSupplies(Fragment):
     def _single_current_to_volts(self, current: TFloat, current_supply_idx: TInt32):
         lim = self.current_configs[current_supply_idx].current_limit
         gain = self.current_configs[current_supply_idx].gain
-        return min(lim, current / gain)
+        return min(lim, current) / gain
 
     @portable
     def _currents_to_volts(self, currents: TList(TFloat), voltages_out: TList(TFloat)):
@@ -202,3 +200,4 @@ class SetAnalogCurrentSupplies(Fragment):
                 self.fastino_channels[i_supply], end_voltages[i_supply]
             )
             delay_mu(self.fastino.t_frame)
+        at_mu(start_of_ramp + self.core.seconds_to_mu(duration))
