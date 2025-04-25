@@ -16,9 +16,19 @@ from repository.models import Eom
 logger = logging.getLogger(__name__)
 
 
-class SetEOM(Fragment):
+class EomFrag(Fragment):
     """
     Set an EOM controlled by an almazny mezzanine.
+
+    The channel to be set should be passed as an argument to
+    :meth:`.build_fragment`, e.g.::
+
+        self.setattr_fragment(
+            "eom_setter",
+            EomFrag,
+            EOMS["repump"],
+            init=False,
+        )
     """
 
     def build_fragment(self, config: Eom, init: bool = True):
@@ -26,6 +36,8 @@ class SetEOM(Fragment):
         self.core: Core
 
         self.config: Eom = config
+        self.default_freq = config.frequency
+        self.default_att = config.attenuation
 
         self.channel = self.get_device(self.config.mirny_ch)
         self.channel: ADF5356
@@ -58,14 +70,14 @@ class SetEOM(Fragment):
             self.channel.cpld.init()
 
             self.core.break_realtime()
-            self.set_defaults()
+            self.set_to_defaults()
 
             self.first_run = False
 
         self.device_setup_subfragments()
 
     @kernel
-    def set_defaults(self):
+    def set_to_defaults(self):
         """
         Set the EOM to its default state. This is called by the
         `device_setup` method it init=True.
@@ -120,18 +132,24 @@ class SetEOM(Fragment):
         Set the frequency of the EOM in MHz
         53.125 MHz <= f <= 6800 MHz
 
-        Does not advance the timeline
+        This uses quite a while (~400us) as it relocks the PLL
         """
         self.channel.set_frequency(frequency)
 
     @kernel
-    def set_att(self, attenuation: TFloat):
+    def set_att(self, attenuation: TFloat, almazny_on: bool = True):
         """
         Set the attenuation of the EOM in dB
+        Also enables the Almazny channel if `almazny_on` is True
 
         Does not advance the timeline
         """
         self.channel.set_att(attenuation)
+        self.almazny.set(
+            attenuation,
+            almazny_on,
+            almazny_on,
+        )
 
     @kernel
     def pulse(self, on_duration=20 * ms, off_duration=1 * ms):

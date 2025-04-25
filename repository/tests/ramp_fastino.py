@@ -91,12 +91,8 @@ class DMA_fastino(EnvExperiment):
         self.record()
         self.core.break_realtime()
 
-        # good for single playback
-        self.core_dma.playback("ramp")
-
-        # ramp_handle = self.core_dma.get_handle("ramp")
-        # self.core.break_realtime()
+        ramp_handle = self.core_dma.get_handle("ramp")
+        self.core.break_realtime()
         # good for multiple playback
         # for i in range(100):
-        #     self.core_dma.playback_handle(ramp_handle)
-
+        self.core_dma.playback_handle(ramp_handle)

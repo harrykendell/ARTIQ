@@ -22,16 +22,23 @@ class SetAnalogCurrentSupplies(Fragment):
     """
     Set multiple current supplies that are controlled by a analog voltages.
     The supplies must all be controlled by the same fastino
+
+    The channel to be set should be passed as an argument to
+    :meth:`.build_fragment`, e.g.::
+
+        self.setattr_fragment(
+            "coil_setter",
+            SetAnalogCurrentSupplies,
+            [VDrivenSupply["X1"]],
+            init=False,
+        )
     """
 
     def build_fragment(self, current_configs: List[VDrivenSupply], init: bool = True):
         self.setattr_device("core")
         self.core: Core
-
         self.current_configs: list[VDrivenSupply] = current_configs
-        self.defaults = [
-            dev.default_current for dev in self.current_configs
-        ]
+        self.defaults = [dev.default_current for dev in self.current_configs]
         assert all(
             [c.fastino == self.current_configs[0].fastino for c in self.current_configs]
         ), "All current drivers must use the same Fastino"
@@ -128,76 +135,3 @@ class SetAnalogCurrentSupplies(Fragment):
     @kernel
     def turn_off(self):
         self.set_currents([0.0] * len(self.current_configs))
-
-    @kernel
-    def set_ramping(
-        self,
-        currents_start: TList(TFloat),
-        currents_end: TList(TFloat),
-        duration: TFloat,
-        num_steps: TInt32 = 100,
-    ):
-        """
-        Queue a linear ramp of the currents controlled by this object
-
-        This method will write lots of RTIO events for the `duration` of the
-        ramp and will advance the timeline until the end of the ramp. It will
-        also require quite a lot of time to compute and queue the ramp, so users
-        should consider DMA if performance is limiting.
-
-        Args:
-            currents_start (TList): List of starting currents / A
-
-            currents_end (TList): List of ending currents / A
-
-            duration (TFloat): Time to perform the ramp for
-        """
-        # work out voltages from currents
-        start_voltages = [0.0] * self.num_supplies
-        end_voltages = [0.0] * self.num_supplies
-        for i_supply in range(self.num_supplies):
-            start_voltages[i_supply] = self._single_current_to_volts(
-                currents_start[i_supply], i_supply
-            )
-            end_voltages[i_supply] = self._single_current_to_volts(
-                currents_end[i_supply], i_supply
-            )
-        if self.debug_enabled:
-            slack_mu = now_mu() - self.core.get_rtio_counter_mu()
-            logger.info(
-                "Starting ramp for %.3f ms",
-                1e3 * duration,
-            )
-            at_mu(self.core.get_rtio_counter_mu() + slack_mu)
-
-        # work out time steps - we want to avoid collisions so space each supplies' write by t_frame
-        # this means we need at least t_frame * num_supplies per timestep or they collide again
-        t_frame = self.core.mu_to_seconds(self.fastino.t_frame)
-        time_step = duration / num_steps 
-        if time_step < (t_frame * self.num_supplies): # avoid collisions
-            time_step = t_frame / self.num_supplies
-            num_steps = max(1, int(duration / time_step))
-            logger.error("Requested steps occur too fast. Decreased steps to %d", num_steps)
-        time_per_step = self.core.seconds_to_mu(time_step)
-
-        # Do the ramping
-        start_of_ramp = now_mu()
-        for i in range(num_steps):
-            for i_supply in range(self.num_supplies):
-                self.fastino.set_dac(
-                    self.fastino_channels[i_supply],
-                    start_voltages[i_supply]
-                    + (end_voltages[i_supply] - start_voltages[i_supply])
-                    * i
-                    / num_steps,
-                )
-                delay_mu(self.fastino.t_frame)
-            at_mu(start_of_ramp + time_per_step * (i+1))
-
-        # Set the final voltages
-        for i_supply in range(self.num_supplies):
-            self.fastino.set_dac(
-                self.fastino_channels[i_supply], end_voltages[i_supply]
-            )
-            delay_mu(self.fastino.t_frame)
-        at_mu(start_of_ramp + self.core.seconds_to_mu(duration))
