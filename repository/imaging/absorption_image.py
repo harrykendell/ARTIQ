@@ -1,6 +1,7 @@
 from artiq.coredevice.core import Core
+from artiq.coredevice.dma import CoreDMA
 from artiq.experiment import kernel, rpc
-from artiq.language import delay, parallel, now_mu, s, ms, us, MHz
+from artiq.language import delay, parallel, now_mu, s, ms, us, MHz, V, at_mu
 from device_db import server_addr
 
 from ndscan.experiment import ExpFragment, make_fragment_scan_exp, FloatParam
@@ -11,7 +12,6 @@ from repository.fragments.current_supply_setter import SetAnalogCurrentSupplies
 from repository.fragments.beam_setter import ControlBeamsWithoutCoolingAOM
 from repository.models.devices import SUServoedBeam, VDrivenSupply
 
-
 class AbsorptionImageExpFrag(ExpFragment):
     """
     Absorption imaging of MOT expansion
@@ -20,6 +20,9 @@ class AbsorptionImageExpFrag(ExpFragment):
     def build_fragment(self):
         self.setattr_device("core")
         self.core: Core
+
+        self.setattr_device("core_dma")
+        self.core_dma: CoreDMA
 
         self.setattr_device("ccb")
 
@@ -45,6 +48,14 @@ class AbsorptionImageExpFrag(ExpFragment):
             init=False,
         )
         self.z_coil_setter: SetAnalogCurrentSupplies
+
+        self.setattr_fragment(
+            "unlock_pusher",
+            SetAnalogCurrentSupplies,
+            VDrivenSupply[["780_modulation"]],
+            init=False,
+        )
+        self.unlock_pusher: SetAnalogCurrentSupplies
 
         self.setattr_fragment(
             "mot_beam_setter",
@@ -88,24 +99,12 @@ class AbsorptionImageExpFrag(ExpFragment):
         self.z_coil_setter.set_to_defaults()
 
         # load the MOT
-        self.mot_beam_setter.turn_beams_on()
-        self.img_beam_setter.turn_beams_off()
         self.coil_setter.set_to_defaults()
+        self.unlock_pusher.set_to_defaults()
+        self.eom_setter.set_to_defaults()
         delay(self.load_time.get())
 
         # compress the MOT - higher field, further detuned
-        DURATION = 50 * ms
-        with parallel:
-            self.coil_setter.set_ramping(
-                self.coil_setter.defaults,
-                [v * 2 for v in self.coil_setter.defaults],
-                DURATION,
-            )
-            self.mot_beam_setter.set_ramping(
-                [self.mot_beam_setter.beam_infos[0].frequency],
-                [self.mot_beam_setter.beam_infos[0].frequency - 10*MHz],
-                DURATION,
-            )
 
         # release MOT and propagate cloud
         with parallel:
@@ -145,7 +144,6 @@ class AbsorptionImageExpFrag(ExpFragment):
 
         self.core.wait_until_mu(now_mu())
         self.update_images()
-
 
     @rpc(flags={"async"})
     def update_images(self):
