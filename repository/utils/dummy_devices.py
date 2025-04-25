@@ -104,6 +104,24 @@ class DummyFloatParameterHandle:
 
 
 class DummySUServoChannel:
+    servo_channel = 0
     @kernel
     def set_setpoint(self, new_setpoint: TFloat):
         return 0.0
+    
+    @kernel
+    def set_dds(self, profile, frequency, offset, phase=0.0):
+        pass
+
+
+class DummyEomFrag:
+    @kernel
+    def set_att(self, attenuation: TFloat, almazny_on: bool = True):
+        pass
+    @kernel
+    def set_freq(self, frequency: TFloat):
+        pass
+
+class DummySetAnalogCurrentSupplies:
+    def set_currents(self, currents):
+        pass

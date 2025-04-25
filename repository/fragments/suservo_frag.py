@@ -92,7 +92,7 @@ class SUServoFrag(Fragment):
         self.beams = beams[start_ch : start_ch + 4]
         if self.debug_enabled:
             logging.info(
-                "Default beams: %s",
+                "Default atts for beams: %s",
                 self.beams,
             )
 
@@ -230,8 +230,8 @@ class SUServoFrag(Fragment):
             status >> 8,
         )
         logging.info(
-            "Profile %s (y=%s): freq=%s, phase=%s, sampler_channel=%s, delay=%s, \
-                offset=%s, kp=%s, ki=%s, gain_limit=%s",
+            "Profile %s (y=%s): freq=%s, phase=%s, sampler_channel=%s,"
+            " delay=%s,offset=%s, kp=%s, ki=%s, gain_limit=%s",
             profile_num,
             y,
             freq / MHz,
@@ -460,8 +460,8 @@ class SUServoFrag(Fragment):
         if self.debug_enabled:
             slack_mu = now_mu() - self.core.get_rtio_counter_mu()
             logging.info(
-                "Setting iir params for %s (profile= %s): sampler_channel=%s,\
-                    kp=%s, ki=%s, gain_limit=%s, delay=%s",
+                "Setting iir params for %s (profile= %s): sampler_channel=%s,"
+                " kp=%s,ki=%s, gain_limit=%s, delay=%s",
                 self.channel,
                 self.suservo_profile,
                 self.sampler_channel,

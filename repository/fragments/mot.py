@@ -1,7 +1,7 @@
 # import logging
 
 # from artiq.coredevice.core import Core
-# from artiq.experiment import at_mu, delay, delay_mu, kernel, now_mu
+# from artiq.language import at_mu, delay, delay_mu, kernel, now_mu
 # from ndscan.experiment import Fragment
 # from ndscan.experiment.parameters import FloatParam, FloatParamHandle
 # from numpy import int64

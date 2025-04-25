@@ -113,8 +113,8 @@ class DEVICE:
             if light_touch:
                 # we will only deal with values that have changed
                 exec(
-                    "from repository.models.devices import *;\
-                        global duplicate_dev;duplicate_dev="
+                    "from repository.models.devices import *;"
+                    " global duplicate_dev;duplicate_dev="
                     + definition["definition"],
                     globals(),
                     locals(),
@@ -203,14 +203,11 @@ class DEVICE:
             except Exception as e:
                 formatted_value = repr(new_value)
                 logging.warning(
-                    f"Could not preserve units for\
-                            {getattr(self,'name')}.{field_name}.\n{e}"
+                    "Could not preserve units for"
+                    f" {getattr(self,'name')}.{field_name}.\n{e}"
                 )
         else:
-            logging.warning(
-                f"Defaulted to repr for {field_name}:\
-                                {type(new_value)}"
-            )
+            logging.warning(f"Defaulted to repr for {field_name}:  {type(new_value)}")
             formatted_value = repr(new_value)
 
         return formatted_value

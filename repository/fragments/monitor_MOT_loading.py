@@ -209,9 +209,9 @@ class MeasureMOTWithPDFrag(ExpFragment):
         self.ccb.issue(
             "create_applet",
             "MOT Photodiode Voltage",
-            f"${{artiq_applet}}plot_xy {self.name}.voltage --title\
-                'tau = {fit_results['tau']: .3f}s'"
-            f" --x {self.name}.time --fit {self.name}.fit --server {server_addr}",
+            f"${{artiq_applet}}plot_xy {self.name}.voltage --title 'tau"
+            f" = {fit_results['tau']: .3f}s' --x {self.name}.time --fit {self.name}.fit"
+            f" --server {server_addr}",
         )
 
 

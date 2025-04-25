@@ -4,13 +4,13 @@ from artiq.language.units import ms, dB, MHz, V, A
 
 EOMS = [
     Eom(
-        name="repump_eom",
+        name="repump",
         frequency=3289.0 * MHz,
         attenuation=12.0 * dB,
         mirny_ch="mirny_eom_repump",
         almazny_ch="almazny_eom_repump",
         almazny_enabled=True,
-    )
+    ),
 ]
 # Convert to dict for ease of use
 EOMS = {eom.name: eom for eom in EOMS}
@@ -69,7 +69,7 @@ VDRIVEN_SUPPLIES = [
         name="Dispenser",
         fastino="fastino",
         ch=7,
-        gain=0.0 * A / V,
+        gain=1.0 * A / V,
         current_limit=3.0 * A,
         default_current=2.70 * A,
         # TODO: Actually set me up
@@ -167,12 +167,10 @@ SUSERVOED_BEAMS = [
 SUSERVOED_BEAMS = {beam.name: beam for beam in SUSERVOED_BEAMS}
 
 # map from class to dict for initializing devices
-device_arrays.update(
-    {
-        Eom: EOMS,
-        VDrivenSupply: VDRIVEN_SUPPLIES,
-        Shutter: SHUTTERS,
-        SUServoedBeam: SUSERVOED_BEAMS,
-        # Add other classes as needed
-    }
-)
+device_arrays.update({
+    Eom: EOMS,
+    VDrivenSupply: VDRIVEN_SUPPLIES,
+    Shutter: SHUTTERS,
+    SUServoedBeam: SUSERVOED_BEAMS,
+    # Add other classes as needed
+})

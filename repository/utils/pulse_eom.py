@@ -7,7 +7,7 @@ from ndscan.experiment import ExpFragment, FloatParam
 from ndscan.experiment.entry_point import make_fragment_scan_exp
 from ndscan.experiment.parameters import FloatParamHandle
 
-from repository.fragments.eom_setter import SetEOM
+from repository.fragments.eom_setter import EomFrag
 from repository.models.devices import Eom
 
 logger = logging.getLogger(__name__)
@@ -17,7 +17,7 @@ class PulseEOMExpFrag(ExpFragment):
     """
     Continually pulse the EOM
 
-    Breaks out the :class:`~SetEOM` Fragment.
+    Breaks out the :class:`~EomFrag` Fragment.
     """
 
     def build_fragment(self):
@@ -33,8 +33,8 @@ class PulseEOMExpFrag(ExpFragment):
         else:
             config = Eom[default]
 
-        self.setattr_fragment("setter", SetEOM, config, init=False)
-        self.setter: SetEOM
+        self.setattr_fragment("setter", EomFrag, config, init=False)
+        self.setter: EomFrag
 
         self.setattr_param(
             "time_on",

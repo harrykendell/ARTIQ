@@ -9,7 +9,7 @@ models act as normal python classes and so are fully compatible with ARTIQ
 kernels.
 """
 
-from typing import Optional
+from numpy import inf
 from pydantic.dataclasses import dataclass
 from repository.models.Device import DEVICE
 
@@ -26,8 +26,7 @@ class VDrivenSupply(DEVICE):
     fastino: str
     ch: int
 
-    gain: float  # The Current gain in Amps/Volt
-    current_limit: float
+    gain: float = 1.0  # The Current gain in Amps/Volt
+    current_limit: float = inf
     enabled: bool = False
-
-    default_current: Optional[float] = None
+    default_current: float = 0.0

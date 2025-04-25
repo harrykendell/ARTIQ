@@ -18,7 +18,6 @@ from repository.utils.dummy_devices import (
 from repository.fragments.suservo_frag import SUServoFrag
 from repository.models import SUServoedBeam
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -331,8 +330,8 @@ class SetBeamsToDefaults(Fragment):
             if self.debug_mode:
                 slack_mu = now_mu() - self.core.get_rtio_counter_mu()
                 logger.info(
-                    "Enabling suservo (%s)\n- beam_info %s\n- setpoint %s\n- \
-                        frequency %s\n- en_out %s\n- initial_amplitude %.3f",
+                    "Enabling suservo (%s)\n- beam_info %s\n- setpoint %s\n-           "
+                    "              frequency %s\n- en_out %s\n- initial_amplitude %.3f",
                     settings.setter,
                     beam_info,
                     setpoint,
