@@ -1,484 +1,502 @@
-# import logging
-
-# from artiq.coredevice.core import Core
-# from artiq.language import at_mu, delay, delay_mu, kernel, now_mu
-# from ndscan.experiment import Fragment
-# from ndscan.experiment.parameters import FloatParam, FloatParamHandle
-# from numpy import int64
-# from repository.fragments.default_beam_setter import (
-#     SetBeamsToDefaults,
-#     make_set_beams_to_default,
-# )
-# from repository.fragments.beam_setter import (
-#     ControlBeamsWithoutCoolingAOM,
-# )
-
-# from repository.models.devices import SUServoedBeam
-# from repository.lib.fragments.beams.reset_all_beams import ResetAllICLBeams
-# from repository.lib.fragments.magnetic_fields import SetMagneticFieldsQuick
-# from repository.lib.fragments.magnetic_fields import SetMagneticFieldsSlow
-# from repository.lib.fragments.ramping_phase_bound import (
-#     GeneralRampingPhaseWithBindingAndMOTField,
-# )
-# from repository.lib.fragments.set_eom_sidebands import SetEOMSidebandsExceptCavity
-
-# logger = logging.getLogger(__name__)
-
-
-# BlueBeamSetter = make_set_beams_to_default(
-#     suservo_beam_infos= SUServoedBeam[
-#             "blue_push_beam",
-#             "blue_2dmot_A",
-#             "blue_2dmot_B",
-#             "blue_3dmot_radial",
-#             "blue_3dmot_axialplus",
-#             "blue_3dmot_axialminus",
-#             "repump_707",
-#             "repump_679",
-# ]
-#     urukul_beam_infos=[],
-#     name="BlueBeamSetter",
-# )
-
-
-# class BlueRampingPhaseWithFields(GeneralRampingPhaseWithBindingAndMOTField):
-#     """
-#     Subclass the GeneralRampingPhase specifically for the blue MOT transfer phase. I.e.:
-
-#     * Control the 3 blue 3D MOT beams
-#     * Add control of the B fields in chamber 2
-#     """
-
-#     duration_default = BLUE_TRANSFER_MOT_DURATION
-#     time_step_default = BLUE_TRANSFER_MOT_RAMP_TIMESTEP
-
-#     suservos = [
-#         "suservo_aom_singlepass_461_3DMOT_axialminus",
-#         "suservo_aom_singlepass_461_3DMOT_axialplus",
-#         "suservo_aom_singlepass_461_3DMOT_radial",
-#     ]
-#     default_suservo_nominal_setpoints = [
-#         0.0
-#     ] * 3  # The nominal setpoints will be retrieved from default beam setter settings (usually set in constants SUServo list, but also an exposed parameter)
-#     default_suservo_setpoint_multiples_start = BLUE_TRANSFER_MOT_SUSERVO_MULTIPLES_START
-#     default_suservo_setpoint_multiples_end = BLUE_TRANSFER_MOT_SUSERVO_MULTIPLES_END
-#     general_setter_default_starts = [BLUE_TRANSFER_MOT_GRADIENT_START]
-#     general_setter_default_ends = [BLUE_TRANSFER_MOT_GRADIENT_END]
-
-
-# class Blue3DMOTFrag(Fragment):
-#     """
-#     Methods for making and controlling the blue 3D MOT
-
-#     If manual_init=True is passed to build_fragment, the user must call init()
-#     before this object is used
-#     """
-
-#     def build_fragment(self, manual_init=False):
-#         self.setattr_device("core")
-#         self.core: Core
-
-#         self.setattr_fragment(
-#             "mirny_eom_sidebands", SetEOMSidebandsExceptCavity, init_mirnys=False
-#         )
-#         self.mirny_eom_sidebands: SetEOMSidebandsExceptCavity
-
-#         self.setattr_param_rebind("sr87", self.mirny_eom_sidebands)
-
-#         self.setattr_fragment("reset_all_beams", ResetAllICLBeams)
-
-#         self.setattr_fragment("all_beam_default_setter", BlueBeamSetter)
-#         self.all_beam_default_setter: SetBeamsToDefaults
-
-#         self.setattr_fragment(
-#             "mot_all_beam_setter",
-#             ControlBeamsWithoutCoolingAOM,
-#             beam_infos= SUServoedBeam["blue_3dmot_radial",
-#                               "blue_3dmot_axialplus",
-#                               "blue_3dmot_axialminus",
-#                               "repump_679",
-#                               "repump_707",
-#                               "blue_2dmot_A",
-#                               "blue_2dmot_B",
-#                               "blue_push_beam",
-#                               ],
-#         )
-#         self.mot_all_beam_setter: ControlBeamsWithoutCoolingAOM
-
-#         self.setattr_fragment(
-#             "blue_push_beam_setter",
-#             ControlBeamsWithoutCoolingAOM,
-#             beam_infos=[
-#                 SUServoedBeam["blue_push_beam"],
-#             ],
-#         )
-#         self.blue_push_beam_setter: ControlBeamsWithoutCoolingAOM
-
-#         self.setattr_fragment(
-#             "mot_2d_and_3d_beams_setter",
-#             ControlBeamsWithoutCoolingAOM,
-#             beam_infos= SUServoedBeam["blue_3dmot_radial",
-#                               "blue_3dmot_axialplus",
-#                               "blue_3dmot_axialminus",
-#                               "blue_push_beam",
-#                               "blue_2dmot_A",
-#                               "blue_2dmot_B",
-#                               ],
-#         )
-#         self.mot_2d_and_3d_beams_setter: ControlBeamsWithoutCoolingAOM
-
-#         self.setattr_fragment(
-#             "mot_2d_and_3d_beams_nopush_setter",
-#             ControlBeamsWithoutCoolingAOM,
-#             beam_infos= SUServoedBeam["blue_3dmot_radial","blue_3dmot_axialplus","blue_3dmot_axialminus","blue_2dmot_A","blue_2dmot_B"],
-#         )
-#         self.mot_2d_and_3d_beams_nopush_setter: ControlBeamsWithoutCoolingAOM
-
-#         self.setattr_fragment(
-#             "mot_3d_beams_setter",
-#             ControlBeamsWithoutCoolingAOM,
-#             beam_infos= SUServoedBeam["blue_3dmot_radial","blue_3dmot_axialplus","blue_3dmot_axialminus"],
-#         )
-#         self.mot_3d_beams_setter: ControlBeamsWithoutCoolingAOM
-
-#         self.setattr_fragment(
-#             "mot_all_beams_except_radial_setter",
-#             ControlBeamsWithoutCoolingAOM,
-#             beam_infos=
-#                 SUServoedBeam["blue_3dmot_axialplus",
-#                                   "blue_3dmot_axialminus",
-#                                   "repump_679",
-#                                   "repump_707",
-#                                   "blue_2dmot_A",
-#                                   "blue_2dmot_B",
-#                                   "blue_push_beam",
-#                   ],
-#         )
-#         self.mot_all_beams_except_radial_setter: ControlBeamsWithoutCoolingAOM
-
-#         self.setattr_fragment(
-#             "radial_beam_setter",
-#             ControlBeamsWithoutCoolingAOM,
-#             beam_infos=[
-#                 SUServoedBeam["blue_3dmot_radial"],
-#             ],
-#         )
-#         self.radial_beam_setter: ControlBeamsWithoutCoolingAOM
-
-#         self.setattr_fragment(
-#             "repump_beam_setter",
-#             ControlBeamsWithoutCoolingAOM,
-#             beam_infos=
-#                 SUServoedBeam["repump_679","repump_707"],
-#         )
-#         self.repump_beam_setter: ControlBeamsWithoutCoolingAOM
-
-#         self.setattr_fragment(
-#             "chamber_2_field_setter",
-#             SetMagneticFieldsQuick,
-#         )
-#         self.chamber_2_field_setter: SetMagneticFieldsQuick
-
-#         self.setattr_fragment(
-#             "chamber_1_field_setter",
-#             SetMagneticFieldsSlow,
-#         )
-#         self.chamber_1_field_setter: SetMagneticFieldsSlow
-
-#         self.setattr_fragment(
-#             "blue_transfer_MOT",
-#             BlueRampingPhaseWithFields,
-#         )
-#         self.blue_transfer_MOT: BlueRampingPhaseWithFields
-
-#         # Bind the SUServo setpoint parameters to those defined in the red default beam setter
-#         self.blue_transfer_MOT.bind_suservo_setpoint_params_to_default_beam_setter(
-#             self.all_beam_default_setter
-#         )
-
-#         self.setattr_param(
-#             "delay_into_red_mot_for_blue_beam_switchoff",
-#             FloatParam,
-#             "Delay into red mot before blue beams switch off",
-#             default=DELAY_INTO_RED_MOT_FOR_BLUE_BEAM_SWITCHOFF,
-#             unit="us",
-#         )
-#         self.delay_into_red_mot_for_blue_beam_switchoff: FloatParamHandle
-
-#         self.setattr_param(
-#             "chamber_2_bias_x",
-#             FloatParam,
-#             "Bias current for chamber 2 - X",
-#             default=B_FIELD_BIAS_BLUE_MOT_X,
-#             unit="A",
-#             min=-5,
-#             max=5,
-#         )
-#         self.setattr_param(
-#             "chamber_2_bias_y",
-#             FloatParam,
-#             "Bias current for chamber 2 - Y",
-#             default=B_FIELD_BIAS_BLUE_MOT_Y,
-#             unit="A",
-#             min=-5,
-#             max=5,
-#         )
-#         self.setattr_param(
-#             "chamber_2_bias_z",
-#             FloatParam,
-#             "Bias current for chamber 2 - Z",
-#             default=B_FIELD_BIAS_BLUE_MOT_Z,
-#             unit="A",
-#             min=-5,
-#             max=5,
-#         )
-#         self.chamber_2_bias_x: FloatParamHandle
-#         self.chamber_2_bias_y: FloatParamHandle
-#         self.chamber_2_bias_z: FloatParamHandle
-
-#         self.setattr_param(
-#             "chamber_2_field_gradient",
-#             FloatParam,
-#             "Field gradient current for chamber 2",
-#             default=B_FIELD_GRADIENT,
-#             unit="A",
-#             min=0,
-#             max=130,
-#         )
-#         self.chamber_2_field_gradient: FloatParamHandle
-
-#         self.setattr_param(
-#             "clearout_time",
-#             FloatParam,
-#             "Time to clear out atoms for",
-#             default=100e-3,
-#             unit="ms",
-#             min=0,
-#         )
-#         self.clearout_time: FloatParamHandle
-
-#         self.setattr_param(
-#             "blue_doublepass_injection_detuning",
-#             FloatParam,
-#             "Detuning of blue doublepass injection AOM from nominal",
-#             default=0,
-#             unit="MHz",
-#             min=0,
-#         )
-#         self.blue_doublepass_injection_detuning: FloatParamHandle
-
-#         self.setattr_param(
-#             "loading_time",
-#             FloatParam,
-#             "Time to load atoms for",
-#             default=BLUE_LOADING_TIME,
-#             unit="ms",
-#             min=0,
-#         )
-#         self.loading_time: FloatParamHandle
-
-#         self.debug_mode = logger.isEnabledFor(logging.DEBUG)
-#         self.manual_init = manual_init
-
-#         # %% Kernel invariants
-#         kernel_invariants = getattr(self, "kernel_invariants", set())
-#         self.kernel_invariants = kernel_invariants | {"debug_mode", "manual_init"}
-
-#     @kernel
-#     def device_setup(self):
-#         self.device_setup_subfragments()
-
-#         if not self.manual_init:
-#             self.core.break_realtime()
-#             self.init()
-
-#     @kernel
-#     def init(self):
-#         """
-#         Set up beam state for the blue MOT
-
-#         This configured all SUServos to the right frequency, setpoint and
-#         attenuation. If a shutter exists, the shutter is closed and the AOM is
-#         turned on. If there is no shutter, the SUServo's RF switch is set to
-#         off.
-
-#         This is called automatically by device_setup unless `manula_init=True`
-#         was passed to build_fragment.
-#         """
-
-#         # Turn on all the AOMs but close all the shutters
-#         delay(200e-6)  # We need some slack - create it deterministically
-#         self.all_beam_default_setter.turn_on_all(light_enabled=False)
-
-#         frequency_blue_doublepass = (
-#             BLUE_DOUBLEPASS_INJECTION_BEAM_INFO.frequency
-#             + self.blue_doublepass_injection_detuning.get()
-#         )
-#         self.doublepass_injection_aom.set(frequency=frequency_blue_doublepass)
-#         delay_mu(int64(self.core.ref_multiplier))
-
-#         self.mirny_eom_sidebands.set_sidebands()
-
-#     @kernel
-#     def enable_mot_fields(self):
-#         """
-#         Turn on the MOT gradient and bias fields
-
-#         This method advances the timeline by a ridiculous amount and does not
-#         respect beam shutter delays - it just turns everything
-#         on immediately. It needs at least 3924ns of slack.
-
-#         TODO: Figure out why I need a stupid amount of slack
-#         """
-
-#         if self.debug_mode:
-#             slack_mu = now_mu() - self.core.get_rtio_counter_mu()
-#             logger.info("Enabling MOT fields")
-#             at_mu(self.core.get_rtio_counter_mu() + slack_mu)
-
-#         delay(50e-3)
-#         self.chamber_2_field_setter.set_bias_fields(
-#             self.chamber_2_bias_x.get(),
-#             self.chamber_2_bias_y.get(),
-#             self.chamber_2_bias_z.get(),
-#         )
-#         delay(50e-3)
-#         self.chamber_2_field_setter.set_mot_gradient(
-#             self.chamber_2_field_gradient.get()
-#         )
-
-#     @kernel
-#     def enable_mot_defaults(self, light_enabled=True):
-#         """
-#         Immediately turn on all beams and fields related to the 3D blue MOT
-#         """
-#         self.all_beam_default_setter.turn_on_all(light_enabled=light_enabled)
-#         self.enable_mot_fields()
-
-#     @kernel
-#     def turn_on_3d_and_2d_beams(self):
-#         return self.mot_2d_and_3d_beams_setter.turn_beams_on()
-
-#     @kernel
-#     def turn_off_3d_and_2d_beams(self):
-#         return self.mot_2d_and_3d_beams_setter.turn_beams_off()
-
-#     @kernel
-#     def turn_off_3d_and_2d_beams_nopush(self):
-#         return self.mot_2d_and_3d_beams_nopush_setter.turn_beams_off()
-
-#     @kernel
-#     def turn_on_all_beams(self):
-#         return self.mot_all_beam_setter.turn_beams_on()
-
-#     @kernel
-#     def turn_off_all_beams(self):
-#         return self.mot_all_beam_setter.turn_beams_off()
-
-#     @kernel
-#     def turn_on_push_beam(self):
-#         return self.blue_push_beam_setter.turn_beams_on()
-
-#     @kernel
-#     def turn_off_push_beam(self):
-#         return self.blue_push_beam_setter.turn_beams_off()
-
-#     @kernel
-#     def turn_on_3d_beams(self, ignore_shutters=False):
-#         return self.mot_3d_beams_setter.turn_beams_on(ignore_shutters=ignore_shutters)
-
-#     @kernel
-#     def turn_off_3d_beams(self, ignore_shutters=False):
-#         """Turn off the 3D blue MOT beams
-
-#         This method will not advance the cursor BUT will write shutter closing
-#         events into the future by "shutter_delay_time" seconds.
-#         """
-#         return self.mot_3d_beams_setter.turn_beams_off(ignore_shutters=ignore_shutters)
-
-#     @kernel
-#     def turn_on_repumpers(self):
-#         return self.repump_beam_setter.turn_beams_on()
-
-#     @kernel
-#     def turn_off_repumpers(self):
-#         return self.repump_beam_setter.turn_beams_off()
-
-#     @kernel
-#     def turn_on_all_beams_except_radial(self, ignore_shutters=False):
-#         return self.mot_all_beams_except_radial_setter.turn_beams_on(
-#             ignore_shutters=ignore_shutters
-#         )
-
-#     @kernel
-#     def turn_off_all_beams_except_radial(self, ignore_shutters=False):
-#         return self.mot_all_beams_except_radial_setter.turn_beams_off(
-#             ignore_shutters=ignore_shutters
-#         )
-
-#     @kernel
-#     def turn_on_radial_beams(self, ignore_shutters=False):
-#         return self.radial_beam_setter.turn_beams_on(ignore_shutters=ignore_shutters)
-
-#     @kernel
-#     def turn_off_radial_beams(self, ignore_shutters=False):
-#         return self.radial_beam_setter.turn_beams_off(ignore_shutters=ignore_shutters)
-
-#     @kernel
-#     def clear_ch2(self):
-#         """
-#         Clear out atoms from chamber 2
-#         """
-
-#         # Turn on the repumps and turn off everything else
-#         self.turn_on_repumpers()
-#         delay(1e-6)
-#         self.turn_off_3d_and_2d_beams()
-
-#         # Wait to allow atoms to disperse if there were any hanging around
-#         delay(self.clearout_time.get())
-
-#     @kernel
-#     def load_mot(self, clearout=True):
-#         """
-#         Load a blue 3D MOT using the configured parameters
-
-#         Optionally clear out atoms first
-#         """
-
-#         if self.debug_mode:
-#             slack_mu = now_mu() - self.core.get_rtio_counter_mu()
-#             logger.info("Loading a blue MOT with clearout = %s", clearout)
-#             at_mu(self.core.get_rtio_counter_mu() + slack_mu)
-
-#         self.enable_mot_fields()
-
-#         if clearout:
-#             self.clear_ch2()
-
-#         self.turn_on_all_beams()
-#         delay(self.loading_time.get())
-
-#     @kernel
-#     def load_magnetic_trap(self, repump_at_end=True):
-#         """
-#         Load the magnetic trap, then optionally repump at the end
-#         """
-
-#         self.enable_mot_fields()
-#         self.turn_on_3d_and_2d_beams()
-#         self.turn_off_repumpers()
-#         delay(self.loading_time.get())
-#         if repump_at_end:
-#             self.turn_on_repumpers()
-
-#     @kernel
-#     def do_blue_transfer_mot(self):
-#         """
-#         Perform the blue transfer mot phase
-
-#         Advances the timeline by the duration of the blue transfer MOT
-#         """
-#         self.turn_off_push_beam()
-#         delay_mu(int64(self.core.ref_multiplier))
-#         self.blue_transfer_MOT.do_phase()
+import logging
+
+from artiq.coredevice.core import Core
+from artiq.coredevice.ttl import TTLOut
+from artiq.language import delay, kernel, sequential, parallel
+from artiq.language.units import s, ms, MHz, dB, A
+from ndscan.experiment import Fragment
+from ndscan.experiment.parameters import FloatParam, FloatParamHandle
+from repository.fragments.default_beam_setter import (
+    SetBeamsToDefaults,
+    make_set_beams_to_default,
+)
+from repository.fragments.eom_setter import EomFrag
+from repository.fragments.supply_setter import SetSupplies
+from repository.fragments.beam_setter import ControlBeamsWithoutCoolingAOM
+
+from repository.models.devices import SUServoedBeam, Eom, VDrivenSupply
+from repository.fragments.ramp import Ramp
+
+logger = logging.getLogger(__name__)
+
+
+class MOT(Fragment):
+    """
+    Methods for making and controlling the MOT
+
+    If manual_init=True is passed to build_fragment, the user must call init()
+    before this object is used
+    """
+
+    def build_fragment(self, manual_init=False):
+        self.setattr_device("core")
+        self.core: Core
+
+        self.state = self.State.UNINITIALIZED
+
+        self.unlock_ttl: TTLOut = self.get_device("780_unlock")
+
+        # Useful params for the MOT
+        self.loading_time: FloatParamHandle = self.setattr_param(
+            "loading_time",
+            FloatParam,
+            "Time to load atoms for",
+            default=20 * s,
+            unit="s",
+            min=0,
+        )
+        self.clearout_time: FloatParamHandle = self.setattr_param(
+            "clearout_time",
+            FloatParam,
+            "Time to allow for atoms to clearout",
+            default=100 * ms,
+            unit="ms",
+            min=0,
+        )
+
+        # Beams
+        self.beam_resetter: SetBeamsToDefaults = self.setattr_fragment(
+            "beam_resetter",
+            make_set_beams_to_default(
+                suservo_beam_infos=SUServoedBeam.all(), name="beam_resetter"
+            ),
+            "Set the beams to their default values",
+        )
+        self.mot_beam: ControlBeamsWithoutCoolingAOM = self.setattr_fragment(
+            "mot_beam",
+            ControlBeamsWithoutCoolingAOM,
+            beam_infos=[SUServoedBeam["MOT"]],
+        )
+        self.odt_beams: ControlBeamsWithoutCoolingAOM = self.setattr_fragment(
+            "odt_beams",
+            ControlBeamsWithoutCoolingAOM,
+            beam_infos=SUServoedBeam["CDT1", "CDT2"],
+        )
+        self.lattice_beams: ControlBeamsWithoutCoolingAOM = self.setattr_fragment(
+            "lattice_beams",
+            ControlBeamsWithoutCoolingAOM,
+            beam_infos=SUServoedBeam["LATX", "LATY"],
+        )
+        #  EOM
+        self.eom: EomFrag = self.setattr_fragment(
+            "eom",
+            EomFrag,
+            Eom["repump"],
+            init=False,
+        )
+        # Supplies
+        self.coils: SetSupplies = self.setattr_fragment(
+            "coils",
+            SetSupplies,
+            VDrivenSupply["X1", "X2", "Y", "Z"],
+            init=False,
+        )
+        self.x_coils: SetSupplies = self.setattr_fragment(
+            "x_coils",
+            SetSupplies,
+            VDrivenSupply["X1", "X2"],
+            init=False,
+        )
+        self.y_coil: SetSupplies = self.setattr_fragment(
+            "y_coil",
+            SetSupplies,
+            VDrivenSupply["Y"],
+            init=False,
+        )
+        self.z_coil: SetSupplies = self.setattr_fragment(
+            "z_coil",
+            SetSupplies,
+            VDrivenSupply["Z"],
+            init=False,
+        )
+        self.push_780: SetSupplies = self.setattr_fragment(
+            "push_780",
+            SetSupplies,
+            [VDrivenSupply["push_780"]],
+            init=False,
+        )
+
+        # Compression ramp
+        self.CMOT_detuning: FloatParamHandle = self.setattr_param(
+            "cmot_detuning",
+            FloatParam,
+            "Detuning red of nominal of the MOT beam during CMOT",
+            default=10 * MHz,
+            unit="MHz",
+            min=0,
+        )
+        self.CMOT_compression_ratio: FloatParamHandle = self.setattr_param(
+            "CMOT_compression_ratio",
+            FloatParam,
+            "Ratio to increase the X1 and X2 coils current by",
+            default=1.75,
+            unit="ratio",
+            min=0.0,
+        )
+        self.CMOT_eom_reduction: FloatParamHandle = self.setattr_param(
+            "CMOT_eom_reduction",
+            FloatParam,
+            "Attenuation to reduce the EOM by",
+            default=10 * dB,
+            unit="dB",
+            min=0 * dB,
+        )
+
+        class CMOT_Ramp(Ramp):
+            """
+            The transition from normal MOT to CMOT
+                - MOT beam detuned red by unlock+push
+                - Coils ramped up
+                - Repump power ramped down
+            """
+
+            duration_default = 1 * ms
+            supplies = VDrivenSupply["X1", "X2", "push_780"]
+            supplies_end = [
+                VDrivenSupply["X1"].default_output * self.CMOT_compression_ratio.get(),
+                VDrivenSupply["X2"].default_output * self.CMOT_compression_ratio.get(),
+                self.CMOT_detuning.get(),
+            ]
+
+            eoms = [Eom["repump"]]
+            eom_att_end = [
+                Eom["repump"].attenuation + self.CMOT_eom_reduction.get(),
+            ]
+
+        self.cmot_ramp: CMOT_Ramp = self.setattr_fragment(
+            "cmot_ramp",
+            CMOT_Ramp,
+        )
+        self.CMOT_duration: FloatParamHandle = self.setattr_param_rebind(
+            "CMOT_duration",
+            self.cmot_ramp,
+            "default_duration",
+            description="Duration of the CMOT ramp",
+        )
+        self.CMOT_settle_time: FloatParamHandle = self.setattr_param(
+            "CMOT_settle_time",
+            FloatParam,
+            "Time to wait after CMOT ramp",
+            default=10 * ms,
+            unit="ms",
+            min=0,
+        )
+
+        # PGC ramp
+        self.PGC_detuning: FloatParamHandle = self.setattr_param(
+            "PGC_detuning",
+            FloatParam,
+            "Detuning red of nominal for the MOT beam during PGC",
+            default=60.65 * MHz,
+            unit="MHz",
+            min=0,
+        )
+        self.X1_bias: FloatParamHandle = self.setattr_param(
+            "X1_bias",
+            FloatParam,
+            "Bias to apply to the coil during PGC",
+            default=0.0 * A,
+            unit="A",
+            min=0.0 * A,
+        )
+        self.X2_bias: FloatParamHandle = self.setattr_param_like(
+            "X2_bias", self, default=0.0
+        )
+        self.Y_bias: FloatParamHandle = self.setattr_param_like(
+            "Y_bias", self, default=0.0
+        )
+        self.Z_bias: FloatParamHandle = self.setattr_param_like(
+            "Z_bias", self, default=0.0
+        )
+
+        class PGC_Ramp(Ramp):
+            """
+            The transition from CMOT to PGC
+                - MOT beam further detuned
+                - Coils ramped back off
+                - Bias ramped on
+            """
+
+            duration_default = 1 * ms
+
+            supplies = VDrivenSupply["X1", "X2", "Y", "Z", "push_780"]
+            supplies_start = [
+                VDrivenSupply["X1"].default_output * self.CMOT_compression_ratio.get(),
+                VDrivenSupply["X2"].default_output * self.CMOT_compression_ratio.get(),
+                VDrivenSupply["Y"].default_output,
+                VDrivenSupply["Z"].default_output,
+                self.CMOT_detuning.get(),
+            ]
+            supplies_end = [
+                self.X1_bias.get(),
+                self.X2_bias.get(),
+                self.Y_bias.get(),
+                self.Z_bias.get(),
+                self.PGC_detuning.get(),
+            ]
+
+        self.pgc_ramp: PGC_Ramp = self.setattr_fragment(
+            "pgc_ramp",
+            PGC_Ramp,
+        )
+        self.PGC_duration: FloatParamHandle = self.setattr_param_rebind(
+            "PGC_duration",
+            self.pgc_ramp,
+            "default_duration",
+            description="Duration of the PGC ramp",
+        )
+        self.PGC_settle_time: FloatParamHandle = self.setattr_param(
+            "PGC_settle_time",
+            FloatParam,
+            "Time to wait after PGC ramp",
+            default=3 * ms,
+            unit="ms",
+            min=0,
+        )
+
+        class ODT_Ramp(Ramp):
+            """
+            The transition from PGC to ODT
+                - MOT ramped off
+                - Bias ramped off
+            """
+
+            duration_default = 1 * ms
+            supplies = VDrivenSupply["X1", "X2", "Y", "Z"]
+            supplies_start = [
+                self.X1_bias.get(),
+                self.X2_bias.get(),
+                self.Y_bias.get(),
+                self.Z_bias.get(),
+            ]
+            supplies_end = [
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+            ]
+
+            suservos = [SUServoedBeam["MOT"]]
+            suservo_setpoint_end = [0.0]
+
+            pass
+
+        self.odt_ramp: ODT_Ramp = self.setattr_fragment(
+            "odt_ramp",
+            ODT_Ramp,
+        )
+        self.ODT_overlap_time: FloatParamHandle = self.setattr_param(
+            "ODT_overlap_time",
+            FloatParam,
+            "Time to keep the ODT and MOT beams on together",
+            default=100 * ms,
+            unit="ms",
+            min=0,
+        )
+        self.ODT_duration: FloatParamHandle = self.setattr_param_rebind(
+            "ODT_duration", self.odt_ramp, "default_duration"
+        )
+        self.ODT_settle_time: FloatParamHandle = self.setattr_param(
+            "ODT_settle_time",
+            FloatParam,
+            "Time to wait after ODT ramp",
+            default=100 * ms,
+            unit="ms",
+            min=0,
+        )
+
+        self.debug_mode = logger.isEnabledFor(logging.DEBUG)
+        self.manual_init = manual_init
+
+        # Kernel invariants
+        kernel_invariants = getattr(self, "kernel_invariants", set())
+        self.kernel_invariants = kernel_invariants | {"debug_mode", "manual_init"}
+
+    @kernel
+    def device_setup(self):
+        self.device_setup_subfragments()
+
+        if not self.manual_init:
+            self.core.break_realtime()
+            self.calculate_dma_handles()
+            self.core.break_realtime()
+            self.init()
+
+    @kernel
+    def init(self) -> None:
+        """
+        Reset all state so we start deterministically:
+        - Lasers off and reset
+        - Eom defaulted
+        - Coils defaulted
+        - MOT locked and unpushed
+
+        This is called automatically by device_setup unless `manual_init=True`
+        was passed to build_fragment.
+
+        **Timeline:** we break_realtime() after setting the devices
+        """
+        # Lasers set to defaults and turned off
+        self.beam_resetter.turn_on_all(light_enabled=False)
+        # EOM set to defaults
+        self.eom.set_to_defaults()
+        # Coils set to defaults
+        self.coils.set_to_defaults()
+        # MOT locked and unpushed
+        self.relock_mot()
+
+        self.core.break_realtime()
+
+    @kernel
+    def calculate_dma_handles(self):
+        """
+        Precalculate the DMA handles for the ramps
+
+        No more DMA sequences may be recorded after this point
+        """
+        logger.warning(
+            "Calculating MOT ramp handles, "
+            "No more DMA sequences may be recorded after this point"
+        )
+        self.cmot_ramp.precalculate_dma_handle()
+        self.pgc_ramp.precalculate_dma_handle()
+        self.odt_ramp.precalculate_dma_handle()
+
+    @kernel
+    def clear_atoms(self) -> None:
+        """
+        Clear out atoms from the MOT
+
+        **Timeline:** advances by approx `clearout_time` seconds
+        """
+        raise NotImplementedError("How do we want to clear out atoms?")
+        delay(self.clearout_time.get())
+
+    @kernel
+    def load(self, clearout=True) -> None:
+        """
+        Load the MOT
+
+        if `clearout` is True, ensure atoms are gone first
+
+        **Timeline:** advances by approx `loading_time` seconds
+        """
+        if clearout:
+            self.clear_atoms()
+
+        self.mot_beam.turn_beams_on()
+
+        delay(self.loading_time.get())
+
+    @kernel
+    def compress(self) -> None:
+        """
+        Compress into a CMOT
+
+        **Timeline:** advances by `self.CMOT_duration` + `self.CMOT_settle_time`
+        """
+        with sequential:
+            # Unlock the MOT
+            self.unlock_mot()
+            # Do the ramp - MOT freq, coil gradient, Eom attenuation
+            self.cmot_ramp.do()
+            # Fix EOM frequency
+            self.eom.set_freq(self.eom.config.frequency + self.CMOT_detuning.get())
+
+        # Wait for settle time
+        delay(self.CMOT_settle_time.get())
+
+    @kernel
+    def pgc(self) -> None:
+        """
+        Cool further using Polarisation Gradient Cooling
+
+        **Timeline:** advances by `self.PGC_duration` + `self.PGC_settle_time`
+        """
+        with sequential:
+            # Do the ramp - MOT freq, coil biases
+            self.pgc_ramp.do()
+            # Fix EOM frequency
+            self.eom.set_freq(self.eom.config.frequency + self.PGC_detuning.get())
+
+        # Wait for settle time
+        delay(self.PGC_settle_time.get())
+
+    @kernel
+    def into_odt(self) -> None:
+        """
+        Load into the Optical Dipole Trap
+
+        ramp on the ODT
+        wait for overlap time
+        ramp the MOT off and reset:
+            - MOT beam off
+            - unpush
+            - relock
+            - reset EOM freq/att
+            - turn off coils
+        """
+        with sequential:
+            # ODT beam comes on and we let atoms transfer
+            self.odt_beams.turn_beams_on()
+            delay(self.ODT_overlap_time.get())
+            # ramp off the MOT
+            self.odt_ramp.do()
+
+            # Turn off the MOT beam
+            self.mot_beam.turn_beams_off()
+
+        # Fix up ECDL for later imaging
+        with parallel:
+            # Relock the MOT
+            self.relock_mot()
+            # Reset the EOM frequency
+            self.eom.set_freq(self.eom.config.frequency)
+
+    @kernel
+    def into_lattice(self) -> None:
+        """
+        Load into the Optical Lattice
+
+        ramp on the lattice
+        wait for settle time
+        """
+        raise NotImplementedError("How do we want to load the lattice?")
+
+    @kernel
+    def unlock_mot(self) -> None:
+        """
+        Unlock the MOT ECDL
+
+        **Timeline:** advances by a single TTL write
+        """
+        self.unlock_ttl.on()
+
+    @kernel
+    def relock_mot(self, time_to_shift=1 * ms) -> None:
+        """
+        Relock the MOT ECDL
+
+        Unpush and then after `time_to_shift` seconds, turn the TTL off
+
+        **Timeline:** advances by `time_to_shift` and a single TTL+Fastino write
+        """
+        self.push_780.set_to_defaults()
+        delay(time_to_shift)
+        self.unlock_ttl.off()
+
+    @kernel
+    def drop(self) -> None:
+        """
+        Drop the MOT immediately
+
+        Turn off all beams and coils
+        """
+        with parallel:
+            # Turn off beams
+            self.mot_beam.turn_beams_off()
+            self.odt_beams.turn_beams_off()
+            self.lattice_beams.turn_beams_off()
+            # Turn off the coils
+            self.coils.set_outputs([0.0] * len(self.coils.supplies))

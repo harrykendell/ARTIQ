@@ -22,7 +22,7 @@ from ndscan.experiment.entry_point import make_fragment_scan_exp
 from submodules.oitg.oitg.fitting import exponential_decay
 
 from repository.fragments.read_adc import ReadSUServoADC
-from repository.fragments.current_supply_setter import SetAnalogCurrentSupplies
+from repository.fragments.supply_setter import SetSupplies
 from repository.models.devices import VDrivenSupply
 from device_db import server_addr
 
@@ -36,11 +36,11 @@ class MOTPhotodiodeMeasurement(Fragment):
 
         self.setattr_fragment(
             "coil_setter",
-            SetAnalogCurrentSupplies,
+            SetSupplies,
             [VDrivenSupply["X1"]],
             init=False,
         )
-        self.coil_setter: SetAnalogCurrentSupplies
+        self.coil_setter: SetSupplies
 
         photodiode_suservo_channel = "MOT_photodiode"
         # Load the ADC utility subfragment

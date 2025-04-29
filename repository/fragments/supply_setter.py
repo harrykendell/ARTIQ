@@ -18,9 +18,9 @@ from repository.models import VDrivenSupply
 logger = logging.getLogger(__name__)
 
 
-class SetAnalogCurrentSupplies(Fragment):
+class SetSupplies(Fragment):
     """
-    Set multiple current supplies that are controlled by a analog voltages.
+    Set multiple supplies that are controlled by a analog voltages.
     The supplies must all be controlled by the same fastino
 
     The channel to be set should be passed as an argument to
@@ -28,37 +28,37 @@ class SetAnalogCurrentSupplies(Fragment):
 
         self.setattr_fragment(
             "coil_setter",
-            SetAnalogCurrentSupplies,
+            SetSupplies,
             [VDrivenSupply["X1"]],
             init=False,
         )
     """
 
-    def build_fragment(self, current_configs: List[VDrivenSupply], init: bool = True):
+    def build_fragment(self, configs: List[VDrivenSupply], init: bool = False):
         self.setattr_device("core")
         self.core: Core
-        self.current_configs: list[VDrivenSupply] = current_configs
-        self.defaults = [dev.default_current for dev in self.current_configs]
+        self.configs: list[VDrivenSupply] = configs
+        self.defaults = [dev.default_output for dev in self.configs]
         assert all(
-            [c.fastino == self.current_configs[0].fastino for c in self.current_configs]
-        ), "All current drivers must use the same Fastino"
+            [c.fastino == self.configs[0].fastino for c in self.configs]
+        ), "All supplies must use the same Fastino"
 
-        self.fastino = self.get_device(self.current_configs[0].fastino)
+        self.fastino = self.get_device(self.configs[0].fastino)
         self.fastino: Fastino
 
-        self.fastino_channels = [c.ch for c in self.current_configs]
+        self.fastino_channels = [c.ch for c in self.configs]
 
-        # %% Kernel variables
+        # Kernel variables
         self.first_run = init
         self.debug_enabled = logger.isEnabledFor(logging.INFO)
-        self.num_supplies = len(self.current_configs)
+        self.num_supplies = len(self.configs)
 
-        # %% Kernel invariants
+        # Kernel invariants
         kernel_invariants = getattr(self, "kernel_invariants", set())
         self.kernel_invariants = kernel_invariants | {
             "debug_enabled",
             "num_supplies",
-            "current_configs",
+            "configs",
             "fastino",
             "fastino_channels",
         }
@@ -80,40 +80,40 @@ class SetAnalogCurrentSupplies(Fragment):
         self.device_setup_subfragments()
 
     @portable
-    def _single_current_to_volts(self, current: TFloat, current_supply_idx: TInt32):
-        lim = self.current_configs[current_supply_idx].current_limit
-        gain = self.current_configs[current_supply_idx].gain
-        return min(lim, current) / gain
+    def _single_output_to_volts(self, output: TFloat, supply_idx: TInt32):
+        lim = self.configs[supply_idx].max_output
+        gain = self.configs[supply_idx].gain
+        return min(lim, output) / gain
 
     @portable
-    def _currents_to_volts(self, currents: TList(TFloat), voltages_out: TList(TFloat)):
-        if len(currents) != len(self.current_configs):
-            raise ValueError("Wrong number of currents")
+    def _outputs_to_volts(self, outputs: TList(TFloat), voltages_out: TList(TFloat)):
+        if len(outputs) != len(self.configs):
+            raise ValueError("Wrong number of outputs")
 
-        if len(currents) != len(voltages_out):
+        if len(outputs) != len(voltages_out):
             raise ValueError("Output array is wrong size")
 
-        for i in range(len(self.current_configs)):
-            voltages_out[i] = self._single_current_to_volts(currents[i], i)
+        for i in range(len(self.configs)):
+            voltages_out[i] = self._single_output_to_volts(outputs[i], i)
 
     @kernel
-    def set_currents(self, currents: TList(TFloat)):
+    def set_outputs(self, outputs: TList(TFloat)):
         """
-        Set currents in amps.
+        Set outputs in their units.
 
         This method does not advance the timeline but does require at least
-        1.5us + 808ns * len(currents) on a Kasli 1.x as SPI events are written
+        1.5us + 808ns * len(outputs) on a Kasli 1.x as SPI events are written
         into the past.
         """
-        voltages = [0.0] * len(self.current_configs)
+        voltages = [0.0] * len(self.configs)
 
-        self._currents_to_volts(currents, voltages)
+        self._outputs_to_volts(outputs, voltages)
 
         if self.debug_enabled:
             slack_mu = now_mu() - self.core.get_rtio_counter_mu()
             logger.info(
-                "Setting currents = %s via voltages = %s on channels %s",
-                currents,
+                "Setting outputs = %s via voltages = %s on channels %s",
+                outputs,
                 voltages,
                 self.fastino_channels,
             )
@@ -128,10 +128,10 @@ class SetAnalogCurrentSupplies(Fragment):
     @kernel
     def set_to_defaults(self):
         """
-        Set the currents to the default values defined in the current_configs
+        Set the outputs to the default values defined in the configs
         """
-        self.set_currents([dev.default_current for dev in self.current_configs])
+        self.set_outputs([dev.default_output for dev in self.configs])
 
     @kernel
     def turn_off(self):
-        self.set_currents([0.0] * len(self.current_configs))
+        self.set_outputs([0.0] * len(self.configs))

@@ -26,7 +26,7 @@ class EomFrag(Fragment):
         self.setattr_fragment(
             "eom_setter",
             EomFrag,
-            EOMS["repump"],
+            Eom["repump"],
             init=False,
         )
     """
@@ -80,7 +80,7 @@ class EomFrag(Fragment):
     def set_to_defaults(self):
         """
         Set the EOM to its default state. This is called by the
-        `device_setup` method it init=True.
+        `device_setup` method if init=True.
 
         Advances the timeline by a small chunk ~10us
         """
@@ -130,11 +130,13 @@ class EomFrag(Fragment):
     def set_freq(self, frequency: TFloat):
         """
         Set the frequency of the EOM in MHz
-        53.125 MHz <= f <= 6800 MHz
+
+        NB: This is the frequency seen on the Almazny
+        106.25 MHz <= f <= 13,600 MHz
 
         This uses quite a while (~400us) as it relocks the PLL
         """
-        self.channel.set_frequency(frequency)
+        self.channel.set_frequency(frequency/2.0)
 
     @kernel
     def set_att(self, attenuation: TFloat, almazny_on: bool = True):

@@ -7,7 +7,7 @@ from ndscan.experiment import ExpFragment, make_fragment_scan_exp, FloatParam
 from ndscan.experiment.parameters import FloatParamHandle
 
 from repository.imaging.PCO_Camera import PcoCamera
-from repository.fragments.current_supply_setter import SetAnalogCurrentSupplies
+from repository.fragments.supply_setter import SetSupplies
 from repository.fragments.beam_setter import ControlBeamsWithoutCoolingAOM
 from repository.models.devices import SUServoedBeam, VDrivenSupply
 
@@ -30,11 +30,11 @@ class FluorescenceImageExpFrag(ExpFragment):
 
         self.setattr_fragment(
             "coil_setter",
-            SetAnalogCurrentSupplies,
+            SetSupplies,
             VDrivenSupply["X1", "X2"],
             init=False,
         )
-        self.coil_setter: SetAnalogCurrentSupplies
+        self.coil_setter: SetSupplies
 
         self.setattr_fragment(
             "mot_beam_setter",

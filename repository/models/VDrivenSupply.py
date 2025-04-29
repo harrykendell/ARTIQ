@@ -17,7 +17,8 @@ from repository.models.Device import DEVICE
 @dataclass
 class VDrivenSupply(DEVICE):
     """
-    A simple class that holds information about a current supply driven from the fastino
+    A simple class that holds information about a supply driven from the fastino
+    It converts the supplied voltage to a the relevant output (current etc.) via gain
 
     """
 
@@ -27,6 +28,6 @@ class VDrivenSupply(DEVICE):
     ch: int
 
     gain: float = 1.0  # The Current gain in Amps/Volt
-    current_limit: float = inf
+    max_output: float = inf
     enabled: bool = False
-    default_current: float = 0.0
+    default_output: float = 0.0

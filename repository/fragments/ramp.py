@@ -3,9 +3,9 @@ from typing import List
 
 from artiq.coredevice.core import Core
 from artiq.coredevice.dma import CoreDMA
-from artiq.coredevice.suservo import Channel as SUServoChannel, T_CYCLE as suservo_cycle
+from artiq.coredevice.suservo import Channel as SUServoChannel
 from artiq.language.core import at_mu, delay, delay_mu, now_mu
-from artiq.language.units import ms, us, ns, MHz
+from artiq.language.units import ms, us, MHz
 from artiq.experiment import kernel, portable, TFloat, TInt32
 from ndscan.experiment import Fragment
 from ndscan.experiment.parameters import FloatParam, FloatParamHandle
@@ -13,11 +13,11 @@ from numpy import int32, int64
 
 from repository.models import SUServoedBeam, Eom, VDrivenSupply
 from repository.fragments.eom_setter import EomFrag
-from repository.fragments.current_supply_setter import SetAnalogCurrentSupplies
+from repository.fragments.supply_setter import SetSupplies
 from repository.utils.dummy_devices import (
     DummyEomFrag,
     DummySUServoChannel,
-    DummySetAnalogCurrentSupplies,
+    DummySetSupplies,
 )
 
 logger = logging.getLogger(__name__)
@@ -25,30 +25,39 @@ logger = logging.getLogger(__name__)
 
 class Ramp(Fragment):
     """
-    Template fragment for a ramp in an experiment. *Needs subclassing*
-        - SUServo Frequency/Setpoint
-        - VDrivenSupply Output
-        - Eom Amplitude/Frequency (although frequency is slow ~0.4ms per step)
+    ------
+    THIS CLASS MUST BE SUBCLASSED TO BE USEFUL
+    ------
 
-    Unspecified start and end values will be set to the default values of the
+    Fragment representing a ramp in an experiment:
+
+    - SUServo Frequency/Setpoint
+    - VDrivenSupply Output
+    - Eom Amplitude/Frequency (although frequency takes ~0.4ms per step)
+
+    Unspecified start or end values will be set to the default values of the
     corresponding device.
 
-    To ramp the MOT down from default and detune by -10MHz from nominal
-    as well as ramp the X1 and X2 VDrivenSupply to 1.8A and 1.9A, you could use:
+    Example usage
+    -------------
 
-    class CompressionRamp(Ramp):
-        duration_default = 50*ms
+    This example creates a ramp that by default lasts 50ms and
+    - Detunes and lowers the MOT intensity
+    - Increases the coil currents::
 
-        suservos = [SUServoedBeam["MOT"]]
-        suservo_setpoint_end = [0.5*SUServoedBeam["MOT"].setpoint]
-        suservo_detuning_end = [-10*MHz]
+        class CompressionRamp(Ramp):
+            duration_default = 50*ms
 
-        eoms = [Eom["repump"]]
-        eom_detuning_end = [-10*MHz/2.0]
+            suservos = [SUServoedBeam["MOT"]]
+            suservo_setpoint_end = [0.5*SUServoedBeam["MOT"].setpoint]
+            suservo_detuning_end = [-10*MHz]
 
-        supplies = VDrivenSupply["X1", "X2"]
-        supplies_start = [1.0, 1.0]
-        supplies_end = [1.8, 1.9]
+            eoms = [Eom["repump"]]
+            eom_detuning_end = [-10*MHz/2.0]
+
+            supplies = VDrivenSupply["X1", "X2"]
+            supplies_end = [1.8 * A, 1.9 * A]
+
     """
 
     time_step_default = 100 * us
@@ -66,7 +75,7 @@ class Ramp(Fragment):
     eoms_used = True
     eom_detuning_start: List[float] = None
     eom_detuning_end: List[float] = None
-    do_eom_detuning = False # avoid if we can as this is slow
+    do_eom_detuning = False  # avoid if we can as this is slow
     eom_att_start: List[float] = None
     eom_att_end: List[float] = None
 
@@ -107,8 +116,6 @@ class Ramp(Fragment):
             self.eom_detuning_start = [0.0 * MHz] * len(self.eoms)
         if not self.eom_detuning_end:
             self.eom_detuning_end = [0.0 * MHz] * len(self.eoms)
-        if self.eom_att_end or self.eom_att_start:
-            self.do_eom_att = self.eoms_used
         if not self.eom_att_start:
             self.eom_att_start = [eom.attenuation for eom in self.eoms]
         if not self.eom_att_end:
@@ -120,9 +127,9 @@ class Ramp(Fragment):
             self.supplies: List[VDrivenSupply] = [VDrivenSupply("dummy", "dummy", -1.0)]
         assert len(self.supplies) == len(set([supply.name for supply in self.supplies]))
         if not self.supplies_start:
-            self.supplies_start = [supply.default_current for supply in self.supplies]
+            self.supplies_start = [supply.default_output for supply in self.supplies]
         if not self.supplies_end:
-            self.supplies_end = [supply.default_current for supply in self.supplies]
+            self.supplies_end = [supply.default_output for supply in self.supplies]
 
     def build_fragment(self):
         self.validate()
@@ -178,12 +185,12 @@ class Ramp(Fragment):
 
         # This is designed to control multiple supplies at once anyway
         # assuming they share a fastino and we only have 1
-        self.supply_setter: SetAnalogCurrentSupplies = (
+        self.supply_setter: SetSupplies = (
             self.setattr_fragment(
-                "supply_setter", SetAnalogCurrentSupplies, self.supplies, init=False
+                "supply_setter", SetSupplies, self.supplies, init=False
             )
             if self.supplies_used
-            else DummySetAnalogCurrentSupplies()
+            else DummySetSupplies()
         )
 
     @kernel
@@ -269,7 +276,9 @@ class Ramp(Fragment):
                     eom_freq_steps,
                     eom_att_steps,
                 )
-                logging.error("Verify this is changing the almazny not just the mirny att.")
+                logger.error(
+                    "Verify this is changing the almazny not just the mirny att."
+                )
             if self.suservos_used:
                 logger.info(
                     "SUServos from %s / %s by %s / %s",
@@ -290,7 +299,7 @@ class Ramp(Fragment):
             for i_step in range(num_points_for_loop):
                 # First the Fastino as it writes into the past
                 if self.supplies_used:
-                    self.supply_setter.set_currents(supply_values)
+                    self.supply_setter.set_outputs(supply_values)
                     for i in range(len(supply_values)):
                         supply_values[i] += supply_steps[i]
 
@@ -372,7 +381,7 @@ class Ramp(Fragment):
         Perform the ramps (or steps) associated with this class, as configured
         by the parameters
 
-        Advances the timeline to the end of the ramp
+        **Timeline:** advances to the end of the ramp
         """
 
         t_end_mu = now_mu() + self.core.seconds_to_mu(self.duration.get())

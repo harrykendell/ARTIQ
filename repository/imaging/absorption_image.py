@@ -1,16 +1,17 @@
 from artiq.coredevice.core import Core
 from artiq.coredevice.dma import CoreDMA
 from artiq.experiment import kernel, rpc
-from artiq.language import delay, parallel, now_mu, s, ms, us, MHz, V, at_mu
+from artiq.language import delay, parallel, now_mu, s, ms, us, MHz, V, at_mu, A
 from device_db import server_addr
 
 from ndscan.experiment import ExpFragment, make_fragment_scan_exp, FloatParam
 from ndscan.experiment.parameters import FloatParamHandle
 
 from repository.imaging.PCO_Camera import PcoCamera
-from repository.fragments.current_supply_setter import SetAnalogCurrentSupplies
+from repository.fragments.mot import MOT
 from repository.fragments.beam_setter import ControlBeamsWithoutCoolingAOM
-from repository.models.devices import SUServoedBeam, VDrivenSupply
+from repository.models.devices import SUServoedBeam
+
 
 class AbsorptionImageExpFrag(ExpFragment):
     """
@@ -33,52 +34,11 @@ class AbsorptionImageExpFrag(ExpFragment):
         )
         self.exposure_time: FloatParamHandle
 
-        self.setattr_fragment(
-            "coil_setter",
-            SetAnalogCurrentSupplies,
-            VDrivenSupply["X1", "X2"],
-            init=False,
-        )
-        self.coil_setter: SetAnalogCurrentSupplies
+        self.mot: MOT = self.setattr_fragment("MOT", MOT, manual_init=False)
 
-        self.setattr_fragment(
-            "z_coil_setter",
-            SetAnalogCurrentSupplies,
-            VDrivenSupply[["Z"]],
-            init=False,
+        self.img_beam: ControlBeamsWithoutCoolingAOM = self.setattr_fragment(
+            "img_beam", ControlBeamsWithoutCoolingAOM, [SUServoedBeam["IMG"]]
         )
-        self.z_coil_setter: SetAnalogCurrentSupplies
-
-        self.setattr_fragment(
-            "unlock_pusher",
-            SetAnalogCurrentSupplies,
-            VDrivenSupply[["780_modulation"]],
-            init=False,
-        )
-        self.unlock_pusher: SetAnalogCurrentSupplies
-
-        self.setattr_fragment(
-            "mot_beam_setter",
-            ControlBeamsWithoutCoolingAOM,
-            beam_infos=[SUServoedBeam["MOT"]],
-        )
-        self.mot_beam_setter: ControlBeamsWithoutCoolingAOM
-
-        self.setattr_fragment(
-            "img_beam_setter",
-            ControlBeamsWithoutCoolingAOM,
-            beam_infos=[SUServoedBeam["IMG"]],
-        )
-        self.img_beam_setter: ControlBeamsWithoutCoolingAOM
-
-        self.setattr_param(
-            "load_time",
-            FloatParam,
-            "Time to load the MOT",
-            default=10.0 * s,
-            unit="s",
-        )
-        self.load_time: FloatParamHandle
 
         self.setattr_param(
             "expansion_time",
@@ -94,43 +54,29 @@ class AbsorptionImageExpFrag(ExpFragment):
     def run_once(self):
         self.core.reset()
 
-        self.z_coil_setter.set_currents([1.5])  # make sure we unload MOT
-        delay(50 * ms)
-        self.z_coil_setter.set_to_defaults()
+        self.mot.load()
+        self.mot.compress()
+        self.mot.pgc()
 
-        # load the MOT
-        self.coil_setter.set_to_defaults()
-        self.unlock_pusher.set_to_defaults()
-        self.eom_setter.set_to_defaults()
-        delay(self.load_time.get())
-
-        # compress the MOT - higher field, further detuned
-
-        # release MOT and propagate cloud
-        with parallel:
-            self.coil_setter.turn_off()
-            self.mot_beam_setter.turn_beams_off()
+        self.mot.drop()
         delay(self.expansion_time.get())
 
         # image cloud
         with parallel:
-            self.img_beam_setter.turn_beams_on()
+            self.img_beam.turn_beams_on()
             self.pco_camera.capture_image()
         delay(self.exposure_time.get())
-        self.img_beam_setter.turn_beams_off()
+        self.img_beam.turn_beams_off()
         delay(self.pco_camera.BUSY_TIME - self.exposure_time.get())
 
-        # make sure the mot has cleared
-        self.z_coil_setter.set_currents([1.5])  # make sure we unload MOT
-        delay(50 * ms)
-        self.z_coil_setter.set_to_defaults()
+        self.mot.clear_atoms()
 
         # reference image
         with parallel:
-            self.img_beam_setter.turn_beams_on()
+            self.img_beam.turn_beams_on()
             self.pco_camera.capture_image()
         delay(self.exposure_time.get())
-        self.img_beam_setter.turn_beams_off()
+        self.img_beam.turn_beams_off()
         delay(self.pco_camera.BUSY_TIME - self.exposure_time.get())
 
         # background image
@@ -138,9 +84,8 @@ class AbsorptionImageExpFrag(ExpFragment):
         delay(self.pco_camera.BUSY_TIME)
 
         # leave the MOT to reload
-        self.coil_setter.set_to_defaults()
-        self.mot_beam_setter.turn_beams_on()
-        self.img_beam_setter.turn_beams_off()
+        self.mot.init()
+        self.mot.load()
 
         self.core.wait_until_mu(now_mu())
         self.update_images()
