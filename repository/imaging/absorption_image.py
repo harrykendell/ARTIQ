@@ -30,7 +30,7 @@ class AbsorptionImageExpFrag(ExpFragment):
         self.setattr_fragment("pco_camera", PcoCamera, num_images=3)
         self.pco_camera: PcoCamera
         self.setattr_param_rebind(
-            "exposure_time", self.pco_camera, "exposure_time", default=1 * ms
+            "exposure_time", self.pco_camera, "exposure_time", default=0.2 * ms
         )
         self.exposure_time: FloatParamHandle
 
@@ -44,7 +44,7 @@ class AbsorptionImageExpFrag(ExpFragment):
             "expansion_time",
             FloatParam,
             "Expansion time before imaging",
-            default=5.0 * ms,
+            default=1.0 * ms,
             min=1.0 * us,
             unit="ms",
         )
@@ -54,10 +54,11 @@ class AbsorptionImageExpFrag(ExpFragment):
     def run_once(self):
         self.core.reset()
 
-        self.mot.load()
-        self.mot.compress()
-        self.mot.pgc()
+        self.core.break_realtime()
 
+        self.mot.load()
+        # self.mot.compress()
+        # self.mot.pgc()
         self.mot.drop()
         delay(self.expansion_time.get())
 
@@ -85,7 +86,7 @@ class AbsorptionImageExpFrag(ExpFragment):
 
         # leave the MOT to reload
         self.mot.init()
-        self.mot.load()
+        self.mot.load(wait_for_load=False)
 
         self.core.wait_until_mu(now_mu())
         self.update_images()
@@ -93,7 +94,7 @@ class AbsorptionImageExpFrag(ExpFragment):
     @rpc(flags={"async"})
     def update_images(self):
         images = self.pco_camera.retrieve_images(
-            roi=self.pco_camera.FULL_ROI, timeout=10 * s
+            roi=self.pco_camera.FULL_ROI, timeout=1 * s
         )
         if images is None:
             raise RuntimeError("Failed to retrieve images from camera")

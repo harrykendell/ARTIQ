@@ -2,22 +2,32 @@ import logging
 
 from artiq.coredevice.core import Core
 from artiq.coredevice.ttl import TTLOut
-from artiq.language import delay, kernel, sequential, parallel
-from artiq.language.units import s, ms, MHz, dB, A
+from artiq.language import delay, kernel, parallel, sequential
+from artiq.language.units import A, MHz, dB, ms, s, V
 from ndscan.experiment import Fragment
 from ndscan.experiment.parameters import FloatParam, FloatParamHandle
+from repository.fragments.beam_setter import ControlBeamsWithoutCoolingAOM
 from repository.fragments.default_beam_setter import (
     SetBeamsToDefaults,
     make_set_beams_to_default,
 )
 from repository.fragments.eom_setter import EomFrag
-from repository.fragments.supply_setter import SetSupplies
-from repository.fragments.beam_setter import ControlBeamsWithoutCoolingAOM
-
-from repository.models.devices import SUServoedBeam, Eom, VDrivenSupply
 from repository.fragments.ramp import Ramp
+from repository.fragments.supply_setter import SetSupplies
+from repository.models.devices import Eom, SUServoedBeam, VDrivenSupply
 
 logger = logging.getLogger(__name__)
+
+# Default values for the mot
+# TODO: we need to work out how to make these changeable in the GUI
+# probably look at what is already set and bind a parameter for it inside the general ramp class?
+
+DURATION = {"LOADING": 20 * s, "CMOT": 1 * ms, "PGC": 1 * ms, "ODT": 1 * ms}
+SETTLE_TIME = {"CMOT": 3 * ms, "PGC": 3 * ms, "ODT": 3 * ms}
+DETUNING = {"CMOT": 5 * 6.065 * MHz, "PGC": 10 * 6.065 * MHz}
+BIASES = {"X1": 0.0 * A, "X2": 0.0 * A, "Y": 0.0 * A, "Z": 0.0 * A}
+CURRENT_COMPRESSION_RATIO = 1.75
+EOM_REDUCTION = 10 * dB
 
 
 class MOT(Fragment):
@@ -32,35 +42,45 @@ class MOT(Fragment):
         self.setattr_device("core")
         self.core: Core
 
-        self.state = self.State.UNINITIALIZED
-
-        self.unlock_ttl: TTLOut = self.get_device("780_unlock")
-
-        # Useful params for the MOT
+        # Expose the loading time to ndscan
         self.loading_time: FloatParamHandle = self.setattr_param(
             "loading_time",
             FloatParam,
             "Time to load atoms for",
-            default=20 * s,
+            default=DURATION["LOADING"],
             unit="s",
             min=0,
         )
-        self.clearout_time: FloatParamHandle = self.setattr_param(
-            "clearout_time",
-            FloatParam,
-            "Time to allow for atoms to clearout",
-            default=100 * ms,
-            unit="ms",
-            min=0,
-        )
 
-        # Beams
+        # Beam setters
+        # Use the resetter ONLY for init/deinit
         self.beam_resetter: SetBeamsToDefaults = self.setattr_fragment(
             "beam_resetter",
             make_set_beams_to_default(
-                suservo_beam_infos=SUServoedBeam.all(), name="beam_resetter"
+                suservo_beam_infos=SUServoedBeam[
+                    "MOT",
+                    "IMG",
+                    "PUMP",
+                    "LATX",
+                    "LATY",
+                    "CDT1",
+                    "CDT2",
+                ],
+                name="beam_resetter",
             ),
-            "Set the beams to their default values",
+        )
+        self.all_beams: ControlBeamsWithoutCoolingAOM = self.setattr_fragment(
+            "all_beams",
+            ControlBeamsWithoutCoolingAOM,
+            beam_infos=SUServoedBeam[
+                "MOT",
+                "IMG",
+                "PUMP",
+                "LATX",
+                "LATY",
+                "CDT1",
+                "CDT2",
+            ],
         )
         self.mot_beam: ControlBeamsWithoutCoolingAOM = self.setattr_fragment(
             "mot_beam",
@@ -77,7 +97,7 @@ class MOT(Fragment):
             ControlBeamsWithoutCoolingAOM,
             beam_infos=SUServoedBeam["LATX", "LATY"],
         )
-        #  EOM
+        # EOM
         self.eom: EomFrag = self.setattr_fragment(
             "eom",
             EomFrag,
@@ -91,55 +111,47 @@ class MOT(Fragment):
             VDrivenSupply["X1", "X2", "Y", "Z"],
             init=False,
         )
-        self.x_coils: SetSupplies = self.setattr_fragment(
-            "x_coils",
-            SetSupplies,
-            VDrivenSupply["X1", "X2"],
-            init=False,
-        )
         self.y_coil: SetSupplies = self.setattr_fragment(
             "y_coil",
             SetSupplies,
             VDrivenSupply["Y"],
             init=False,
         )
-        self.z_coil: SetSupplies = self.setattr_fragment(
-            "z_coil",
-            SetSupplies,
-            VDrivenSupply["Z"],
-            init=False,
-        )
         self.push_780: SetSupplies = self.setattr_fragment(
             "push_780",
             SetSupplies,
-            [VDrivenSupply["push_780"]],
+            VDrivenSupply["push_780"],
             init=False,
         )
+        self.unlock_ttl: TTLOut = self.get_device("780_unlock")
 
-        # Compression ramp
-        self.CMOT_detuning: FloatParamHandle = self.setattr_param(
-            "cmot_detuning",
+        # Ramps
+        self._build_cmot()
+        self._build_pgc()
+        self._build_odt()
+
+        self.debug_mode = logger.isEnabledFor(logging.DEBUG)
+        self.manual_init = manual_init
+
+        # Kernel invariants
+        kernel_invariants = getattr(self, "kernel_invariants", set())
+        self.kernel_invariants = kernel_invariants | {
+            "debug_mode",
+            "manual_init",
+        }
+
+    def _build_cmot(self):
+        """
+        This function generates the ramp from MOT to CMOT
+        It also creates parameters to expose to ndscan
+        """
+        self.CMOT_settle_time: FloatParamHandle = self.setattr_param(
+            "CMOT_settle_time",
             FloatParam,
-            "Detuning red of nominal of the MOT beam during CMOT",
-            default=10 * MHz,
-            unit="MHz",
-            min=0,
-        )
-        self.CMOT_compression_ratio: FloatParamHandle = self.setattr_param(
-            "CMOT_compression_ratio",
-            FloatParam,
-            "Ratio to increase the X1 and X2 coils current by",
-            default=1.75,
-            unit="ratio",
-            min=0.0,
-        )
-        self.CMOT_eom_reduction: FloatParamHandle = self.setattr_param(
-            "CMOT_eom_reduction",
-            FloatParam,
-            "Attenuation to reduce the EOM by",
-            default=10 * dB,
-            unit="dB",
-            min=0 * dB,
+            "Time to wait after CMOT ramp",
+            default=SETTLE_TIME["CMOT"],
+            unit="ms",
+            min=0 * ms,
         )
 
         class CMOT_Ramp(Ramp):
@@ -150,17 +162,17 @@ class MOT(Fragment):
                 - Repump power ramped down
             """
 
-            duration_default = 1 * ms
+            duration_default = DURATION["CMOT"]
             supplies = VDrivenSupply["X1", "X2", "push_780"]
             supplies_end = [
-                VDrivenSupply["X1"].default_output * self.CMOT_compression_ratio.get(),
-                VDrivenSupply["X2"].default_output * self.CMOT_compression_ratio.get(),
-                self.CMOT_detuning.get(),
+                VDrivenSupply["X1"].default_output * CURRENT_COMPRESSION_RATIO,
+                VDrivenSupply["X2"].default_output * CURRENT_COMPRESSION_RATIO,
+                DETUNING["CMOT"],
             ]
 
             eoms = [Eom["repump"]]
             eom_att_end = [
-                Eom["repump"].attenuation + self.CMOT_eom_reduction.get(),
+                Eom["repump"].attenuation + EOM_REDUCTION,
             ]
 
         self.cmot_ramp: CMOT_Ramp = self.setattr_fragment(
@@ -170,43 +182,22 @@ class MOT(Fragment):
         self.CMOT_duration: FloatParamHandle = self.setattr_param_rebind(
             "CMOT_duration",
             self.cmot_ramp,
-            "default_duration",
+            "duration",
             description="Duration of the CMOT ramp",
         )
-        self.CMOT_settle_time: FloatParamHandle = self.setattr_param(
-            "CMOT_settle_time",
-            FloatParam,
-            "Time to wait after CMOT ramp",
-            default=10 * ms,
-            unit="ms",
-            min=0,
-        )
 
-        # PGC ramp
-        self.PGC_detuning: FloatParamHandle = self.setattr_param(
-            "PGC_detuning",
+    def _build_pgc(self):
+        """
+        This function generates the ramp from CMOT to PGC
+        It also creates parameters to expose to ndscan
+        """
+        self.PGC_settle_time: FloatParamHandle = self.setattr_param(
+            "PGC_settle_time",
             FloatParam,
-            "Detuning red of nominal for the MOT beam during PGC",
-            default=60.65 * MHz,
-            unit="MHz",
-            min=0,
-        )
-        self.X1_bias: FloatParamHandle = self.setattr_param(
-            "X1_bias",
-            FloatParam,
-            "Bias to apply to the coil during PGC",
-            default=0.0 * A,
-            unit="A",
-            min=0.0 * A,
-        )
-        self.X2_bias: FloatParamHandle = self.setattr_param_like(
-            "X2_bias", self, default=0.0
-        )
-        self.Y_bias: FloatParamHandle = self.setattr_param_like(
-            "Y_bias", self, default=0.0
-        )
-        self.Z_bias: FloatParamHandle = self.setattr_param_like(
-            "Z_bias", self, default=0.0
+            "Time to wait after PGC ramp",
+            default=SETTLE_TIME["PGC"],
+            unit="ms",
+            min=0 * ms,
         )
 
         class PGC_Ramp(Ramp):
@@ -217,22 +208,19 @@ class MOT(Fragment):
                 - Bias ramped on
             """
 
-            duration_default = 1 * ms
+            duration_default = DURATION["PGC"]
 
             supplies = VDrivenSupply["X1", "X2", "Y", "Z", "push_780"]
             supplies_start = [
-                VDrivenSupply["X1"].default_output * self.CMOT_compression_ratio.get(),
-                VDrivenSupply["X2"].default_output * self.CMOT_compression_ratio.get(),
+                VDrivenSupply["X1"].default_output * CURRENT_COMPRESSION_RATIO,
+                VDrivenSupply["X2"].default_output * CURRENT_COMPRESSION_RATIO,
                 VDrivenSupply["Y"].default_output,
                 VDrivenSupply["Z"].default_output,
-                self.CMOT_detuning.get(),
+                DETUNING["CMOT"],
             ]
             supplies_end = [
-                self.X1_bias.get(),
-                self.X2_bias.get(),
-                self.Y_bias.get(),
-                self.Z_bias.get(),
-                self.PGC_detuning.get(),
+                *BIASES.values(),
+                DETUNING["PGC"],
             ]
 
         self.pgc_ramp: PGC_Ramp = self.setattr_fragment(
@@ -242,14 +230,28 @@ class MOT(Fragment):
         self.PGC_duration: FloatParamHandle = self.setattr_param_rebind(
             "PGC_duration",
             self.pgc_ramp,
-            "default_duration",
+            "duration",
             description="Duration of the PGC ramp",
         )
-        self.PGC_settle_time: FloatParamHandle = self.setattr_param(
-            "PGC_settle_time",
+
+    def _build_odt(self):
+        """
+        This function generates the ramp from the PGC to the ODT
+        It also creates parameters to expose to ndscan
+        """
+        self.ODT_overlap_time: FloatParamHandle = self.setattr_param(
+            "ODT_overlap_time",
             FloatParam,
-            "Time to wait after PGC ramp",
-            default=3 * ms,
+            "Time to keep the ODT and MOT beams on together",
+            default=100 * ms,
+            unit="ms",
+            min=0,
+        )
+        self.ODT_settle_time: FloatParamHandle = self.setattr_param(
+            "ODT_settle_time",
+            FloatParam,
+            "Time to wait after ODT ramp",
+            default=SETTLE_TIME["ODT"],
             unit="ms",
             min=0,
         )
@@ -261,65 +263,30 @@ class MOT(Fragment):
                 - Bias ramped off
             """
 
-            duration_default = 1 * ms
+            duration_default = DURATION["ODT"]
             supplies = VDrivenSupply["X1", "X2", "Y", "Z"]
-            supplies_start = [
-                self.X1_bias.get(),
-                self.X2_bias.get(),
-                self.Y_bias.get(),
-                self.Z_bias.get(),
-            ]
-            supplies_end = [
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-            ]
+            supplies_start = list(BIASES.values())
+            supplies_end = [0.0 * A] * len(supplies)
 
             suservos = [SUServoedBeam["MOT"]]
-            suservo_setpoint_end = [0.0]
-
-            pass
+            suservo_setpoint_end = [0.0 * V]
 
         self.odt_ramp: ODT_Ramp = self.setattr_fragment(
             "odt_ramp",
             ODT_Ramp,
         )
-        self.ODT_overlap_time: FloatParamHandle = self.setattr_param(
-            "ODT_overlap_time",
-            FloatParam,
-            "Time to keep the ODT and MOT beams on together",
-            default=100 * ms,
-            unit="ms",
-            min=0,
-        )
         self.ODT_duration: FloatParamHandle = self.setattr_param_rebind(
-            "ODT_duration", self.odt_ramp, "default_duration"
+            "ODT_duration",
+            self.odt_ramp,
+            "duration",
+            description="Duration of the ODT ramp",
         )
-        self.ODT_settle_time: FloatParamHandle = self.setattr_param(
-            "ODT_settle_time",
-            FloatParam,
-            "Time to wait after ODT ramp",
-            default=100 * ms,
-            unit="ms",
-            min=0,
-        )
-
-        self.debug_mode = logger.isEnabledFor(logging.DEBUG)
-        self.manual_init = manual_init
-
-        # Kernel invariants
-        kernel_invariants = getattr(self, "kernel_invariants", set())
-        self.kernel_invariants = kernel_invariants | {"debug_mode", "manual_init"}
 
     @kernel
     def device_setup(self):
         self.device_setup_subfragments()
 
         if not self.manual_init:
-            self.core.break_realtime()
-            self.calculate_dma_handles()
             self.core.break_realtime()
             self.init()
 
@@ -337,6 +304,9 @@ class MOT(Fragment):
 
         **Timeline:** we break_realtime() after setting the devices
         """
+        self.core.break_realtime()
+        self.calculate_dma_handles()
+        self.core.break_realtime()
         # Lasers set to defaults and turned off
         self.beam_resetter.turn_on_all(light_enabled=False)
         # EOM set to defaults
@@ -355,26 +325,29 @@ class MOT(Fragment):
 
         No more DMA sequences may be recorded after this point
         """
-        logger.warning(
-            "Calculating MOT ramp handles, "
-            "No more DMA sequences may be recorded after this point"
-        )
+        if self.debug_mode:
+            logger.warning(
+                "Calculating MOT ramp handles, "
+                "No more DMA sequences may be recorded after this point"
+            )
+        self.core.break_realtime()
         self.cmot_ramp.precalculate_dma_handle()
         self.pgc_ramp.precalculate_dma_handle()
         self.odt_ramp.precalculate_dma_handle()
 
     @kernel
-    def clear_atoms(self) -> None:
+    def clear_atoms(self, clearout_time=100 * ms) -> None:
         """
         Clear out atoms from the MOT
 
         **Timeline:** advances by approx `clearout_time` seconds
         """
-        raise NotImplementedError("How do we want to clear out atoms?")
-        delay(self.clearout_time.get())
+        self.y_coil.set_outputs([1.0 * A])
+        delay(clearout_time)
+        self.y_coil.set_to_defaults()
 
     @kernel
-    def load(self, clearout=True) -> None:
+    def load(self, clearout=True, clearout_time=1000 * ms, wait_for_load=True) -> None:
         """
         Load the MOT
 
@@ -383,11 +356,12 @@ class MOT(Fragment):
         **Timeline:** advances by approx `loading_time` seconds
         """
         if clearout:
-            self.clear_atoms()
+            self.clear_atoms(clearout_time=clearout_time)
 
         self.mot_beam.turn_beams_on()
 
-        delay(self.loading_time.get())
+        if wait_for_load:
+            delay(self.loading_time.get())
 
     @kernel
     def compress(self) -> None:
@@ -415,7 +389,7 @@ class MOT(Fragment):
         **Timeline:** advances by `self.PGC_duration` + `self.PGC_settle_time`
         """
         with sequential:
-            # Do the ramp - MOT freq, coil biases
+            # Do the ramp - MOT freq, coil to biases
             self.pgc_ramp.do()
             # Fix EOM frequency
             self.eom.set_freq(self.eom.config.frequency + self.PGC_detuning.get())
@@ -428,31 +402,21 @@ class MOT(Fragment):
         """
         Load into the Optical Dipole Trap
 
-        ramp on the ODT
-        wait for overlap time
-        ramp the MOT off and reset:
-            - MOT beam off
-            - unpush
-            - relock
-            - reset EOM freq/att
-            - turn off coils
+        **Timeline:** advances by `self.ODT_duration` + `self.ODT_settle_time`
         """
-        with sequential:
-            # ODT beam comes on and we let atoms transfer
-            self.odt_beams.turn_beams_on()
-            delay(self.ODT_overlap_time.get())
-            # ramp off the MOT
-            self.odt_ramp.do()
+        # ODT beam comes on and we let atoms transfer
+        self.odt_beams.turn_beams_on()
+        delay(self.ODT_overlap_time.get())
+        # ramp off the MOT
+        self.odt_ramp.do()
 
-            # Turn off the MOT beam
-            self.mot_beam.turn_beams_off()
-
-        # Fix up ECDL for later imaging
+        # Fix up MOT ECDL for later imaging
+        self.mot_beam.reset()
         with parallel:
             # Relock the MOT
             self.relock_mot()
-            # Reset the EOM frequency
-            self.eom.set_freq(self.eom.config.frequency)
+            # Reset the EOM
+            self.eom.set_to_defaults()
 
     @kernel
     def into_lattice(self) -> None:
@@ -480,11 +444,14 @@ class MOT(Fragment):
 
         Unpush and then after `time_to_shift` seconds, turn the TTL off
 
-        **Timeline:** advances by `time_to_shift` and a single TTL+Fastino write
+        **Timeline:** advances a single TTL+Fastino write
+
+        However it writes the lock signal into the future by `time_to_shift`
         """
         self.push_780.set_to_defaults()
         delay(time_to_shift)
         self.unlock_ttl.off()
+        delay(-time_to_shift)
 
     @kernel
     def drop(self) -> None:
@@ -492,11 +459,12 @@ class MOT(Fragment):
         Drop the MOT immediately
 
         Turn off all beams and coils
+
+        We also relock the MOT to ensure the ECDL is in a known state
         """
-        with parallel:
-            # Turn off beams
-            self.mot_beam.turn_beams_off()
-            self.odt_beams.turn_beams_off()
-            self.lattice_beams.turn_beams_off()
-            # Turn off the coils
-            self.coils.set_outputs([0.0] * len(self.coils.supplies))
+        # Turn off beams
+        self.all_beams.turn_beams_off()
+        # Turn off the coils
+        self.coils.turn_off()
+
+        self.relock_mot()

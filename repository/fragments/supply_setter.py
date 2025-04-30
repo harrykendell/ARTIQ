@@ -133,7 +133,7 @@ class SetSupplies(Fragment):
             self.fastino.set_dac(self.fastino_channels[idx], voltages[idx])
             delay_mu(
                 8
-            )  # Nothing happens for multiple channels if we use a shorter delay?!
+            )  # TODO: Nothing happens for multiple channels if we use a shorter delay?!
 
     @kernel
     def set_to_defaults(self):
