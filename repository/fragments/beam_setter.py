@@ -2,15 +2,15 @@ import logging
 from typing import List
 
 import numpy as np
+
 from artiq.coredevice.core import Core
 from artiq.coredevice.suservo import Channel as SUServoChannel
 from artiq.coredevice.ttl import TTLOut
-from artiq.language import delay, delay_mu, now_mu, at_mu
 from artiq.experiment import kernel, portable
+from artiq.language import at_mu, delay, delay_mu, now_mu
 from ndscan.experiment import Fragment
-
-from repository.utils.get_local_devices import get_local_devices
 from repository.models import SUServoedBeam
+from repository.utils.dummy_devices import DummySUServoedBeam
 
 logger = logging.getLogger(__name__)
 
@@ -112,16 +112,8 @@ class ControlBeamsWithoutCoolingAOM(Fragment):
         # Add a dummy entry to the list. This is so that the ARTIQ compiler can
         # infer the type even if we're passed an empty list. We'll ignore these
         # in the loops
-        dummy_beaminfo = SUServoedBeam(
-            name="dummy",
-            frequency=-1.0,
-            attenuation=-1.0,
-            shutter_device=get_local_devices(self, TTLOut)[0],
-            suservo_device=get_local_devices(self, SUServoChannel)[0],
-            shutter_delay=0,
-        )
         if len(self.beam_infos) == 0:
-            self.beam_infos.insert(0, dummy_beaminfo)
+            self.beam_infos.insert(0, DummySUServoedBeam)
 
         for beam_info in self.beam_infos:
             self.beam_suservos.append(self.get_device(beam_info.suservo_device))
@@ -381,3 +373,25 @@ class ControlBeamsWithoutCoolingAOM(Fragment):
     @portable
     def get_longest_shutter_delay(self):
         return self.longest_beam_delay
+
+    @kernel
+    def reset(self, light_enabled=False):
+        """
+        Set the beams to their default:
+        - setpoint
+        - amplitude
+        - frequency
+
+        we don't touch the attenuation
+        """
+        for i in range(self.num_beams):
+            suservo = self.beam_suservos[i]
+            beam_info = self.beam_infos[i]
+
+            suservo.set_dds(
+                suservo.servo_channel,
+                beam_info.frequency,
+                -1.0 * beam_info.setpoint / 10.0,
+            )
+
+            suservo.set_y(beam_info.initial_amplitude)

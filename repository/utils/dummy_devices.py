@@ -9,6 +9,7 @@ from artiq.experiment import kernel
 from artiq.experiment import TBool
 from artiq.experiment import TFloat
 from artiq.experiment import TInt32
+from repository.models.devices import SUServoedBeam, Eom, VDrivenSupply
 
 
 class DummySUServoFrag:
@@ -128,3 +129,17 @@ class DummyEomFrag:
 class DummySetSupplies:
     def set_currents(self, currents):
         pass
+
+
+DummySUServoedBeam = SUServoedBeam(
+    name="dummy",
+    frequency=-1.0,
+    attenuation=-1.0,
+    suservo_device="dummy",
+    shutter_device="None",
+    shutter_delay=0,
+)
+
+DummyEom = Eom("dummy", -1.0, -1.0, "dummy", "dummy")
+
+DummyVDrivenSupply = VDrivenSupply("dummy", "dummy", -1.0)

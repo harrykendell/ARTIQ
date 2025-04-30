@@ -14,11 +14,7 @@ from numpy import int32, int64
 from repository.models import SUServoedBeam, Eom, VDrivenSupply
 from repository.fragments.eom_setter import EomFrag
 from repository.fragments.supply_setter import SetSupplies
-from repository.utils.dummy_devices import (
-    DummyEomFrag,
-    DummySUServoChannel,
-    DummySetSupplies,
-)
+from repository.utils.dummy_devices import *
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +53,6 @@ class Ramp(Fragment):
 
             supplies = VDrivenSupply["X1", "X2"]
             supplies_end = [1.8 * A, 1.9 * A]
-
     """
 
     time_step_default = 100 * us
@@ -90,9 +85,7 @@ class Ramp(Fragment):
         # Validate suservos
         if self.suservos is None:
             self.suservos_used = False
-            self.suservos: List[SUServoedBeam] = [
-                SUServoedBeam("dummy", -1.0, -1.0, "dummy")
-            ]
+            self.suservos: List[SUServoedBeam] = [DummySUServoedBeam]
         assert len(self.suservos) == len(set([ss.name for ss in self.suservos]))
         # Ensure non-empty lists are properly initialized
         if not self.suservo_detuning_start:
@@ -107,7 +100,7 @@ class Ramp(Fragment):
         # Validate eoms
         if self.eoms is None:
             self.eoms_used = False
-            self.eoms: List[Eom] = [Eom("dummy", -1.0, -1.0, "dummy", "dummy")]
+            self.eoms: List[Eom] = [DummyEom]
         assert len(self.eoms) == len(set([eom.name for eom in self.eoms]))
         # Ensure non-empty lists are properly initialized
         if self.eom_detuning_end or self.eom_detuning_start:
@@ -124,7 +117,7 @@ class Ramp(Fragment):
         # Validate supplies
         if self.supplies is None:
             self.supplies_used = False
-            self.supplies: List[VDrivenSupply] = [VDrivenSupply("dummy", "dummy", -1.0)]
+            self.supplies: List[VDrivenSupply] = [DummyVDrivenSupply]
         assert len(self.supplies) == len(set([supply.name for supply in self.supplies]))
         if not self.supplies_start:
             self.supplies_start = [supply.default_output for supply in self.supplies]
@@ -395,11 +388,12 @@ class Ramp(Fragment):
         if self.dma_handle_valid:
             self.core_dma.playback_handle(self.dma_handle)
         else:
-            logger.warning(
-                "You should .precalculate_dma_handle the DMA handle for %s at the start"
-                " of run_once to avoid the overhead of string lookups",
-                self.fqn,
-            )
+            if self.debug_enabled:
+                logger.warning(
+                    "You should .precalculate_dma_handle the DMA handle for %s at the start"
+                    " of run_once to avoid the overhead of string lookups",
+                    self.fqn,
+                )
             self.core_dma.playback(self.fqn)
 
         # Ensure that the timeline points to the end of the phase, not just the
