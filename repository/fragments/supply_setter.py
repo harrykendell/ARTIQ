@@ -37,6 +37,8 @@ class SetSupplies(Fragment):
     def build_fragment(self, configs: List[VDrivenSupply], init: bool = False):
         self.setattr_device("core")
         self.core: Core
+        if type(configs) is not list:
+            configs = [configs]
         self.configs: list[VDrivenSupply] = configs
         self.defaults = [dev.default_output for dev in self.configs]
         assert all(
@@ -83,7 +85,15 @@ class SetSupplies(Fragment):
     def _single_output_to_volts(self, output: TFloat, supply_idx: TInt32):
         lim = self.configs[supply_idx].max_output
         gain = self.configs[supply_idx].gain
-        return min(lim, output) / gain
+        if output > lim:
+            logger.warning(
+                "Output %s exceeds max output %s for supply %s",
+                output,
+                lim,
+                self.configs[supply_idx].name,
+            )
+            return lim / gain
+        return output / gain
 
     @portable
     def _outputs_to_volts(self, outputs: TList(TFloat), voltages_out: TList(TFloat)):
@@ -134,4 +144,7 @@ class SetSupplies(Fragment):
 
     @kernel
     def turn_off(self):
+        """
+        Convenience method to turn off all supplies
+        """
         self.set_outputs([0.0] * len(self.configs))
