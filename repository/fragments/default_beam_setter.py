@@ -6,9 +6,8 @@ from numpy import int64
 
 from artiq.coredevice.core import Core
 from artiq.coredevice.ttl import TTLOut
-from artiq.language import delay_mu, host_only, kernel, portable, at_mu, now_mu
+from artiq.language import delay_mu, kernel, portable, at_mu, now_mu
 from ndscan.experiment import Fragment
-from ndscan.experiment.parameters import FloatParam, FloatParamHandle
 
 from repository.utils.dummy_devices import (
     DummyTTL,
@@ -255,7 +254,7 @@ class SetBeamsToDefaults(Fragment):
                 float(beam_info.attenuation),
                 en_out=en_out,
                 setpoint_v=beam_info.setpoint,
-                enable_iir=beam_info.servo_enabled and light_enabled,
+                enable_iir=beam_info.servo_enabled,
             )
 
     @kernel

@@ -109,9 +109,9 @@ class FastinoManager:  # {{{
         # Prepare core
         self.core.break_realtime()
 
-        # Initialize Fastino
-        self.fastino.init()
-        delay(200 * us)
+        # Initialize Fastino transiently provides -10V so avoid it
+        # self.fastino.init()
+        # delay(200 * us)
 
         # Set LEDs
         self.fastino.set_leds(0b00000000)

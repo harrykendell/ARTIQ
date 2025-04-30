@@ -16,6 +16,7 @@ from artiq.experiment import (
     TInt32,
     MHz,
     ms,
+    us,
 )
 from ndscan.experiment import Fragment
 from numpy import int32
@@ -141,7 +142,8 @@ class SUServoFrag(Fragment):
         if self.first_run and not self.mark_suservo_initiated(self.suservo.channel):
             if self.debug_enabled:
                 logging.info(
-                    "Initiating suservo %s = artiq channel 0x%x -> enabled",
+                    "Initiating and resetting all attenuations for suservo  %s = artiq"
+                    " channel 0x%x -> enabled",
                     self.channel,
                     self.suservo.channel,
                 )
@@ -149,6 +151,7 @@ class SUServoFrag(Fragment):
             self.core.break_realtime()
             self.suservo.init()
             self.suservo.set_config(enable=1)
+            self.reset_all_attenuations()
 
         else:
             if self.debug_enabled:
@@ -258,17 +261,10 @@ class SUServoFrag(Fragment):
         return -1.0 * setpoint_v / 10.0
 
     @kernel
-    def set_attenuation(self, attenuation: TFloat, needs_reset: TBool = False):
+    def set_attenuation(self, attenuation: TFloat):
         """
-        Set only the attenuator for this channel on this Urukul
-
-        If reset_all_attenuations hasn't been called this will clobber
-        the other channels on the same Urukul
+        Set only the attenuator for this channel on this suservo
         """
-        if needs_reset:
-            self._reset_all_attenuations(attenuation)
-            return
-
         attenuator_channel = self.suservo_channel.servo_channel % 4
 
         if self.debug_enabled:
@@ -285,10 +281,9 @@ class SUServoFrag(Fragment):
         cpld.set_att(attenuator_channel, attenuation)
 
     @kernel
-    def _reset_all_attenuations(self, attenuation: TFloat):
+    def reset_all_attenuations(self):
         """
-        Set the required attenuation but also reset the attenuations of all
-        other channels on the same Urukul to their defaults
+        Set the attenuations of all channels on the same Urukul to their defaults
 
         This is annoyingly required because there is no way of getting
         information out from the SUServo gateware about the current settings, so
@@ -296,13 +291,22 @@ class SUServoFrag(Fragment):
         """
         if self.debug_enabled:
             slack_mu = now_mu() - self.core.get_rtio_counter_mu()
-            logging.warning("Setting the attenuator for all channels to their defaults")
+            logging.info(
+                "Clobbering attenuations for suservo %s = artiq channel 0x%x",
+                self.channel,
+                self.suservo.channel,
+            )
             at_mu(self.core.get_rtio_counter_mu() + slack_mu)
 
         cpld = self.suservo_channel.dds.cpld  # type: CPLD
         cpld.get_att_mu()
 
-        cpld.set_all_att_mu(self.calc_atts_reg(attenuation))
+        reg = 0
+        for i in range(4):
+            delay(1 * ms)
+            reg += self.suservo.cplds[0].att_to_mu(self.beams[i][2]) << (i * 8)
+
+        cpld.set_all_att_mu(reg)
 
     @kernel
     def set_suservo(
@@ -333,16 +337,20 @@ class SUServoFrag(Fragment):
         self.set_attenuation(attenuation)
 
         # Configure this profile to have the requested amplitude and frequency
-        self.set_y(amplitude)
+        self.suservo_channel.set_y(profile=self.suservo_profile, y=amplitude)
 
-        self.set_dds(
+        self.suservo_channel.set_dds(
             profile=self.suservo_profile,
             offset=self.setpoint_to_offset(setpoint_v),
             frequency=freq,
+            phase=0.0,
         )
 
         # Set channel output state
         self.set_channel_state(en_out, enable_iir)
+        delay(
+            10 * us
+        )  # This is needed otherwise we seem to lose slack on setting state
 
     @kernel
     def set_dds(

@@ -6,7 +6,7 @@ EOMS = [
     Eom(
         name="repump",
         frequency=6578.0 * MHz,
-        attenuation=12.0 * dB,
+        attenuation=13.0 * dB,
         mirny_ch="mirny_eom_repump",
         almazny_ch="almazny_eom_repump",
         almazny_enabled=True,
@@ -79,9 +79,8 @@ VDRIVEN_SUPPLIES = [
 VDRIVEN_SUPPLIES = {supply.name: supply for supply in VDRIVEN_SUPPLIES}
 
 THORLABS_SHUTTER_DELAY = 35.0 * ms
-EBAY_SHUTTER_DELAY = (
-    25.0 * ms
-)  # the switch on time is actually quick fast. The limit is the dislike of short pulses
+EBAY_SHUTTER_DELAY = 25.0 * ms 
+# the switch on time is actually quick fast. The limit is the dislike of short pulses
 SHUTTERS = [
     Shutter(
         name="MOT2D",
