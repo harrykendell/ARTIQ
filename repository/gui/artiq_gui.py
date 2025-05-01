@@ -840,6 +840,7 @@ class ArtiqGUIExperiment(EnvExperiment):
                 return True
         raise RuntimeError(
             "Could not find a working display localhost:10 to localhost:15"
-            " - check your X forwarding settings"
+            " - Ensure localhost is set to 127.0.0.1 in /etc/hosts"
+            " - check `xmessage -center 'hello world'` works"
             " - if you are running locally, set remoteDisplay to False"
         )
