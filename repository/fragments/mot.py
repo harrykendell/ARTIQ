@@ -5,7 +5,7 @@ from artiq.coredevice.ttl import TTLOut
 from artiq.language import delay, kernel, parallel, sequential
 from artiq.language.units import A, MHz, dB, ms, s, V
 from ndscan.experiment import Fragment
-from ndscan.experiment.parameters import FloatParam, FloatParamHandle
+from ndscan.experiment.parameters import FloatParam, FloatParamHandle, ParamHandle
 from repository.fragments.beam_setter import ControlBeamsWithoutCoolingAOM
 from repository.fragments.default_beam_setter import (
     SetBeamsToDefaults,
@@ -184,6 +184,12 @@ class MOT(Fragment):
             self.cmot_ramp,
             "duration",
             description="Duration of the CMOT ramp",
+        )
+
+        self.CMOT_detuning: FloatParamHandle = self.setattr_param_rebind(
+            "CMOT_detuning",
+            self.cmot_ramp,
+            "end_push_780",
         )
 
     def _build_pgc(self):
