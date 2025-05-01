@@ -55,6 +55,7 @@ VDRIVEN_SUPPLIES = [
         gain=222 * MHz / V,
         max_output=222 * MHz,
         default_output=0.0 * MHz,
+        unit="MHz",
     ),
     VDrivenSupply(
         name="GreenTA",

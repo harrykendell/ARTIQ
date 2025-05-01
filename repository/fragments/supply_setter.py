@@ -111,9 +111,9 @@ class SetSupplies(Fragment):
         """
         Set outputs in their units.
 
-        This method does not advance the timeline but does require at least
-        1.5us + 808ns * len(outputs) on a Kasli 1.x as SPI events are written
-        into the past.
+        This method advances the timeline by 8ns * len(outputs) but also requires
+        slack at least 1.5us + 808ns * len(outputs) on a Kasli 1.x as SPI events are
+        written into the past.
         """
         voltages = [0.0] * len(self.configs)
 
