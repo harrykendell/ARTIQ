@@ -56,11 +56,11 @@ fi
 
 # Running remotely on server - we forward to the client
 if on_server; then
+    echo -e "${GREEN}Remotely running on the ARTIQ server${NC}"
     if ! check_localhost; then
         echo -e "${RED}WARNING: /etc/hosts has localhost set to 127.0.1.1.\nThis will prevent X-forwarding.\nPlease set it to 127.0.0.1${NC}"
         exit 1
     fi
-    echo -e "${GREEN}Remotely running on the ARTIQ server${NC}"
     #  PyQt5 and SO fix
     FIX=". ./scripts/nix-fix-pyqt.sh ; export LD_LIBRARY_PATH=$(find /nix/store -type d -wholename '/nix/store/*artiq-env/lib')"
     nix shell --command bash -c "$FIX ; artiq_dashboard -v --server=\"$SERVER_ADDRESS\" -p=\"ndscan.dashboard_plugin\""
