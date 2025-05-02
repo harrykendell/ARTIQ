@@ -41,7 +41,7 @@ def ravel(func):
 class AbsImage:
     nm = 1e-9
     um = 1e-6
-    threshold = 100
+    threshold = 0.1 # multiple of maximum light to count as in the beam
 
     def __init__(
         self,
@@ -118,14 +118,11 @@ a 50mm lens at 150mm focuses to 75mm away, so set to 0.5"
         # If the light data is below some threshold, we assume that any
         # atom data at this location is invalid and treat as if no transmission.
         # The threshold value was selected experimentally
-        transmission = np.divide(atoms, light, where=light > AbsImage.threshold)
-        transmission[light <= AbsImage.threshold] = 1
+        threshold = np.max(atoms) * AbsImage.threshold
+        transmission = np.divide(atoms, light, where=light > threshold)
+        transmission[light <= threshold] = 1
         np.clip(transmission, a_min=0, a_max=1, out=transmission)
 
-        if np.min(transmission) == 1:
-            raise ValueError(
-                "Transmission is all 1s, there doesn't appear to be an atom cloud"
-            )
         return transmission
 
     @functools.cached_property
@@ -144,6 +141,10 @@ a 50mm lens at 150mm focuses to 75mm away, so set to 0.5"
         area = np.square(self.physical_scale)  # pixel area in SI units
 
         optical_density = self.optical_density[self.sigma_mask]
+
+        if np.max(optical_density) < 0.2:
+            logging.warning("There don't seem to be any atoms in the image")
+            return -np.inf
 
         return (
             (area / sigma) * np.sum(optical_density) / 0.866

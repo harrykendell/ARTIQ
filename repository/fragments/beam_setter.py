@@ -122,6 +122,7 @@ class ControlBeamsWithoutCoolingAOM(Fragment):
                 if self.debug_enabled and beam_info.name != "dummy":
                     logger.info("Beam [%s] has no shutter", beam_info.name)
                 self.shutter_indexes.append(-1)
+                self.beam_shutters.append(self.get_device("dummy_shutter"))
             else:
                 self.beam_shutters.append(self.get_device(beam_info.shutter_device))
                 self.shutter_indexes.append(len(self.beam_shutters) - 1)

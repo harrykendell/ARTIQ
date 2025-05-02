@@ -55,8 +55,8 @@ class ElapsedTimer(ExpFragment):
         for _ in range(self.num_pulses.get()):
             with parallel:
                 self.ttl3.pulse(duration=0.1 * ms)
-                self.ttl5.pulse(duration=0.1 * ms)
-                self.ttl6.pulse(duration=0.1 * ms)
+                # self.ttl5.pulse(duration=0.1 * ms)
+                # self.ttl6.pulse(duration=0.1 * ms)
                 # self.ttl7.pulse(duration=0.1 * ms)
                 # self.ttl9.pulse(duration=0.1 * ms)
                 # self.ttl10.pulse(duration=0.1 * ms)
