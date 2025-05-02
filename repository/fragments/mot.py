@@ -5,26 +5,24 @@ from artiq.coredevice.ttl import TTLOut
 from artiq.language import delay, kernel, parallel, sequential
 from artiq.language.units import A, MHz, dB, ms, s, V
 from ndscan.experiment import Fragment
-from ndscan.experiment.parameters import FloatParam, FloatParamHandle, ParamHandle
+from ndscan.experiment.parameters import FloatParam, FloatParamHandle
 from repository.fragments.beam_setter import ControlBeamsWithoutCoolingAOM
 from repository.fragments.default_beam_setter import (
     SetBeamsToDefaults,
     make_set_beams_to_default,
 )
+from repository.fragments.ramp import Ramp, default
 from repository.fragments.eom_setter import EomFrag
-from repository.fragments.ramp import Ramp
 from repository.fragments.supply_setter import SetSupplies
 from repository.models.devices import Eom, SUServoedBeam, VDrivenSupply
 
 logger = logging.getLogger(__name__)
 
-# Default values for the mot
-# TODO: we need to work out how to make these changeable in the GUI
-# probably look at what is already set and bind a parameter for it inside the general ramp class?
-
+# Default constants - these can be overridden in the experiment
+Γ_Rb = 6.065 * MHz  # Natural linewidth of Rb-87
 DURATION = {"LOADING": 20 * s, "CMOT": 1 * ms, "PGC": 1 * ms, "ODT": 1 * ms}
 SETTLE_TIME = {"CMOT": 3 * ms, "PGC": 3 * ms, "ODT": 3 * ms}
-DETUNING = {"CMOT": 5 * 6.065 * MHz, "PGC": 10 * 6.065 * MHz}
+DETUNING = {"CMOT": 2.5 * Γ_Rb, "PGC": 6 * Γ_Rb}  # This is beyond the normal 2Γ
 BIASES = {"X1": 0.0 * A, "X2": 0.0 * A, "Y": 0.0 * A, "Z": 0.0 * A}
 CURRENT_COMPRESSION_RATIO = 1.75
 EOM_REDUCTION = 10 * dB
@@ -153,6 +151,14 @@ class MOT(Fragment):
             unit="ms",
             min=0 * ms,
         )
+        self.CMOT_detuning: FloatParamHandle = self.setattr_param(
+            "CMOT_detuning",
+            FloatParam,
+            "Detuning of the CMOT ramp",
+            default=DETUNING["CMOT"],
+            unit="Γ",
+            scale=Γ_Rb,
+        )
 
         class CMOT_Ramp(Ramp):
             """
@@ -167,7 +173,7 @@ class MOT(Fragment):
             supplies_end = [
                 VDrivenSupply["X1"].default_output * CURRENT_COMPRESSION_RATIO,
                 VDrivenSupply["X2"].default_output * CURRENT_COMPRESSION_RATIO,
-                DETUNING["CMOT"],
+                self.CMOT_detuning,
             ]
 
             eoms = [Eom["repump"]]
@@ -186,12 +192,6 @@ class MOT(Fragment):
             description="Duration of the CMOT ramp",
         )
 
-        self.CMOT_detuning: FloatParamHandle = self.setattr_param_rebind(
-            "CMOT_detuning",
-            self.cmot_ramp,
-            "end_push_780",
-        )
-
     def _build_pgc(self):
         """
         This function generates the ramp from CMOT to PGC
@@ -205,6 +205,14 @@ class MOT(Fragment):
             unit="ms",
             min=0 * ms,
         )
+        self.PGC_detuning: FloatParamHandle = self.setattr_param(
+            "PGC_detuning",
+            FloatParam,
+            "Detuning of the PGC ramp",
+            default=DETUNING["PGC"],
+            unit="Γ",
+            scale=Γ_Rb,
+        )
 
         class PGC_Ramp(Ramp):
             """
@@ -216,17 +224,23 @@ class MOT(Fragment):
 
             duration_default = DURATION["PGC"]
 
-            supplies = VDrivenSupply["X1", "X2", "Y", "Z", "push_780"]
+            supplies = VDrivenSupply[
+                "X1",
+                "X2",
+                "Y",
+                "Z",
+                "push_780",
+            ]
             supplies_start = [
-                VDrivenSupply["X1"].default_output * CURRENT_COMPRESSION_RATIO,
-                VDrivenSupply["X2"].default_output * CURRENT_COMPRESSION_RATIO,
-                VDrivenSupply["Y"].default_output,
-                VDrivenSupply["Z"].default_output,
-                DETUNING["CMOT"],
+                self.cmot_ramp,
+                self.cmot_ramp,
+                default,
+                default,
+                self.CMOT_detuning,
             ]
             supplies_end = [
                 *BIASES.values(),
-                DETUNING["PGC"],
+                self.PGC_detuning,
             ]
 
         self.pgc_ramp: PGC_Ramp = self.setattr_fragment(
@@ -271,7 +285,7 @@ class MOT(Fragment):
 
             duration_default = DURATION["ODT"]
             supplies = VDrivenSupply["X1", "X2", "Y", "Z"]
-            supplies_start = list(BIASES.values())
+            supplies_start = [self.pgc_ramp] * len(supplies)
             supplies_end = [0.0 * A] * len(supplies)
 
             suservos = [SUServoedBeam["MOT"]]

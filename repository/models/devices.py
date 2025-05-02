@@ -5,7 +5,7 @@ from artiq.language.units import ms, dB, MHz, V, A
 EOMS = [
     Eom(
         name="repump",
-        frequency=6578.0 * MHz,
+        frequency=6580.0 * MHz,
         attenuation=13.0 * dB,
         mirny_ch="mirny_eom_repump",
         almazny_ch="almazny_eom_repump",
@@ -107,7 +107,7 @@ SUSERVOED_BEAMS = [
     SUServoedBeam(
         name="MOT",
         suservo_device="suservo_aom_MOT",
-        frequency=193.0 * MHz,
+        frequency=191.0 * MHz,
         attenuation=17.0 * dB,
         shutter_device="shutter_3DMOT",
         shutter_delay=THORLABS_SHUTTER_DELAY,

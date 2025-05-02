@@ -4,8 +4,8 @@ from artiq.experiment import kernel, rpc
 from artiq.language import delay, parallel, now_mu, s, ms, us, MHz, V, at_mu, A
 from device_db import server_addr
 
-from ndscan.experiment import ExpFragment, make_fragment_scan_exp, FloatParam
-from ndscan.experiment.parameters import FloatParamHandle
+from ndscan.experiment import ExpFragment, make_fragment_scan_exp, FloatParam, BoolParam
+from ndscan.experiment.parameters import FloatParamHandle, BoolParamHandle
 
 from repository.imaging.PCO_Camera import PcoCamera
 from repository.fragments.mot import MOT
@@ -30,7 +30,7 @@ class AbsorptionImageExpFrag(ExpFragment):
         self.setattr_fragment("pco_camera", PcoCamera, num_images=3)
         self.pco_camera: PcoCamera
         self.setattr_param_rebind(
-            "exposure_time", self.pco_camera, "exposure_time", default=0.2 * ms
+            "exposure_time", self.pco_camera, "exposure_time", default=0.1 * ms
         )
         self.exposure_time: FloatParamHandle
 
@@ -50,6 +50,14 @@ class AbsorptionImageExpFrag(ExpFragment):
         )
         self.expansion_time: FloatParamHandle
 
+        self.setattr_param(
+            "compress",
+            BoolParam,
+            "Enable MOT compression",
+            default=True
+        )
+        self.compress: BoolParamHandle
+
     @kernel
     def run_once(self):
         self.core.reset()
@@ -57,8 +65,9 @@ class AbsorptionImageExpFrag(ExpFragment):
         self.core.break_realtime()
 
         self.mot.load()
-        # self.mot.compress()
-        # self.mot.pgc()
+        if self.compress.get():
+            self.mot.compress()
+            # self.mot.pgc()
         self.mot.drop()
         delay(self.expansion_time.get())
 

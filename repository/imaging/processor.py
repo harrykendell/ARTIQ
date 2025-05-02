@@ -41,14 +41,14 @@ def ravel(func):
 class AbsImage:
     nm = 1e-9
     um = 1e-6
-    threshold = 1000
+    threshold = 100
 
     def __init__(
         self,
         data,
         ref,
         bg,
-        wavelength=780.24 * nm,
+        wavelength=780.24602089 * nm,
         detuning=0 * MHz,
         linewidth=6.065 * MHz,
         pixel_size=6.45 * um,
