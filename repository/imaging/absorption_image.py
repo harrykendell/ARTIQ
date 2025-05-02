@@ -4,13 +4,15 @@ from artiq.experiment import kernel, rpc
 from artiq.language import delay, parallel, now_mu, s, ms, us, MHz, V, at_mu, A
 from device_db import server_addr
 
-from ndscan.experiment import ExpFragment, make_fragment_scan_exp, FloatParam, BoolParam
+from ndscan.experiment import ExpFragment, make_fragment_scan_exp, FloatParam, BoolParam, FloatChannel
 from ndscan.experiment.parameters import FloatParamHandle, BoolParamHandle
 
 from repository.imaging.PCO_Camera import PcoCamera
 from repository.fragments.mot import MOT
 from repository.fragments.beam_setter import ControlBeamsWithoutCoolingAOM
 from repository.models.devices import SUServoedBeam
+
+from repository.imaging.processor import AbsImage  # noqa: E402
 
 
 class AbsorptionImageExpFrag(ExpFragment):
@@ -50,24 +52,29 @@ class AbsorptionImageExpFrag(ExpFragment):
         )
         self.expansion_time: FloatParamHandle
 
-        self.setattr_param(
-            "compress",
-            BoolParam,
-            "Enable MOT compression",
-            default=True
+        self.do_cmot: BoolParamHandle = self.setattr_param(
+            "do_cmot", BoolParam, "Do the CMOT step", default=True
         )
-        self.compress: BoolParamHandle
+
+        self.do_pgc: BoolParamHandle = self.setattr_param(
+            "do_pgc", BoolParam, "Do the PGC step", default=False
+        )
+
+        self.atom_number: FloatChannel = self.setattr_result("atom_number")
 
     @kernel
     def run_once(self):
         self.core.reset()
 
+        self.mot.calculate_dma_handles()
         self.core.break_realtime()
 
         self.mot.load()
-        if self.compress.get():
+        if self.do_cmot.get():
             self.mot.compress()
-            # self.mot.pgc()
+            if self.do_pgc.get():
+                self.mot.pgc()
+
         self.mot.drop()
         delay(self.expansion_time.get())
 
@@ -119,11 +126,20 @@ class AbsorptionImageExpFrag(ExpFragment):
             broadcast=True,
         )
 
-        self.ccb.issue(
-            "create_applet",
-            "AbsorptionImage",
-            f"${{python}} -m repository.imaging.applet --server {server_addr}",  # noqa: E501,
+        self.absimg = AbsImage(
+            data=images[0],
+            ref=images[1],
+            bg=images[2],
+            magnification=0.5,  # Set default magnification
         )
+
+        self.atom_number.push(self.absimg.atom_number)
+
+        # self.ccb.issue(
+        #     "create_applet",
+        #     "AbsorptionImage",
+        #     f"${{python}} -m repository.imaging.applet --server {server_addr}",  # noqa: E501,
+        # )
 
 
 AbsorptionImage = make_fragment_scan_exp(AbsorptionImageExpFrag)
