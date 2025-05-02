@@ -136,7 +136,6 @@ class SUServoFrag(Fragment):
 
     @kernel
     def device_setup(self):
-        self.device_setup_subfragments()
 
         # Initiate the suservo itself (i.e. all four channels)
         if self.first_run and not self.mark_suservo_initiated(self.suservo.channel):
@@ -299,7 +298,8 @@ class SUServoFrag(Fragment):
             at_mu(self.core.get_rtio_counter_mu() + slack_mu)
 
         cpld = self.suservo_channel.dds.cpld  # type: CPLD
-        cpld.get_att_mu()
+        # TODO: for some reason the `self.bus.read()` in  `cpld.get_att_mu() takes minutes to complete the first time but only in an ndscan scan???
+        # cpld.get_att_mu()
 
         reg = 0
         for i in range(4):
