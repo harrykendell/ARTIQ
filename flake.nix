@@ -144,6 +144,10 @@
           artiq.inputs.sipyco.packages.x86_64-linux.sipyco
         ];
         doCheck = false;
+        # patch out numpy dependecy as its incomaptible with the artiq numpy
+        postPatch = ''
+          sed -i -e "s/^numpy = .*//" pyproject.toml
+        '';
         };
       oitg = pkgs.python3Packages.buildPythonPackage {
         name = "oitg";
@@ -157,10 +161,9 @@
           pkgs.python3Packages.poetry-core
           pkgs.python3Packages.poetry-dynamic-versioning
         ];
-        # We don't need to do this anymore as oitg made it optional in 3ecba4b
-        # patch out qiskit dependecy as it doesn't support python 3.11 and we dont personally use it
+        # patch out numpy dependecy as its incomaptible with the artiq numpy
         postPatch = ''
-          sed -i -e "s/^qiskit = .*//" pyproject.toml
+          sed -i -e "s/^numpy = .*//" pyproject.toml
         '';
         };
       ndscan = pkgs.python3Packages.buildPythonPackage {
@@ -174,6 +177,10 @@
           pkgs.python3Packages.pyqt6
         ];
         dontWrapQtApps = true; # Pulled in via the artiq package; we don't care.
+        # patch out numpy dependecy as its incomaptible with the artiq numpy
+        postPatch = ''
+          sed -i -e "s/^numpy = .*//" pyproject.toml
+        '';
         };
 
     in {
