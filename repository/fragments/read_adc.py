@@ -5,11 +5,9 @@ from artiq.coredevice.core import Core
 from artiq.coredevice.sampler import Sampler
 from artiq.coredevice.suservo import Channel as SUServoChannel
 from artiq.coredevice.suservo import SUServo
-from artiq.experiment import EnumerationValue
-from artiq.experiment import kernel
+from artiq.experiment import EnumerationValue, kernel
 from ndscan.experiment import Fragment
-from ndscan.experiment.parameters import IntParam
-from ndscan.experiment.parameters import IntParamHandle
+from ndscan.experiment.parameters import IntParam, IntParamHandle
 from repository.utils.get_local_devices import get_local_devices
 
 logger = logging.getLogger(__name__)

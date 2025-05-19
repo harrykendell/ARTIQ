@@ -1,7 +1,8 @@
-import pyvisa
-import numpy as np
-import matplotlib.pyplot as plt
 import logging
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pyvisa
 
 logging.basicConfig(level=logging.WARNING)
 

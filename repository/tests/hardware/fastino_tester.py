@@ -5,12 +5,12 @@ sys.path.append(
     __file__.split("repository")[0] + "repository"
 )  # link to repository root
 
+from utils.wait_for_enter import is_enter_pressed
+
+from artiq.coredevice.core import Core
 from artiq.experiment import *
 from artiq.master.databases import DeviceDB
 from artiq.master.worker_db import DeviceManager
-
-from artiq.coredevice.core import Core
-from utils.wait_for_enter import is_enter_pressed
 
 
 class FastinoTester(EnvExperiment):

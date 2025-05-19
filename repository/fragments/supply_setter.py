@@ -3,16 +3,9 @@ from typing import List
 
 from artiq.coredevice.core import Core
 from artiq.coredevice.fastino import Fastino
-from artiq.experiment import (
-    TFloat,
-    TInt32,
-    TList,
-    kernel,
-    portable,
-)
-from artiq.language import delay_mu, now_mu, at_mu
+from artiq.experiment import TFloat, TInt32, TList, kernel, portable
+from artiq.language import at_mu, delay_mu, now_mu
 from ndscan.experiment import Fragment
-
 from repository.models import VDrivenSupply
 
 logger = logging.getLogger(__name__)

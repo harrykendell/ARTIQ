@@ -1,8 +1,9 @@
-import numpy as np
-from scipy.ndimage import gaussian_filter
-import logging
-from lmfit import Model
 import functools
+import logging
+
+import numpy as np
+from lmfit import Model
+from scipy.ndimage import gaussian_filter
 
 from artiq.language.units import MHz
 
@@ -41,7 +42,7 @@ def ravel(func):
 class AbsImage:
     nm = 1e-9
     um = 1e-6
-    threshold = 0.1 # multiple of maximum light to count as in the beam
+    threshold = 0.1  # multiple of maximum light to count as in the beam
 
     def __init__(
         self,
@@ -87,8 +88,8 @@ class AbsImage:
             # NB for now 50mm lens at 150mm distance focuses to 75mm away
             # self.magnification = 75 / 150 = 0.5
             raise ValueError(
-                "Please set magnification for the PCO camera\nNB: For now\
-a 50mm lens at 150mm focuses to 75mm away, so set to 0.5"
+                "Please set magnification for the PCO camera\nNB: For nowa 50mm lens at"
+                " 150mm focuses to 75mm away, so set to 0.5"
             )
         self.magnification = magnification
 
@@ -294,9 +295,9 @@ a 50mm lens at 150mm focuses to 75mm away, so set to 0.5"
         Plots raw images, optical density, best fit, and fit stats using a clean layout.
         """
         import matplotlib.pyplot as plt
+        import numpy as np
         from matplotlib.gridspec import GridSpec
         from matplotlib.ticker import FuncFormatter
-        import numpy as np
 
         if fig is None:
             fig = plt.figure(figsize=(6, 6), constrained_layout=True)

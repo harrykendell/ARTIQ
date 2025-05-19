@@ -1,6 +1,6 @@
-from artiq.experiment import *
-
 from utils.wait_for_enter import is_enter_pressed
+
+from artiq.experiment import *
 
 
 class Shutter(EnvExperiment):

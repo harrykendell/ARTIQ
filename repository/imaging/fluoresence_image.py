@@ -1,14 +1,12 @@
 from artiq.coredevice.core import Core
-from artiq.experiment import kernel, rpc, delay, parallel, now_mu
-from artiq.language.units import s, ms, us
+from artiq.experiment import delay, kernel, now_mu, parallel, rpc
+from artiq.language.units import ms, s, us
 from device_db import server_addr
-
-from ndscan.experiment import ExpFragment, make_fragment_scan_exp, FloatParam
+from ndscan.experiment import ExpFragment, FloatParam, make_fragment_scan_exp
 from ndscan.experiment.parameters import FloatParamHandle
-
-from repository.imaging.PCO_Camera import PcoCamera
-from repository.fragments.supply_setter import SetSupplies
 from repository.fragments.beam_setter import ControlBeamsWithoutCoolingAOM
+from repository.fragments.supply_setter import SetSupplies
+from repository.imaging.PCO_Camera import PcoCamera
 from repository.models.devices import SUServoedBeam, VDrivenSupply
 
 

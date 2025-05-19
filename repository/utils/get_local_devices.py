@@ -1,5 +1,4 @@
-from typing import List
-from typing import Type
+from typing import List, Type
 
 from artiq.experiment import HasEnvironment
 

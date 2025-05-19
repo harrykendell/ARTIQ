@@ -1,18 +1,21 @@
 from artiq.coredevice.core import Core
 from artiq.coredevice.dma import CoreDMA
 from artiq.experiment import kernel, rpc
-from artiq.language import delay, parallel, now_mu, s, ms, us, MHz, V, at_mu, A
+from artiq.language import A, MHz, V, at_mu, delay, ms, now_mu, parallel, s, us
 from device_db import server_addr
-
-from ndscan.experiment import ExpFragment, make_fragment_scan_exp, FloatParam, BoolParam, FloatChannel
-from ndscan.experiment.parameters import FloatParamHandle, BoolParamHandle
-
-from repository.imaging.PCO_Camera import PcoCamera
-from repository.fragments.mot import MOT
+from ndscan.experiment import (
+    BoolParam,
+    ExpFragment,
+    FloatChannel,
+    FloatParam,
+    make_fragment_scan_exp,
+)
+from ndscan.experiment.parameters import BoolParamHandle, FloatParamHandle
 from repository.fragments.beam_setter import ControlBeamsWithoutCoolingAOM
-from repository.models.devices import SUServoedBeam
-
+from repository.fragments.mot import MOT
+from repository.imaging.PCO_Camera import PcoCamera
 from repository.imaging.processor import AbsImage  # noqa: E402
+from repository.models.devices import SUServoedBeam
 
 
 class AbsorptionImageExpFrag(ExpFragment):

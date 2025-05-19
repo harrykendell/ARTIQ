@@ -1,16 +1,11 @@
 import logging
 
-from artiq.coredevice.core import Core
-from artiq.coredevice.almazny import AlmaznyChannel
 from artiq.coredevice.adf5356 import ADF5356
-from artiq.language.units import us, ms
-from artiq.experiment import (
-    TFloat,
-    delay,
-    kernel,
-)
+from artiq.coredevice.almazny import AlmaznyChannel
+from artiq.coredevice.core import Core
+from artiq.experiment import TFloat, delay, kernel
+from artiq.language.units import ms, us
 from ndscan.experiment import Fragment
-
 from repository.models import Eom
 
 logger = logging.getLogger(__name__)
@@ -136,7 +131,7 @@ class EomFrag(Fragment):
 
         This uses quite a while (~400us) as it relocks the PLL
         """
-        self.channel.set_frequency(frequency/2.0)
+        self.channel.set_frequency(frequency / 2.0)
 
     @kernel
     def set_att(self, attenuation: TFloat, almazny_on: bool = True):

@@ -38,8 +38,6 @@ class DefaultFlag:
 
 
 default = DefaultFlag()
-
-
 class Ramp(Fragment):
     """
     ------
@@ -178,7 +176,7 @@ class Ramp(Fragment):
             if not hasattr(values[num], key):
                 raise RuntimeError(
                     f"Cannot follow ramp {values[num].__class__.__name__} for {desc} - "
-                    f"transitive bindings are not allowed"
+                    "transitive bindings are not allowed"
                 )
             return values[num].__dict__[key]
 
@@ -198,7 +196,9 @@ class Ramp(Fragment):
             if values_name.endswith("_end"):
                 start_vals = getattr(self, f"{values_name[:-4]}_start")
                 if not (not start_vals or start_vals[num] is default):
-                    logging.warning(f"Did you mean to use a default for {desc} but not it's start?")
+                    logging.warning(
+                        f"Did you mean to use a default for {desc} but not it's start?"
+                    )
             # We don't want to expose defaulted values as they follow devices.py
             # and it would give two sources of truth
             self.override_param(f"{param_name}", default_value)

@@ -2,17 +2,17 @@
 The startup sequence for the experiment.
 """
 
-from artiq.experiment import EnvExperiment, kernel
-from artiq.language.core import delay, now_mu, delay_mu
-from artiq.language.units import us, ms
-from artiq.coredevice.ttl import TTLOut, TTLInOut
+import logging
+
+from artiq.coredevice.adf5356 import ADF5356 as MirnyChannel
 from artiq.coredevice.core import Core
-from artiq.coredevice.suservo import SUServo
 from artiq.coredevice.fastino import Fastino
 from artiq.coredevice.mirny import Mirny
-from artiq.coredevice.adf5356 import ADF5356 as MirnyChannel
-
-import logging
+from artiq.coredevice.suservo import SUServo
+from artiq.coredevice.ttl import TTLInOut, TTLOut
+from artiq.experiment import EnvExperiment, kernel
+from artiq.language.core import delay, delay_mu, now_mu
+from artiq.language.units import ms, us
 
 
 class Startup(EnvExperiment):

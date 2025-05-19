@@ -1,6 +1,6 @@
 from artiq.experiment import EnvExperiment, kernel
+from artiq.language.core import delay, now_mu, parallel
 from artiq.language.units import ms
-from artiq.language.core import now_mu, delay, parallel
 
 
 class Idle(EnvExperiment):
@@ -12,7 +12,7 @@ class Idle(EnvExperiment):
 
     @kernel
     def run(self):
-        start_time = now_mu() + self.core.seconds_to_mu(500*ms)
+        start_time = now_mu() + self.core.seconds_to_mu(500 * ms)
         while self.core.get_rtio_counter_mu() < start_time:
             pass
         self.core.reset()
@@ -20,10 +20,10 @@ class Idle(EnvExperiment):
 
         while True:
             with parallel:
-                self.led1.pulse(250*ms)
-                self.led2.pulse(250*ms)
-            delay(125*ms)
-            self.led1.pulse(125*ms)
-            delay(125*ms)
-            self.led1.pulse(125*ms)
-            delay(250*ms)
+                self.led1.pulse(250 * ms)
+                self.led2.pulse(250 * ms)
+            delay(125 * ms)
+            self.led1.pulse(125 * ms)
+            delay(125 * ms)
+            self.led1.pulse(125 * ms)
+            delay(250 * ms)

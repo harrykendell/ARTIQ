@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 
-import PyQt5  # noqa: F401 # make sure pyqtgraph imports Qt5
-from PyQt5 import QtWidgets, QtCore
-
 import matplotlib
+import PyQt5  # noqa: F401 # make sure pyqtgraph imports Qt5
+from PyQt5 import QtCore, QtWidgets
 
 matplotlib.use("Qt5Agg")
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg  # noqa: E402
@@ -60,8 +59,9 @@ class AbsorptionView(QtWidgets.QWidget):
         """Save the images and fit results to a local directory"""
         try:
             import os
-            import numpy as np
             from datetime import datetime
+
+            import numpy as np
 
             # Create timestamp for unique filenames
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")

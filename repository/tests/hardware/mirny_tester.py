@@ -5,16 +5,15 @@ sys.path.append(
     __file__.split("repository")[0] + "repository"
 )  # link to repository root
 
+from utils.wait_for_enter import is_enter_pressed
+
+from artiq.coredevice.adf5356 import ADF5356
+from artiq.coredevice.almazny import AlmaznyChannel, AlmaznyLegacy
+from artiq.coredevice.core import Core
+from artiq.coredevice.mirny import Mirny
 from artiq.experiment import *
 from artiq.master.databases import DeviceDB
 from artiq.master.worker_db import DeviceManager
-
-from utils.wait_for_enter import is_enter_pressed
-
-from artiq.coredevice.core import Core
-from artiq.coredevice.mirny import Mirny
-from artiq.coredevice.adf5356 import ADF5356
-from artiq.coredevice.almazny import AlmaznyChannel, AlmaznyLegacy
 
 
 def chunker(seq, size):
@@ -242,6 +241,7 @@ class MirnyTester(EnvExperiment):
         self.test_almaznys()
 
         self.test_legacy_almaznys()
+
 
 def main():
     device_mgr = DeviceManager(DeviceDB("device_db.py"))

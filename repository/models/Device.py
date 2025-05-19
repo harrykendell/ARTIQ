@@ -1,10 +1,10 @@
-import sys
-import re
 import logging
-from pydantic.dataclasses import dataclass
+import re
+import sys
 
 from pint import UnitRegistry
 from pint.util import infer_base_unit
+from pydantic.dataclasses import dataclass
 
 sys.path.append(__file__.split("repository")[0] + "repository")
 

@@ -1,6 +1,6 @@
+from artiq.language.units import A, MHz, V, dB, ms
 from repository.models import Eom, Shutter, SUServoedBeam, VDrivenSupply
 from repository.models.Device import device_arrays
-from artiq.language.units import ms, dB, MHz, V, A
 
 EOMS = [
     Eom(
@@ -80,7 +80,7 @@ VDRIVEN_SUPPLIES = [
 VDRIVEN_SUPPLIES = {supply.name: supply for supply in VDRIVEN_SUPPLIES}
 
 THORLABS_SHUTTER_DELAY = 35.0 * ms
-EBAY_SHUTTER_DELAY = 25.0 * ms 
+EBAY_SHUTTER_DELAY = 25.0 * ms
 # the switch on time is actually quick fast. The limit is the dislike of short pulses
 SHUTTERS = [
     Shutter(

@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 import os
-import sys
 import select
+import sys
+
 from artiq.language.types import TBool
 
 if os.name == "nt":

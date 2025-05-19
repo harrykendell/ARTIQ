@@ -5,11 +5,8 @@ type of an empty list. You can therefore add one of these into your list in
 build() if it's empty, and it won't do anything when called.
 """
 
-from artiq.experiment import kernel
-from artiq.experiment import TBool
-from artiq.experiment import TFloat
-from artiq.experiment import TInt32
-from repository.models.devices import SUServoedBeam, Eom, VDrivenSupply
+from artiq.experiment import TBool, TFloat, TInt32, kernel
+from repository.models.devices import Eom, SUServoedBeam, VDrivenSupply
 
 
 class DummySUServoFrag:

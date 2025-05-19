@@ -9,10 +9,11 @@ models act as normal python classes and so are fully compatible with ARTIQ
 kernels.
 """
 
-from pydantic.dataclasses import dataclass
-from repository.models.Device import DEVICE
-
 from typing import Optional
+
+from pydantic.dataclasses import dataclass
+
+from repository.models.Device import DEVICE
 
 
 @dataclass

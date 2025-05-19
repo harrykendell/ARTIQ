@@ -1,26 +1,25 @@
 import logging
 from typing import Set
 
+from numpy import int32
+
 from artiq.coredevice.core import Core
-from artiq.coredevice.suservo import Channel
-from artiq.coredevice.suservo import SUServo, T_CYCLE, COEFF_SHIFT, COEFF_WIDTH
+from artiq.coredevice.suservo import COEFF_SHIFT, COEFF_WIDTH, T_CYCLE, Channel, SUServo
 from artiq.coredevice.urukul import CPLD  # noqa F401
 from artiq.experiment import (
-    delay,
-    at_mu,
-    now_mu,
-    kernel,
-    rpc,
+    MHz,
     TBool,
     TFloat,
     TInt32,
-    MHz,
+    at_mu,
+    delay,
+    kernel,
     ms,
+    now_mu,
+    rpc,
     us,
 )
 from ndscan.experiment import Fragment
-from numpy import int32
-
 from repository.models.devices import SUServoedBeam
 
 

@@ -1,8 +1,7 @@
 from artiq.coredevice.core import Core
-from ndscan.experiment import ExpFragment
 from artiq.language import delay, ms, parallel
 from artiq.language.core import kernel
-from ndscan.experiment import make_fragment_scan_exp
+from ndscan.experiment import ExpFragment, make_fragment_scan_exp
 
 
 class PulserFrag(ExpFragment):

@@ -6,7 +6,6 @@ from artiq.language.units import ms
 from ndscan.experiment import ExpFragment, FloatParam
 from ndscan.experiment.entry_point import make_fragment_scan_exp
 from ndscan.experiment.parameters import FloatParamHandle
-
 from repository.fragments.eom_setter import EomFrag
 from repository.models.devices import Eom
 

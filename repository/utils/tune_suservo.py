@@ -12,7 +12,6 @@ from ndscan.experiment.parameters import (
     FloatParamHandle,
     IntParamHandle,
 )
-
 from repository.fragments.suservo_frag import SUServoFrag
 from repository.models.devices import SUServoedBeam
 

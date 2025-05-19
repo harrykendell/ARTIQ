@@ -5,13 +5,11 @@ sys.path.append(
     __file__.split("repository")[0] + "repository"
 )  # link to repository root
 
+from artiq.coredevice.core import Core
+from artiq.coredevice.suservo import Channel, SUServo
 from artiq.experiment import *
 from artiq.master.databases import DeviceDB
 from artiq.master.worker_db import DeviceManager
-
-from artiq.coredevice.suservo import SUServo, Channel
-from artiq.coredevice.core import Core
-
 
 
 def chunker(seq, size):
@@ -117,7 +115,8 @@ class SUServoTester(EnvExperiment):
         print("on the respective Urukul0 (ADC 0-3) and Urukul1 (ADC 4-7, if")
         print("present) channels.")
         print(
-            "Frequency: 10 MHz, output power: about -9 dBm at 0 V and about -15 dBm at 1.5 V"
+            "Frequency: 10 MHz, output power: about -9 dBm at 0 V and about -15 dBm at"
+            " 1.5 V"
         )
         print("Verify frequency and power behavior.")
         print("Press ENTER when done.")

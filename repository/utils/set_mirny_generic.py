@@ -3,12 +3,10 @@ import logging
 from artiq.coredevice.adf5356 import ADF5356
 from artiq.coredevice.core import Core
 from artiq.coredevice.mirny import Mirny
-from artiq.experiment import EnumerationValue
-from artiq.experiment import kernel
+from artiq.experiment import EnumerationValue, kernel
 from ndscan.experiment import ExpFragment
 from ndscan.experiment.entry_point import make_fragment_scan_exp
-from ndscan.experiment.parameters import BoolParam
-from ndscan.experiment.parameters import FloatParam
+from ndscan.experiment.parameters import BoolParam, FloatParam
 from repository.utils.get_local_devices import get_local_devices
 
 logger = logging.getLogger(__name__)

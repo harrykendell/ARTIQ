@@ -1,9 +1,8 @@
-from artiq.experiment import *
-from artiq.language import MHz, delay, ms, dB
 from artiq.coredevice.adf5356 import ADF5356
-
 from artiq.coredevice.almazny import AlmaznyLegacy
 from artiq.coredevice.core import Core
+from artiq.experiment import *
+from artiq.language import MHz, dB, delay, ms
 
 
 class TestMirny(EnvExperiment):
@@ -13,9 +12,25 @@ class TestMirny(EnvExperiment):
     """
 
     def build(self):
-        self.setattr_argument("Channel", NumberValue(default=0, precision=0, min=0, max=3, step=1, type="int"), tooltip="Mirny channel.")
-        self.setattr_argument("attenuation", NumberValue(default=0.0, unit="dB", precision=1, min=0.0, max=31.5, step=0.5, type="float"), tooltip="Attenuation to set on the Mirny.")
-        
+        self.setattr_argument(
+            "Channel",
+            NumberValue(default=0, precision=0, min=0, max=3, step=1, type="int"),
+            tooltip="Mirny channel.",
+        )
+        self.setattr_argument(
+            "attenuation",
+            NumberValue(
+                default=0.0,
+                unit="dB",
+                precision=1,
+                min=0.0,
+                max=31.5,
+                step=0.5,
+                type="float",
+            ),
+            tooltip="Attenuation to set on the Mirny.",
+        )
+
         self.setattr_argument(
             "frequency",
             NumberValue(

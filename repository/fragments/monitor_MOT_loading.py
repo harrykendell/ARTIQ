@@ -1,30 +1,29 @@
 import logging
+
 import numpy as np
 
 from artiq.coredevice.core import Core
-from artiq.experiment import TFloat, TInt32, TInt64, TList
-from artiq.experiment import kernel, rpc, delay_mu
+from artiq.experiment import TFloat, TInt32, TInt64, TList, delay_mu, kernel, rpc
 from artiq.language.units import ms, s
+from device_db import server_addr
 from ndscan.experiment import (
-    Fragment,
-    ExpFragment,
-    OpaqueChannel,
-    FloatParam,
-    IntParam,
     BoolParam,
-)
-from ndscan.experiment.parameters import (
-    FloatParamHandle,
-    IntParamHandle,
-    BoolParamHandle,
+    ExpFragment,
+    FloatParam,
+    Fragment,
+    IntParam,
+    OpaqueChannel,
 )
 from ndscan.experiment.entry_point import make_fragment_scan_exp
-from submodules.oitg.oitg.fitting import exponential_decay
-
+from ndscan.experiment.parameters import (
+    BoolParamHandle,
+    FloatParamHandle,
+    IntParamHandle,
+)
 from repository.fragments.read_adc import ReadSUServoADC
 from repository.fragments.supply_setter import SetSupplies
 from repository.models.devices import VDrivenSupply
-from device_db import server_addr
+from submodules.oitg.oitg.fitting import exponential_decay
 
 logger = logging.getLogger(__name__)
 

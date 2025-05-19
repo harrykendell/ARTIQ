@@ -2,14 +2,8 @@ import logging
 
 from artiq.coredevice.core import Core
 from artiq.coredevice.suservo import Channel as SUServoChannel
-from artiq.experiment import (
-    BooleanValue,
-    EnumerationValue,
-    kernel,
-    ms,
-    rpc,
-    delay,
-)
+from artiq.experiment import BooleanValue, EnumerationValue, delay, kernel, ms, rpc
+from device_db import server_addr
 from ndscan.experiment import ExpFragment, FloatParam
 from ndscan.experiment.entry_point import make_fragment_scan_exp
 from ndscan.experiment.parameters import FloatParamHandle
@@ -17,10 +11,8 @@ from repository.fragments.default_beam_setter import (
     SetBeamsToDefaults,
     make_set_beams_to_default,
 )
-from repository.models.devices import SUServoedBeam
 from repository.fragments.read_adc import ReadSUServoADC
-
-from device_db import server_addr
+from repository.models.devices import SUServoedBeam
 
 logger = logging.getLogger(__name__)
 

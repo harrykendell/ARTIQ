@@ -6,16 +6,15 @@ from numpy import int64
 
 from artiq.coredevice.core import Core
 from artiq.coredevice.ttl import TTLOut
-from artiq.language import delay_mu, kernel, portable, at_mu, now_mu
+from artiq.language import at_mu, delay_mu, kernel, now_mu, portable
 from ndscan.experiment import Fragment
-
-from repository.utils.dummy_devices import (
-    DummyTTL,
-    DummySUServoFrag,
-    DummyFloatParameterHandle,
-)
 from repository.fragments.suservo_frag import SUServoFrag
 from repository.models import SUServoedBeam
+from repository.utils.dummy_devices import (
+    DummyFloatParameterHandle,
+    DummySUServoFrag,
+    DummyTTL,
+)
 
 logger = logging.getLogger(__name__)
 

@@ -1,3 +1,8 @@
+from artiq.coredevice.core import Core
+from artiq.coredevice.ttl import TTLInOut
+from artiq.experiment import EnvExperiment, NumberValue
+from artiq.language import delay, kernel, now_mu, parallel
+from artiq.language.units import ms, s
 from ndscan.experiment import (
     ExpFragment,
     FloatParam,
@@ -5,11 +10,6 @@ from ndscan.experiment import (
     OnlineFit,
     make_fragment_scan_exp,
 )
-from artiq.experiment import EnvExperiment, NumberValue
-from artiq.language.units import ms, s
-from artiq.language import delay, parallel, kernel, now_mu
-from artiq.coredevice.core import Core
-from artiq.coredevice.ttl import TTLInOut
 
 
 class ElapsedTimer(ExpFragment):

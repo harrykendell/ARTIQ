@@ -1,20 +1,15 @@
 import logging
-import pco
 import time
+
 import numpy as np
+import pco
 
 from artiq.coredevice.core import Core
 from artiq.coredevice.ttl import TTLInOut
-from artiq.experiment import kernel, rpc, host_only, delay, delay_mu
+from artiq.experiment import delay, delay_mu, host_only, kernel, rpc
 from artiq.language.units import ms, s, us
-from ndscan.experiment import (
-    Fragment,
-    ExpFragment,
-    FloatParam,
-    make_fragment_scan_exp,
-)
 from device_db import server_addr
-
+from ndscan.experiment import ExpFragment, FloatParam, Fragment, make_fragment_scan_exp
 from ndscan.experiment.parameters import FloatParamHandle
 
 logger = logging.getLogger(__name__)
@@ -158,9 +153,7 @@ class PcoCamera(Fragment):
         self.images, _ = self.cam.images(roi=roi)
         logger.info("Images retrieved")
         self.images = self.rotate_and_flip(self.images).astype(np.float64)
-        self.set_dataset(
-            "Images.Latest_image", self.images[-1], broadcast=True
-        )
+        self.set_dataset("Images.Latest_image", self.images[-1], broadcast=True)
 
         if self.debug:
             logger.info("Images retrieved")

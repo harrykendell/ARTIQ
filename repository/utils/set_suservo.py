@@ -1,13 +1,12 @@
+import logging
+
 from artiq.coredevice.core import Core
 from artiq.experiment import kernel
 from ndscan.experiment import BoolParam, EnumerationValue, ExpFragment, FloatParam
 from ndscan.experiment.entry_point import make_fragment_scan_exp
 from ndscan.experiment.parameters import BoolParamHandle, FloatParamHandle
-
 from repository.fragments.suservo_frag import SUServoFrag
 from repository.models.devices import SUServoedBeam
-
-import logging
 
 
 class SetSUServoExpFrag(ExpFragment):

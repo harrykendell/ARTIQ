@@ -1,8 +1,9 @@
 from artiq.experiment import EnvExperiment
-from ndscan.experiment import ExpFragment
-from ndscan.experiment import ResultChannel
-from ndscan.experiment.entry_point import create_and_run_fragment_once
-from ndscan.experiment.entry_point import make_fragment_scan_exp
+from ndscan.experiment import ExpFragment, ResultChannel
+from ndscan.experiment.entry_point import (
+    create_and_run_fragment_once,
+    make_fragment_scan_exp,
+)
 
 
 class FooResultFrag(ExpFragment):

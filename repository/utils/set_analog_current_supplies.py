@@ -1,11 +1,10 @@
 import logging
 
 from artiq.coredevice.core import Core
-from artiq.experiment import EnumerationValue, delay, kernel, A
+from artiq.experiment import A, EnumerationValue, delay, kernel
 from ndscan.experiment import ExpFragment, FloatParam
 from ndscan.experiment.entry_point import make_fragment_scan_exp
 from ndscan.experiment.parameters import FloatParamHandle
-
 from repository.fragments.supply_setter import SetSupplies
 from repository.models.devices import VDrivenSupply
 
@@ -25,7 +24,8 @@ class SetAnalogCurrentSupplyExp(ExpFragment):
 
         default = VDrivenSupply.keys()[0]
         self.setattr_argument(
-            "current_supply", EnumerationValue(VDrivenSupply.keys(), default=default)
+            "current_supply",
+            EnumerationValue(VDrivenSupply.keys(), default=default),
         )
         self.current_supply: str
 

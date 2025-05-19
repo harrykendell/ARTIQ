@@ -11,6 +11,7 @@ kernels.
 
 from numpy import inf
 from pydantic.dataclasses import dataclass
+
 from repository.models.Device import DEVICE
 
 

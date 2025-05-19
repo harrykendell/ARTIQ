@@ -1,9 +1,5 @@
 from artiq.coredevice.core import Core
-from ndscan.experiment import ExpFragment
-from ndscan.experiment import FloatChannel
-from ndscan.experiment import kernel
-from ndscan.experiment import make_fragment_scan_exp
-
+from ndscan.experiment import ExpFragment, FloatChannel, kernel, make_fragment_scan_exp
 from repository.fragments.read_adc import ReadSamplerADC
 
 

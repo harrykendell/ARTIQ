@@ -3,7 +3,7 @@ import logging
 from artiq.coredevice.core import Core
 from artiq.coredevice.ttl import TTLOut
 from artiq.language import delay, kernel, parallel, sequential
-from artiq.language.units import A, MHz, dB, ms, s, V
+from artiq.language.units import A, MHz, V, dB, ms, s
 from ndscan.experiment import Fragment
 from ndscan.experiment.parameters import FloatParam, FloatParamHandle
 from repository.fragments.beam_setter import ControlBeamsWithoutCoolingAOM
@@ -11,8 +11,8 @@ from repository.fragments.default_beam_setter import (
     SetBeamsToDefaults,
     make_set_beams_to_default,
 )
-from repository.fragments.ramp import Ramp, default
 from repository.fragments.eom_setter import EomFrag
+from repository.fragments.ramp import Ramp, default
 from repository.fragments.supply_setter import SetSupplies
 from repository.models.devices import Eom, SUServoedBeam, VDrivenSupply
 
