@@ -69,4 +69,5 @@ See the [example](repository/tests/ramping_phase.py) for more details.
 We also have a [basic GUI](repository/gui/artiq_gui.py) which offers general control over the experiment in real time. This is run as an experiment and blocks other experiments while it runs.
 >[!CAUTION]
 >This is built on an older concept of devices and does not synchronise state with other experiments
+
 An [updated GUI](repository/gui/ArtiqGUI.py) that doesn't block experiments, can be run remotely, and repsects state is in the works.
