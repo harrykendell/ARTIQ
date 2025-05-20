@@ -19,8 +19,10 @@ However in summary, *Artiq* is difficult to work with because it has to compile 
 - A subset of Python
 - Restricted by hardware timing constraints
 
-*NDScan* provides a convenience layer nominally just for running experimental sweeps. However, it is much more generally useful introducing the idea of `Fragments` allowing for a nice object oriented approach to experimental design.
-Almost all of our code relies on *NDScan* due to how nuch easier it is to work with.
+*NDScan* provides a convenience layer nominally just for running experimental sweeps. However, it is much more generally useful introducing the idea of `Fragments` and `ExpFragments` allowing for a nice object oriented approach to experimental design. Almost all of our code relies on *NDScan* due to how nuch easier it is to work with.
+
+The general outline is that `Fragment` classes are defined that represent "building blocks that accept parameters and produce result data", they can recursively contain other `Fragments` as member variables building up more complex blocks.
+We can then upgrade to `ExpFragments` which support the notion of also being run on their own. This effectively translates to being a full experiment. A nice feature is they natively support exposing parameters to the end user and sweeping over these parameters in, as the name suggests, N dimensional scans.
 
 ## Repository
 Any code that we write lives inside the `repository` directory.
@@ -34,7 +36,7 @@ There is further Artiq specific configuration info in [device_db.py](repository/
 > [!TIP]
 > Devices.py is used by most code as the default values for equipment and should reflect a safe state
 
-The primary interface to hardware itself are the *Fragments*. These reflect a lightweight translation layer from *Artiq* to *NDScan*:
+The primary interface to hardware itself are the `Fragments` below. These reflect a lightweight translation layer from *Artiq* to *NDScan*:
 - [SUServoFrag](repository/fragments/suservo_frag.py): Controls a [SUServo channel](https://m-labs.hk/artiq/manual/core_drivers_reference.html#artiq.coredevice.suservo.SUServo) DDS generally driving a stabilised AOM
 - [EomFrag](repository/fragments/eom_setter.py): Controls a [Mirny channel](https://m-labs.hk/artiq/manual/core_drivers_reference.html#module-artiq.coredevice.mirny)/[Almazny channel](https://m-labs.hk/artiq/manual/core_drivers_reference.html#module-artiq.coredevice.almazny) PLL VCO hooked up to an EOM
 - [SetSupplies](repository/fragments/supply_setter.py): Controls a [Fastino channel](https://m-labs.hk/artiq/manual/core_drivers_reference.html#module-artiq.coredevice.fastino) DAC controlling:
@@ -43,14 +45,25 @@ The primary interface to hardware itself are the *Fragments*. These reflect a li
 - [ReadADC](repository/fragments/read_adc.py): Controls a [Sampler channel](https://m-labs.hk/artiq/manual/core_drivers_reference.html#module-artiq.coredevice.sampler) ADC to read a voltage
 - [PcoCamera](repository/imaging/PCO_Camera.py): Controls the [PCO Pixelfly 1.4 USB](https://www.excelitas.com/product/pcopixelfly-14-usb) camera over Ethernet and analog triggers
 
-These are augmented by higher level *Fragments* exposing experimental concepts:
-- [SetBeamsToDefaults](repository/fragments/default_beam_setter.py): To reset beams to their default settings for Freq./Amp./etc.
-- [ControlBeamsWithoutCoolingAOM](repository/fragments/beam_setter.py): To toggle beams on/off with a shutter/AOM combo.
+These are augmented by higher level `Fragments` exposing experimental concepts:
+- [SetBeamsToDefaults](repository/fragments/default_beam_setter.py): To reset beams to their default settings of Freq./Amp./etc.
+- [ControlBeamsWithoutCoolingAOM](repository/fragments/beam_setter.py): To toggle beam(s) on/off with a shutter/AOM combo.
 - [AbsorptionImage](repository/imaging/absorption_image.py): To take triple exposure images of atoms.
-- [Ramp](repository/fragments/ramp.py): A generic linear ramp step in an experiment (see below)
+- [Ramp](repository/fragments/ramp.py): A generic linear ramp step in an experiment ([see below](#ramps))
 - [MOT](repository/fragments/mot.py): This represents the whole MOT
   - Loading
   - Cooling
+ 
+Many of these `Fragments` also define `ExpFragments` in their own file to support being run on their own.
+
+### Ramps
+The ramp fragment has been created to address the common problem of wanting to vary some number of parameters smoothly in a single ramp. 
+It represents a single stage of an experiment with some useful features:
+- Simultaneous ramping of any number of devices
+- Pulls default values from devices.py
+- Can use the final from other ramps as its initial value
+- Creates *NDScan* parameters for all values that aren't chained
+See the [example](repository/tests/ramping_phase.py) for more details.
 
 ## GUI
 We also have a basic GUI which offers general control over the experiment in real time. This is run as an experiment and blocks other experiments while it runs.
