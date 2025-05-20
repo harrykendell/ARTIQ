@@ -319,7 +319,7 @@ class SUServoFrag(Fragment):
     ):
         """Set a static output on a SUServo channel
 
-        This method advances the timeline by at least 5 servo cycles (a bit more if the
+        This method advances the timeline by at least 5 servo cycles ~1.168us each (a bit more if the
         attenuation is changed).
 
         Args:
@@ -362,6 +362,8 @@ class SUServoFrag(Fragment):
         """
         Set the DDS parameters for this channel.
 
+        This method advances the timeline by at 4 servo cycles ~1.168us each.
+
         Args:
             frequency (TFloat): Frequency in Hz
             phase (TFloat): Phase in radians
@@ -392,6 +394,8 @@ class SUServoFrag(Fragment):
         """
         Set the PGIA gain of this channel (0,1,2,3) = (1x,10x,100x,1000x)
 
+        This method does not advance the timeline.
+
         See :meth:`artiq.coredevice.suservo.SUServo.set_pgia_mu` for details.
         """
         if self.debug_enabled:
@@ -411,6 +415,8 @@ class SUServoFrag(Fragment):
 
         Updates only the SUServo setpoint. Does not enable the SUServo /
         RF switch or change any other parameters.
+
+        This method does not advance the timeline.
 
         Args:
             new_offset (TFloat): The new offset in volts
@@ -433,8 +439,9 @@ class SUServoFrag(Fragment):
     @kernel
     def set_channel_state(self, en_out: TBool, enable_iir: TBool):
         """
-        Quickly enable / disable the RF switch and servo. This method does not
-        advance the timeline.
+        Quickly enable / disable the RF switch and servo.
+        
+        This method does not advance the timeline.
 
         Automatically sets the profile to the AION lab convention of the channel number.
         """
@@ -463,6 +470,8 @@ class SUServoFrag(Fragment):
         """
         Set loop filter parameters for the suservo. See ARTIQ documentation for
         details. Note all of kp,ki,gain_limit should usually be negative.
+
+        This method advances the timeline by at least 5 servo cycles ~1.168us each.
         """
         if self.debug_enabled:
             slack_mu = now_mu() - self.core.get_rtio_counter_mu()
@@ -486,7 +495,10 @@ class SUServoFrag(Fragment):
 
     @kernel
     def set_y(self, amplitude: TFloat):
-        """Set the amplitude of the channel"""
+        """Set the amplitude of the channel
+
+        This method advances the timeline by 1 servo cycles ~1.168us each.
+        """
         if self.debug_enabled:
             slack_mu = now_mu() - self.core.get_rtio_counter_mu()
             logging.info(
