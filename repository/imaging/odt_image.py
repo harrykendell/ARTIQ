@@ -1,7 +1,7 @@
 from artiq.coredevice.core import Core
 from artiq.experiment import delay, kernel, now_mu, parallel, rpc
 from artiq.language.units import ms, s, us
-from device_db import server_addr
+from repository.models.device_db import server_addr
 from ndscan.experiment import ExpFragment, FloatParam, make_fragment_scan_exp
 from ndscan.experiment.parameters import FloatParamHandle
 from repository.fragments.beam_setter import ControlBeamsWithoutCoolingAOM

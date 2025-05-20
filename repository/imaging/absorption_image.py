@@ -2,7 +2,7 @@ from artiq.coredevice.core import Core
 from artiq.coredevice.dma import CoreDMA
 from artiq.experiment import kernel, rpc
 from artiq.language import A, MHz, V, at_mu, delay, ms, now_mu, parallel, s, us
-from device_db import server_addr
+from repository.models.device_db import server_addr
 from ndscan.experiment import (
     BoolParam,
     ExpFragment,

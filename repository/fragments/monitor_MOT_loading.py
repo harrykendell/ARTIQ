@@ -5,7 +5,7 @@ import numpy as np
 from artiq.coredevice.core import Core
 from artiq.experiment import TFloat, TInt32, TInt64, TList, delay_mu, kernel, rpc
 from artiq.language.units import ms, s
-from device_db import server_addr
+from repository.models.device_db import server_addr
 from ndscan.experiment import (
     BoolParam,
     ExpFragment,
