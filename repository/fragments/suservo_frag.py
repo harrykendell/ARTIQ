@@ -498,3 +498,11 @@ class SUServoFrag(Fragment):
             at_mu(self.core.get_rtio_counter_mu() + slack_mu)
 
         self.suservo_channel.set_y(profile=self.suservo_profile, y=amplitude)
+
+    @kernel
+    def read_adc(self):
+        return self.suservo.get_adc(self.sampler_channel)
+
+    @kernel
+    def read_ctrl_signal(self):
+        return self.suservo_channel.get_y(self.suservo_profile)
