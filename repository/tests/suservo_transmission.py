@@ -50,12 +50,12 @@ class DoublePassTransmissionFrag(ExpFragment):
         # reference for the default suservo values
         self.config: SUServoedBeam = SUServoedBeam[self.suservo_channel]
 
-        self.frequency: FloatParamHandle = self.setattr_param(
-            "frequency",
+        self.detuning: FloatParamHandle = self.setattr_param(
+            "detuning",
             FloatParam,
             description="Detuning of the AOM from nominal",
-            default=default.frequency,
-            min=0,
+            default=0.0,
+            min=-400e6,  # from AD9910 specs
             max=400e6,  # from AD9910 specs
             unit="MHz",
             step=1,
@@ -68,7 +68,7 @@ class DoublePassTransmissionFrag(ExpFragment):
         self.core.reset()
 
         self.suservo.set_dds(
-            frequency=self.config.frequency-self.frequency.get(),
+            frequency=self.config.frequency+self.detuning.get(),
             profile=self.suservo.suservo_profile,
             offset=self.suservo.setpoint_to_offset(self.config.setpoint),
         )
@@ -83,7 +83,7 @@ class DoublePassTransmissionFrag(ExpFragment):
             OnlineFit(
                 "line",
                 data={
-                    "x": self.frequency.get(),
+                    "x": self.detuning.get(),
                     "y": self.voltage,
                 },
             ),
