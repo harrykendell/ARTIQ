@@ -14,6 +14,6 @@ class NoErrorInKernel(EnvExperiment):
     @kernel
     def run(self):
 
-        self.core.break_realtime()
+        self.core.reset()
         # this ki is valid so wont raise ValueError inside the kernel
         self.suservo_aom_MOT.set_iir(profile=1, adc=1, kp=-0.001, ki=0.0)

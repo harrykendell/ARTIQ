@@ -60,6 +60,11 @@ class FluorescenceImageExpFrag(ExpFragment):
         self.expansion_time: FloatParamHandle
 
     @kernel
+    def device_setup(self) -> None:
+        self.core.reset()
+        self.device_setup_subfragments()
+
+    @kernel
     def run_once(self):
         self.core.break_realtime()
         self.coil_setter.turn_off()  # make sure we unload MOT

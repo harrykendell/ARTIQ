@@ -190,6 +190,11 @@ class PcoCameraExpFrag(ExpFragment):
         logging.debug("PCO camera fragment setup complete")
 
     @kernel
+    def device_setup(self) -> None:
+        self.core.reset()
+        self.device_setup_subfragments()
+
+    @kernel
     def run_once(self):
         self.core.break_realtime()
 

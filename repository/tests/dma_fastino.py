@@ -81,7 +81,7 @@ class DMA_fastino(EnvExperiment):
 
     @kernel
     def run(self):
-        self.core.break_realtime()
+        self.core.reset()
         # init causes a transient spike to -10V so avoid if possible
         if False:
             self.fastino.init()

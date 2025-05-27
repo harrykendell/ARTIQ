@@ -66,6 +66,11 @@ class AbsorptionImageExpFrag(ExpFragment):
         self.atom_number: FloatChannel = self.setattr_result("atom_number")
 
     @kernel
+    def device_setup(self) -> None:
+        self.core.reset()
+        self.device_setup_subfragments()
+
+    @kernel
     def run_once(self):
         self.core.break_realtime()
 

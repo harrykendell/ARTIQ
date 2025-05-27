@@ -13,6 +13,16 @@ The primary interface for this codebase is [run_gui.sh](run_gui.sh). This should
 Artiq as mentioned has some sharp corners, here are some:
 ### self.core.reset()
 This will reinitialise many of the devices, this is particularly problematic for SUServo. It will reset the overall enable flag which prevents Sampler updates until set with self.suservo_device.set_config(1). This will then silently serve stale voltage readings to you.
+
+> [!TIP]
+> To fix this you should **ONLY** use it at the start of a top level device_setup.
+> ```python
+> @kernel
+>     def device_setup(self) -> None:
+>        self.core.reset()
+>        self.device_setup_subfragments()
+> ```
+
 ## Libraries
 Any code that we write is based on top of Artiq and NDScan, This allows us to take a much higher level approach than if we were spinning our own control system.
 

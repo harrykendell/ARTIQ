@@ -64,6 +64,11 @@ class DoublePassTransmissionFrag(ExpFragment):
         self.voltage: ResultChannel = self.setattr_result("voltage")
 
     @kernel
+    def device_setup(self) -> None:
+        self.core.reset()
+        self.device_setup_subfragments()
+
+    @kernel
     def run_once(self):
         self.core.break_realtime()
 
@@ -75,8 +80,9 @@ class DoublePassTransmissionFrag(ExpFragment):
 
         # ensure its settled
         delay(10*ms)
-
-        self.voltage.push(self.sampler.read_adc())
+        volts = self.sampler.read_adc()
+        # self.voltage.push(self.sampler.read_adc())
+        self.voltage.push(volts)
 
     def get_default_analyses(self):
         return [
