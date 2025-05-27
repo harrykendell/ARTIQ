@@ -46,7 +46,7 @@ class ElapsedTimer(ExpFragment):
 
     @kernel
     def run_once(self):
-        self.core.reset()
+        self.core.break_realtime()
         delay(1 * s)
 
         start_rtio = self.core.get_rtio_counter_mu()

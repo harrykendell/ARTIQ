@@ -260,7 +260,6 @@ class SUServoManager:  # {{{
         """
 
         # Prepare core
-        # self.core.reset()
         self.core.break_realtime()
         self.suservo.set_config(enable=0)
         delay(50 * ms)

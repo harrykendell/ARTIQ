@@ -135,7 +135,6 @@ class MirnyManager:  # {{{
         """
 
         # Prepare core
-        # self.core.reset()
         self.core.break_realtime()
 
         # Initialize Mirny CPLD - shared by all Mirny channels

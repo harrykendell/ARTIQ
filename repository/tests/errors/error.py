@@ -13,7 +13,6 @@ class ErrorInKernel(EnvExperiment):
 
     @kernel
     def run(self):
-        self.core.reset()
 
         self.core.break_realtime()
         # this ki is invalid so causes a raise ValueError inside the kernel

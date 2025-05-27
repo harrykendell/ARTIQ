@@ -15,7 +15,6 @@ class Idle(EnvExperiment):
         start_time = now_mu() + self.core.seconds_to_mu(500 * ms)
         while self.core.get_rtio_counter_mu() < start_time:
             pass
-        self.core.reset()
         self.core.break_realtime()
 
         while True:

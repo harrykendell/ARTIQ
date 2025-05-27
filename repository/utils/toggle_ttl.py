@@ -17,7 +17,6 @@ class PulserFrag(ExpFragment):
 
     @kernel
     def run_once(self) -> None:
-        self.core.reset()
         self.core.break_realtime()
 
         for _ in range(50):

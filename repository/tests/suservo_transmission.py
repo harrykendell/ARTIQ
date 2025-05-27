@@ -1,4 +1,4 @@
-from fragments.suservo_frag import SUServoFrag
+from repository.fragments.suservo_frag import SUServoFrag
 from models.devices import SUServoedBeam
 
 from artiq.coredevice.core import Core
@@ -65,7 +65,7 @@ class DoublePassTransmissionFrag(ExpFragment):
 
     @kernel
     def run_once(self):
-        self.core.reset()
+        self.core.break_realtime()
 
         self.suservo.set_dds(
             frequency=self.config.frequency+self.detuning.get(),

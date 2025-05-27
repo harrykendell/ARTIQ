@@ -67,7 +67,7 @@ class AbsorptionImageExpFrag(ExpFragment):
 
     @kernel
     def run_once(self):
-        self.core.reset()
+        self.core.break_realtime()
 
         self.mot.calculate_dma_handles()
         self.core.break_realtime()

@@ -191,7 +191,6 @@ class PcoCameraExpFrag(ExpFragment):
 
     @kernel
     def run_once(self):
-        self.core.reset()
         self.core.break_realtime()
 
         self.pco_camera.capture_image()

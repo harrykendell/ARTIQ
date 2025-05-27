@@ -13,7 +13,6 @@ class NoErrorInKernel(EnvExperiment):
 
     @kernel
     def run(self):
-        self.core.reset()
 
         self.core.break_realtime()
         # this ki is valid so wont raise ValueError inside the kernel

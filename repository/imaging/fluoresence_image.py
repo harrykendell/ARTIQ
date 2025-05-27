@@ -61,7 +61,6 @@ class FluorescenceImageExpFrag(ExpFragment):
 
     @kernel
     def run_once(self):
-        self.core.reset()
         self.core.break_realtime()
         self.coil_setter.turn_off()  # make sure we unload MOT
         delay(100 * ms)
