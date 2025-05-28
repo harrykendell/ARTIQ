@@ -9,6 +9,7 @@ from ndscan.experiment import (
     FloatChannel,
     FloatParam,
     make_fragment_scan_exp,
+    OpaqueChannel,
 )
 from ndscan.experiment.parameters import BoolParamHandle, FloatParamHandle
 from repository.fragments.beam_setter import ControlBeamsWithoutCoolingAOM
@@ -64,6 +65,9 @@ class AbsorptionImageExpFrag(ExpFragment):
         )
 
         self.atom_number: FloatChannel = self.setattr_result("atom_number")
+        self.info: OpaqueChannel = self.setattr_result(
+            "info", OpaqueChannel
+        )
 
     @kernel
     def device_setup(self) -> None:
@@ -142,6 +146,7 @@ class AbsorptionImageExpFrag(ExpFragment):
         )
 
         self.atom_number.push(self.absimg.atom_number)
+        self.info.push(self.absimg.all_info())
 
         # self.ccb.issue(
         #     "create_applet",

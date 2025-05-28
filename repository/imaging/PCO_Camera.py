@@ -9,7 +9,12 @@ from artiq.coredevice.ttl import TTLInOut
 from artiq.experiment import delay, delay_mu, host_only, kernel, rpc
 from artiq.language.units import ms, s, us
 from repository.models.device_db import server_addr
-from ndscan.experiment import ExpFragment, FloatParam, Fragment, make_fragment_scan_exp
+from ndscan.experiment import (
+    ExpFragment,
+    FloatParam,
+    Fragment,
+    make_fragment_scan_exp,
+)
 from ndscan.experiment.parameters import FloatParamHandle
 
 logger = logging.getLogger(__name__)

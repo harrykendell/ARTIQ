@@ -93,6 +93,21 @@ class AbsImage:
             )
         self.magnification = magnification
 
+    def all_info(self):
+        """Returns a string of a dict with all the information about the image."""
+        return f"""
+            "wavelength": {self.wavelength},
+            "detuning": {self.detuning},
+            "linewidth": {self.linewidth},
+            "pixel_size": {self.pixel_size},
+            "magnification": {self.magnification},
+            "od": {self.optical_density},
+            "atom_number": {self.atom_number},
+            "peak": {self.peak},
+            "centroid": {self.centroid},
+            "best_values": {self.best_values},
+        """
+
     @functools.cached_property
     def physical_scale(self):
         """Pixel to real-space size in m."""
