@@ -18,7 +18,7 @@ logging.getLogger("pco").setLevel(logging.WARNING)
 
 class PcoCamera(Fragment):
     FULL_ROI = (1, 1, 1392, 1040)
-    MOT_SIZE = 35
+    MOT_SIZE = 350
     MOT_X = 695
     MOT_Y = 535
     MOT_ROI = (MOT_X - MOT_SIZE, MOT_Y - MOT_SIZE, MOT_X + MOT_SIZE, MOT_Y + MOT_SIZE)
@@ -71,10 +71,6 @@ class PcoCamera(Fragment):
             logger.info(f"{self.cam.camera_name} ({self.cam.camera_serial})")
             logger.info(self.cam.configuration)
             logger.info("running in trigger_mode %s", self.cam.configuration["trigger"])
-        self.cam.record(self.num_images, mode="sequence non blocking")
-
-        if self.debug:
-            logger.info(f"Recording {self.num_images} images")
 
         super().host_setup()
 
@@ -83,6 +79,8 @@ class PcoCamera(Fragment):
             self.cam.close()
             if self.debug:
                 logger.info("PCO Camera closed")
+        else:
+            logger.warning("PCO Camera was not opened, cannot close it")
         super().host_cleanup()
 
     @rpc(flags={"async"})
@@ -102,13 +100,14 @@ class PcoCamera(Fragment):
         Initialise the camera ready to be triggered
         """
         self.core.break_realtime()
-
         self.trigger.output()
         delay_mu(10)
         self.trigger.off()
 
+        self.cam.record(self.num_images, mode="sequence non blocking")
+
         if self.debug:
-            logger.info("PCO Camera setup")
+            logger.info("Recording %s images", self.num_images)
 
     @kernel
     def capture_image(self) -> None:
@@ -154,9 +153,6 @@ class PcoCamera(Fragment):
         logger.info("Images retrieved")
         self.images = self.rotate_and_flip(self.images).astype(np.float64)
         self.set_dataset("Images.Latest_image", self.images[-1], broadcast=True)
-
-        if self.debug:
-            logger.info("Images retrieved")
 
         return self.images
 
