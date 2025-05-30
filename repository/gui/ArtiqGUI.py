@@ -320,18 +320,22 @@ class MainWindow(QWidget):
         self.setLayout(layout)
 
     def update_datasets(self, mod):
-        self.save_button.setEnabled(True)
+        if mod["action"] != "init":
+            route = f"{mod['path']}.{mod['key']}"
+            if "Images.absorption" not in route:
+                return
+
         # if absorption images changed then redo AbsImg
-        tof = self.client.datasets.get("Images.absorption.TOF")[1]
-        ref = self.client.datasets.get("Images.absorption.REF")[1]
-        bg = self.client.datasets.get("Images.absorption.BG")[1]
+        tof = self.client.datasets.get("Images.absorption.TOF")
+        ref = self.client.datasets.get("Images.absorption.REF")
+        bg = self.client.datasets.get("Images.absorption.BG")
         if tof is None or ref is None or bg is None:
             return
 
         self.absimg = AbsImage(
-            data=tof,
-            ref=ref,
-            bg=bg,
+            data=tof[1],
+            ref=ref[1],
+            bg=bg[1],
             magnification=0.5,  # Set default magnification
         )
 
@@ -340,8 +344,10 @@ class MainWindow(QWidget):
         self.canvas.axes = axes
         self.canvas.draw()
 
-        self.layout().addWidget(self.canvas)
-        self.resize(self.width(), self.height() + 500)
+        if not self.save_button.isEnabled():
+            self.save_button.setEnabled(True)
+            self.layout().addWidget(self.canvas)
+            self.resize(self.width(), self.height() + 500)
 
     def update_schedule(self, mod):
         text = ""
