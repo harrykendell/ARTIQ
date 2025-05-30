@@ -1,6 +1,7 @@
 from artiq.language.units import A, MHz, V, dB, ms
 from repository.models import Eom, Shutter, SUServoedBeam, VDrivenSupply
 from repository.models.Device import device_arrays
+from ndscan.experiment import Fragment, FloatParam
 
 EOMS = [
     Eom(
@@ -176,3 +177,72 @@ device_arrays.update({
     SUServoedBeam: SUSERVOED_BEAMS,
     # Add other classes as needed
 })
+
+
+class DefaultValues(Fragment):
+    """
+    This Fragment provides the global store for default values for all devices.
+    This then allows them to be set in the GUI and scanned with a global source of truth.
+
+    It must be added to the experiment's Fragment tree to be used:
+    ```python
+        DEVICE.fragment = frag.setattr_fragment("DefaultValues", DefaultValues)
+    ```
+    """
+
+    def build_fragment(self):
+        for eom in Eom.values():
+            eom: Eom
+            self.setattr_param(
+                f"Eom_{eom.name}_frequency",
+                FloatParam,
+                f"Default frequency for Eom {eom.name}",
+                default=eom.frequency,
+                min=0.0,
+                unit="MHz",
+            )
+            self.setattr_param(
+                f"Eom_{eom.name}_attenuation",
+                FloatParam,
+                f"Default attenuation for Eom {eom.name}",
+                default=eom.attenuation,
+                min=0.0,
+                max=31.5,
+                unit="dB",
+            )
+        for sus in SUServoedBeam.values():
+            sus: SUServoedBeam
+            self.setattr_param(
+                f"SUServoedBeam_{sus.name}_frequency",
+                FloatParam,
+                f"Default frequency for SUServoedBeam {sus.name}",
+                default=sus.frequency,
+                min=0.0,
+                unit="MHz",
+            )
+            self.setattr_param(
+                f"SUServoedBeam_{sus.name}_attenuation",
+                FloatParam,
+                f"Default attenuation for SUServoedBeam {sus.name}",
+                default=sus.attenuation,
+                min=0.0,
+                max=31.5,
+                unit="dB",
+            )
+            self.setattr_param(
+                f"SUServoedBeam_{sus.name}_setpoint",
+                FloatParam,
+                f"Default setpoint for SUServoedBeam {sus.name}",
+                default=sus.setpoint,
+                min=0.0,
+                unit="V",
+            )
+        for vds in VDrivenSupply.values():
+            vds: VDrivenSupply
+            self.setattr_param(
+                f"VDrivenSupply_{vds.name}_default_output",
+                FloatParam,
+                f"Default output for VDrivenSupply {vds.name}",
+                default=vds.default_output,
+                unit=vds.unit,
+            )

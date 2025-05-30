@@ -14,10 +14,49 @@ device_arrays = {}  # This will be filled with the devices from devices.py
 ureg = UnitRegistry(autoconvert_offset_to_baseunit=True)
 ureg.default_format = "~"
 
+"""
+Note a few sharp edges of dataclasses:
+
+to be a dataclass field it must be typed:
+name:str = 'my_name'  # this is a field
+name = 'my_name'  # this is not a field, just a class variable
+
+
+"""
+
 
 @dataclass
 class DEVICE:
     name: str
+    fragment = ""
+
+    def __getattribute__(self, name: str):
+        """
+        Pull the value from the Fragment if it exists, otherwise
+        use the original __getattribute__ to access the attribute.
+        """
+
+        def get(name):
+            # Access directly from object to avoid recursion
+            return object.__getattribute__(self, name)
+
+        if (
+            (frag := get("fragment"))
+            and name in get("__dataclass_fields__")
+            and not name.startswith("__")
+        ):
+            var = f"{get('__class__').__name__}_{get('name')}_{name}"
+
+            if hasattr(frag, var):
+                # Pull from the Fragments's relevant Param
+                try:
+                    val = frag.__dict__[var].get()
+                    print("used Param for", var, "=", val)
+                    return val
+                except Exception:
+                    print("failed to get Param for", var)
+        # print("used __getattribute__ for", name)
+        return get(name)
 
     @classmethod
     def __class_getitem__(cls, name: str | list[str]):
