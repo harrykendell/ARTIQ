@@ -1,31 +1,30 @@
-import sys
-import logging
-import numpy as np
+import asyncio
 import json
+import logging
+import sys
+import time
 from enum import Enum
 
-from sipyco.sync_struct import Subscriber
-import asyncio
-from qasync import QEventLoop
 import aiomqtt
-
+import numpy as np
+from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtGui import QColor, QPalette
 from PyQt5.QtWidgets import (
     QApplication,
-    QLabel,
-    QWidget,
-    QVBoxLayout,
-    QHBoxLayout,
-    QPushButton,
-    QGridLayout,
     QFrame,
+    QGridLayout,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
 )
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QPalette, QColor
-from PyQt5.QtCore import QTimer
+from qasync import QEventLoop
+from sipyco.sync_struct import Subscriber
 
 sys.path.append(__file__.split("artiq")[0] + "artiq")
-from repository.imaging.processor import AbsImage  # noqa: E402
 from repository.imaging.applet import MatplotlibCanvas  # noqa: E402
+from repository.imaging.processor import AbsImage  # noqa: E402
 
 
 class DeviceState(Enum):
@@ -36,43 +35,41 @@ class DeviceState(Enum):
     LOW_POWER = "Low"
     LOCKED = "Locked"
     UNLOCKED = "Unlocked"
+    TRIPPED = "Tripped"
 
 
+ERROR = {
+    "state": "color: red; font-weight: bold;",
+    "frame": "background-color: #ffe8e8;",
+    "value": "",
+}
+WORKING = {
+    "state": "color: green; font-weight: bold;",
+    "frame": "background-color: #e8ffe8;",
+    "value": "",
+}
+DUBIOUS = {
+    "state": "color: #aa6600; font-weight: bold;",
+    "frame": "background-color: #fff8e0;",
+    "value": "font-weight: bold;",
+}
+UNKOWN = {
+    "state": "",
+    "frame": "background-color: #f0f0f0;",
+    "value": "",
+}
 DEVICE_STYLES = {
-    DeviceState.ERROR: {
-        "state": "color: red;",
-        "frame": "background-color: #ffe8e8;",
-        "value": "",
-    },
-    DeviceState.LOW_POWER: {
-        "state": "color: #aa6600; font-weight: bold;",
-        "frame": "background-color: #fff8e0;",
-        "value": "font-weight: bold;",
-    },
-    DeviceState.ENABLED: {
-        "state": "color: green; font-weight: bold;",
-        "frame": "background-color: #e8ffe8;",
-        "value": "",
-    },
-    DeviceState.DISABLED: {
-        "state": "color: red; font-weight: bold;",
-        "frame": "background-color: #ffe8e8;",
-        "value": "",
-    },
-    DeviceState.UNKNOWN: {
-        "state": "",
-        "frame": "background-color: #f0f0f0;",
-        "value": "",
-    },
+    DeviceState.ENABLED: WORKING,
+    DeviceState.LOW_POWER: DUBIOUS,
+    DeviceState.UNLOCKED: DUBIOUS,
+    DeviceState.ERROR: ERROR,
+    DeviceState.DISABLED: ERROR,
+    DeviceState.TRIPPED: ERROR,
+    DeviceState.UNKNOWN: UNKOWN,
     DeviceState.LOCKED: {
         "state": "color: blue; font-weight: bold;",
         "frame": "background-color: #e8e8ff;",
         "value": "font-weight: bold;",
-    },
-    DeviceState.UNLOCKED: {
-        "state": "color: #aa6600; font-weight: bold;",
-        "frame": "background-color: #fff8e0;",
-        "value": "",
     },
 }
 
@@ -141,7 +138,7 @@ class GUIClient:
             self.booster[ch] = data
 
             if self.main_window:
-                self.main_window.update_booster(data)
+                self.main_window.update_booster(ch)
 
         try:
             async with aiomqtt.Client(self.server) as client:
@@ -169,9 +166,17 @@ class MainWindow(QWidget):
         self.client = client
         self.client.set_main_window(self)  # Set this window for direct updates
 
+        # Add Active tracking
+        self.last_update_time = None
+
         self.setWindowTitle("ARTIQ GUI")
         self.setGeometry(100, 100, 550, 400)
         self.initUI()
+
+        # Create a timer that updates every second
+        self.update_timer = QTimer(self)
+        self.update_timer.timeout.connect(self.update_elapsed_time)
+        self.update_timer.start(1000)  # Update every second
 
     def initUI(self):
         layout = QVBoxLayout()
@@ -209,13 +214,15 @@ class MainWindow(QWidget):
             channel_layout.addWidget(reflected_label)
 
             frame.setLayout(channel_layout)
-            self.booster_frames.append({
-                "frame": frame,
-                "ch_label": ch_label,
-                "state": state_label,
-                "power": power_label,
-                "reflected": reflected_label,
-            })
+            self.booster_frames.append(
+                {
+                    "frame": frame,
+                    "ch_label": ch_label,
+                    "state": state_label,
+                    "power": power_label,
+                    "reflected": reflected_label,
+                }
+            )
 
             row = i // 4
             col = i % 4
@@ -282,14 +289,16 @@ class MainWindow(QWidget):
             laser_layout.addWidget(current_widget)
 
             frame.setLayout(laser_layout)
-            self.dlc_frames.append({
-                "frame": frame,
-                "name": name_label,
-                "state": state_label,
-                "dl_current": dl_current_label,
-                "amp_current": amp_current_label,
-                "lock": lock_label,
-            })
+            self.dlc_frames.append(
+                {
+                    "frame": frame,
+                    "name": name_label,
+                    "state": state_label,
+                    "dl_current": dl_current_label,
+                    "amp_current": amp_current_label,
+                    "lock": lock_label,
+                }
+            )
 
             dlc_layout.addWidget(frame, 0, i)
 
@@ -304,28 +313,74 @@ class MainWindow(QWidget):
         dlc_outer_frame.setLayout(outer_layout)
         layout.addWidget(dlc_outer_frame)
 
-        self.schedule_text = QLabel()
-        self.schedule_text.setAlignment(Qt.AlignCenter)
-        layout.addWidget(self.schedule_text)
-
         # Create the matplotlib canvas
         self.canvas = MatplotlibCanvas(self, width=8, height=8)
 
+        # Create a single bottom bar layout
+        bottom_bar_layout = QHBoxLayout()
+
+        # Experiment status (left side)
+        self.schedule_text = QLabel("<b>Running:</b>\t---")
+        self.schedule_text.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        bottom_bar_layout.addWidget(self.schedule_text, 1)  # Takes stretch priority 1
+
+        # Add spacer to push everything else to the right
+        bottom_bar_layout.addStretch(1)
+
+        # Right-aligned controls in their own layout
+        right_controls = QHBoxLayout()
+        right_controls.setSpacing(10)  # Space between button and timer
+
+        # Save button
         save_button = QPushButton("Save Datasets")
         save_button.clicked.connect(self.saveDatasets)
         save_button.setEnabled(False)
         self.save_button = save_button
-        layout.addWidget(save_button)
+        right_controls.addWidget(save_button)
+
+        # Elapsed time
+        self.elapsed_time_label = QLabel("↻ ... ago")
+        self.elapsed_time_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        right_controls.addWidget(self.elapsed_time_label)
+
+        # Add right controls to main layout
+        bottom_bar_layout.addLayout(right_controls)
+
+        layout.addLayout(bottom_bar_layout)
 
         self.setLayout(layout)
 
-    def update_datasets(self, mod):
-        if mod["action"] != "init":
-            route = f"{mod['path']}.{mod['key']}"
-            if "Images.absorption" not in route:
-                return
+    def update_elapsed_time(self, reset=False):
+        """Update the elapsed time display"""
+        if reset:
+            self.last_update_time = time.time()
+        if self.last_update_time is None:
+            self.elapsed_time_label.setText("↻ ... ago")
+            return
 
-        # if absorption images changed then redo AbsImg
+        elapsed = int(time.time() - self.last_update_time)
+        hours, remainder = divmod(elapsed, 3600)
+        minutes, seconds = divmod(remainder, 60)
+
+        if hours > 0:
+            time_str = f"{hours}h {minutes}m ago"
+        elif minutes > 0:
+            time_str = f"{minutes}m {seconds}s ago"
+        else:
+            time_str = f"{seconds}s ago"
+
+        self.elapsed_time_label.setText(f"↻ {time_str}")
+
+    def update_datasets(self, mod):
+        if mod["action"] != "delitem":
+            self.update_elapsed_time(True)
+        if (
+            mod["action"] != "init"
+            and "Images.absorption" not in f"{mod['path']}.{mod['key']}"
+        ):
+            return
+
+        # if absorption images changed then redo AbsImage
         tof = self.client.datasets.get("Images.absorption.TOF")
         ref = self.client.datasets.get("Images.absorption.REF")
         bg = self.client.datasets.get("Images.absorption.BG")
@@ -350,9 +405,12 @@ class MainWindow(QWidget):
             self.resize(self.width(), self.height() + 500)
 
     def update_schedule(self, mod):
-        text = ""
+        self.update_elapsed_time(True)
+
+        text = "<b>Running:</b>\t---"
         for key, value in self.client.schedule.items():
-            text += f"<b>{value['status']}</b>\t{value['expid']['class_name']}\n"
+            if value["status"] == "running":
+                text = f"<b>Running:</b>\t{value['expid']['class_name']}"
         self.schedule_text.setText(text)
 
     def update_DLCProState(self, mod):
@@ -387,64 +445,59 @@ class MainWindow(QWidget):
             lock_enabled = self.client.dlcpro.get(
                 f"{laser_prefix}dl:lock:lock-enabled", False
             )
-
-            dl_current_text = f"Laser: {dl_current:.1f} mA"
-            amp_current_text = f"Amp: {amp_current:.1f} mA"
-
-            if not emission_enabled or not laser_enabled:
-                state = DeviceState.DISABLED
-                lock_state = DeviceState.UNLOCKED
-            else:
-                state = DeviceState.ENABLED
-                lock_state = (
-                    DeviceState.LOCKED if lock_enabled else DeviceState.UNLOCKED
-                )
+            label = self.client.dlcpro.get(f"{laser_prefix}label", f"Laser {i}")
+            self.dlc_frames[i - 1]["name"].setText(f"<b>{label}</b>")
 
             self._update_device_display(
                 "dlc",
                 i - 1,
-                state,
-                dl_current_text,
-                amp_current_text=amp_current_text,
-                lock_state=lock_state,
+                (
+                    DeviceState.ENABLED
+                    if emission_enabled and laser_enabled
+                    else DeviceState.DISABLED
+                ),
+                f"Laser: {dl_current:.1f} mA",
+                amp_current_text=f"Amp: {amp_current:.1f} mA",
+                lock_state=DeviceState.LOCKED if lock_enabled else DeviceState.UNLOCKED,
             )
 
-    def update_booster(self, mod):
+    def update_booster(self, channel):
         LOW_POWER_THRESHOLD = 5.0
 
-        for channel in range(8):
-            state = DeviceState.UNKNOWN
-            power_text = "--.- → --.- dBm"
-            reflected_text = "↻ --.- dBm"
+        state = DeviceState.UNKNOWN
+        power_text = "--.- → --.- dBm"
+        reflected_text = "↻ --.- dBm"
 
-            if channel in self.client.booster:
-                try:
-                    data = json.loads(self.client.booster[channel])
-                    state_str = data.get("state", DeviceState.UNKNOWN.value)
-                    input_power = data.get("input_power", 0.0)
-                    output_power = data.get("output_power", 0.0)
-                    reflected_power = data.get("reflected_power", 0.0)
+        if channel in self.client.booster:
+            try:
+                data = json.loads(self.client.booster[channel])
+                state_str = data.get("state", DeviceState.UNKNOWN.value)
+                input_power = data.get("input_power", 0.0)
+                output_power = data.get("output_power", 0.0)
+                reflected_power = data.get("reflected_power", 0.0)
 
-                    power_text = f"{input_power:.1f} → {output_power:.1f} dBm"
-                    reflected_text = f"↻ {reflected_power:.1f} dBm"
+                power_text = f"{input_power:.1f} → {output_power:.1f} dBm"
+                reflected_text = f"↻ {reflected_power:.1f} dBm"
 
-                    if state_str == DeviceState.ENABLED.value:
-                        state = (
-                            DeviceState.LOW_POWER
-                            if output_power < LOW_POWER_THRESHOLD
-                            else DeviceState.ENABLED
-                        )
-                    elif state_str == DeviceState.DISABLED.value:
-                        state = DeviceState.DISABLED
-                    else:
-                        state = DeviceState.UNKNOWN
+                if state_str == DeviceState.ENABLED.value:
+                    state = (
+                        DeviceState.LOW_POWER
+                        if output_power < LOW_POWER_THRESHOLD
+                        else DeviceState.ENABLED
+                    )
+                elif state_str == DeviceState.DISABLED.value:
+                    state = DeviceState.DISABLED
+                elif "Tripped" in state_str:
+                    state = DeviceState.TRIPPED
+                else:
+                    state = DeviceState.UNKNOWN
 
-                except (json.JSONDecodeError, KeyError):
-                    state = DeviceState.ERROR
+            except (json.JSONDecodeError, KeyError):
+                state = DeviceState.ERROR
 
-            self._update_device_display(
-                "booster", channel, state, power_text, reflected_text=reflected_text
-            )
+        self._update_device_display(
+            "booster", channel, state, power_text, reflected_text=reflected_text
+        )
 
     def _update_device_display(
         self,

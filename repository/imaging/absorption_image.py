@@ -1,8 +1,8 @@
 from artiq.coredevice.core import Core
 from artiq.coredevice.dma import CoreDMA
 from artiq.experiment import kernel, rpc
-from artiq.language import A, MHz, V, at_mu, delay, ms, now_mu, parallel, s, us
-from repository.models.device_db import server_addr
+from artiq.language import delay, ms, now_mu, parallel, s, us
+# from repository.models.device_db import server_addr
 from ndscan.experiment import (
     BoolParam,
     ExpFragment,
@@ -64,10 +64,12 @@ class AbsorptionImageExpFrag(ExpFragment):
             "do_pgc", BoolParam, "Do the PGC step", default=False
         )
 
-        self.atom_number: FloatChannel = self.setattr_result("atom_number")
-        self.info: OpaqueChannel = self.setattr_result(
-            "info", OpaqueChannel
+        self.do_odt: BoolParamHandle = self.setattr_param(
+            "do_odt", BoolParam, "Do the ODT step", default=False
         )
+
+        self.atom_number: FloatChannel = self.setattr_result("atom_number")
+        self.info: OpaqueChannel = self.setattr_result("info", OpaqueChannel)
 
     @kernel
     def device_setup(self) -> None:
@@ -86,6 +88,8 @@ class AbsorptionImageExpFrag(ExpFragment):
             self.mot.compress()
             if self.do_pgc.get():
                 self.mot.pgc()
+                if self.do_odt.get():
+                    self.mot.into_odt()
 
         self.mot.drop()
         delay(self.expansion_time.get())

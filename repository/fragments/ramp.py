@@ -82,7 +82,7 @@ class Ramp(Fragment):
             ]
     """
 
-    time_step_default = 100 * us
+    time_step_default = 50 * us
     duration_default: float = None
     add_final_point = True
 
@@ -461,7 +461,7 @@ class Ramp(Fragment):
             num_points = 2
 
         # Calculate the time step in machine units
-        time_step = self.duration.get() / float(num_points - 1)
+        time_step = self.duration.get() / float(num_points)
         time_step_mu = self.core.seconds_to_mu(time_step)
 
         # Compute step sizes and initial values
@@ -644,7 +644,9 @@ class Ramp(Fragment):
         **Timeline:** advances to the end of the ramp
         """
 
-        t_end_mu = now_mu() + self.core.seconds_to_mu(self.duration.get())
+        t_end_mu = now_mu() + self.core.seconds_to_mu(
+            self.duration.get()
+        )
 
         # It's nicer to use handles here instead of string lookup.
         # Unfortunately, the DMA handle changes whenever another DMA sequence is

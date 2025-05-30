@@ -325,7 +325,20 @@ class MOT(Fragment):
         **Timeline:** we break_realtime() after setting the devices
         """
         self.core.break_realtime()
-        self.calculate_dma_handles()
+
+        self.reset()
+        self.core.break_realtime()
+
+    @kernel
+    def reset(self) -> None:
+        """
+        Reset the MOT to a known state
+
+        This is called automatically by device_setup unless `manual_init=True`
+        was passed to build_fragment.
+
+        **Timeline:** we break_realtime() after setting the devices
+        """
         self.core.break_realtime()
         # Lasers set to defaults and turned off
         self.beam_resetter.turn_on_all(light_enabled=False)
@@ -335,8 +348,6 @@ class MOT(Fragment):
         self.coils.set_to_defaults()
         # MOT locked and unpushed
         self.relock_mot()
-
-        self.core.break_realtime()
 
     @kernel
     def calculate_dma_handles(self):
@@ -355,6 +366,18 @@ class MOT(Fragment):
         self.pgc_ramp.precalculate_dma_handle()
         self.odt_ramp.precalculate_dma_handle()
 
+        # safety check - EOMs take 400us to shift so we cant run faster than that
+        if self.CMOT_settle_time.get() < 400 * us:
+            logger.warning(
+                "CMOT ramp is too fast, "
+                "EOMs will not have time to shift before the next operation"
+            )
+        if self.PGC_settle_time.get() < 400 * us:
+            logger.warning(
+                "PGC ramp is too fast, "
+                "EOMs will not have time to shift before the next operation"
+            )
+
     @kernel
     def clear_atoms(self, clearout_time=100 * ms) -> None:
         """
@@ -369,7 +392,7 @@ class MOT(Fragment):
     @kernel
     def load(self, clearout=True, clearout_time=1000 * ms, wait_for_load=True) -> None:
         """
-        Load the MOT
+        Load the MOT by turning on the MOT beams, assumes we are starting from the reset state
 
         if `clearout` is True, ensure atoms are gone first
 
@@ -390,16 +413,14 @@ class MOT(Fragment):
 
         **Timeline:** advances by `self.CMOT_duration` + `self.CMOT_settle_time`
         """
-        with sequential:
-            # Unlock the MOT
-            self.unlock_mot()
-            # Do the ramp - MOT freq, coil gradient, Eom attenuation
-            self.cmot_ramp.do()
+        # Unlock the MOT
+        self.unlock_mot()
+        self.cmot_ramp.do()
+
+        with parallel:
             # Fix EOM frequency
             self.eom.set_freq(self.eom.config.frequency + self.CMOT_detuning.get())
-
-        # Wait for settle time
-        delay(self.CMOT_settle_time.get())
+            delay(self.CMOT_settle_time.get())
 
     @kernel
     def pgc(self) -> None:
@@ -408,14 +429,13 @@ class MOT(Fragment):
 
         **Timeline:** advances by `self.PGC_duration` + `self.PGC_settle_time`
         """
-        with sequential:
-            # Do the ramp - MOT freq, coil to biases
-            self.pgc_ramp.do()
+        # Do the ramp - MOT freq, coil to biases
+        self.pgc_ramp.do()
+
+        with parallel:
             # Fix EOM frequency
             self.eom.set_freq(self.eom.config.frequency + self.PGC_detuning.get())
-
-        # Wait for settle time
-        delay(self.PGC_settle_time.get())
+            delay(self.PGC_settle_time.get())
 
     @kernel
     def into_odt(self) -> None:
@@ -424,19 +444,14 @@ class MOT(Fragment):
 
         **Timeline:** advances by `self.ODT_duration` + `self.ODT_settle_time`
         """
+
         # ODT beam comes on and we let atoms transfer
         self.odt_beams.turn_beams_on()
         delay(self.ODT_overlap_time.get())
         # ramp off the MOT
         self.odt_ramp.do()
-
-        # Fix up MOT ECDL for later imaging
-        self.mot_beam.reset()
-        with parallel:
-            # Relock the MOT
-            self.relock_mot()
-            # Reset the EOM
-            self.eom.set_to_defaults()
+        # Wait for the ODT to settle
+        delay(self.ODT_settle_time.get())
 
     @kernel
     def into_lattice(self) -> None:
@@ -458,7 +473,7 @@ class MOT(Fragment):
         self.unlock_ttl.on()
 
     @kernel
-    def relock_mot(self, time_to_shift=1 * ms) -> None:
+    def relock_mot(self, time_to_shift=0.5 * ms) -> None:
         """
         Relock the MOT ECDL
 
@@ -486,5 +501,5 @@ class MOT(Fragment):
         self.all_beams.turn_beams_off()
         # Turn off the coils
         self.coils.turn_off()
-
+        # For imaging we need to be back on resonance
         self.relock_mot()

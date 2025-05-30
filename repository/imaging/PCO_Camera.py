@@ -108,7 +108,7 @@ class PcoCamera(Fragment):
         self.trigger.output()
         delay_mu(10)
         self.trigger.off()
-
+        self.cam.stop()
         self.cam.record(self.num_images, mode="sequence non blocking")
 
         if self.debug:
@@ -146,13 +146,7 @@ class PcoCamera(Fragment):
                 break
             time.sleep(timeout / 10)
         else:
-            logging.warning(
-                "Recieved %d images, expected %d",
-                self.cam.recorded_image_count,
-                self.num_images,
-            )
-            if self.cam.recorded_image_count == 0:
-                return None
+            return None
         logger.info("All images counted")
         self.images, _ = self.cam.images(roi=roi)
         logger.info("Images retrieved")
