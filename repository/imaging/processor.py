@@ -233,7 +233,6 @@ class AbsImage:
             max_nfev=1000,
             fit_kws={"xtol": 1e-7},
         )
-        logging.info(result.fit_report())
 
         return result
 
