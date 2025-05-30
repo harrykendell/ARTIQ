@@ -1,12 +1,13 @@
 import logging
-from dataclasses import dataclass
 from typing import List, Type
 
 from numpy import int64
 
 from artiq.coredevice.core import Core
 from artiq.coredevice.ttl import TTLOut
-from artiq.language import at_mu, delay_mu, kernel, now_mu, portable
+from artiq.language import at_mu, delay, delay_mu, kernel, now_mu, portable
+from artiq.experiment import RTIOUnderflow
+
 from ndscan.experiment import Fragment
 from repository.fragments.suservo_frag import SUServoFrag
 from repository.models import SUServoedBeam
@@ -175,6 +176,9 @@ class SetBeamsToDefaults(Fragment):
         kernel_invariants = getattr(self, "kernel_invariants", set())
         self.kernel_invariants = kernel_invariants | {"debug_mode", "max_shutter_delay"}
 
+        # Start with 1ms of slack for turning on the beams. We'll add more if required in device_setup
+        self.autosetter_slack_required = 1e-3
+
         self.first_run = True
 
     def host_setup(self):
@@ -186,8 +190,26 @@ class SetBeamsToDefaults(Fragment):
 
         # If configured to setup the AOMs automatically, do so now
         if self.automatic_setup:
-            self.core.break_realtime()
-            self.turn_on_all(light_enabled=self.automatic_turnon)
+            # Loop, adding more slack until it works
+            while True:
+                try:
+                    self.core.break_realtime()
+                    delay(self.autosetter_slack_required)
+                    self.turn_on_all(light_enabled=self.automatic_turnon)
+                    break
+
+                except RTIOUnderflow:
+                    if self.autosetter_slack_required >= 50e-3:
+                        raise RuntimeError(
+                            "Unable to turn on beams despite 50ms of slack"
+                        )
+
+                    logger.debug(
+                        "Underflow when turning on beams. Adding 1 ms of slack, total ="
+                        " %s ms",
+                        self.autosetter_slack_required * 1e3,
+                    )
+                    self.autosetter_slack_required += 1e-3
 
     @portable
     def get_max_shutter_delay(self):
