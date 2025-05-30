@@ -37,7 +37,7 @@ VDRIVEN_SUPPLIES = [
         fastino="fastino",
         ch=2,
         gain=2.0 * A / V,
-        max_output=2.0 * A,
+        max_output=1.0 * A,
         default_output=0.0 * A,
     ),
     VDrivenSupply(
@@ -45,7 +45,7 @@ VDRIVEN_SUPPLIES = [
         fastino="fastino",
         ch=3,
         gain=2.0 * A / V,
-        max_output=2.0 * A,
+        max_output=1.0 * A,
         default_output=0.0 * A,
     ),
     VDrivenSupply(
@@ -53,7 +53,7 @@ VDRIVEN_SUPPLIES = [
         fastino="fastino",
         ch=4,
         gain=222 * MHz / V,
-        max_output=222 * MHz,
+        max_output=200 * MHz,  # we are in 150Ω mode so max JP5 open -> +-5V
         default_output=0.0 * MHz,
         unit="MHz",
     ),
@@ -64,6 +64,7 @@ VDRIVEN_SUPPLIES = [
         gain=0.4 * A / V,  # 4A max * V / 10V -> 0.4 A/V
         max_output=2.0 * A,
         default_output=1.450 * A,
+        disabled=True,
         # TODO: Actually set me up
     ),
     VDrivenSupply(
@@ -73,6 +74,7 @@ VDRIVEN_SUPPLIES = [
         gain=1.0 * A / V,
         max_output=3.0 * A,
         default_output=2.70 * A,
+        disabled=True,
         # TODO: Actually set me up
     ),
 ]
