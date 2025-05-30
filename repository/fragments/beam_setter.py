@@ -376,7 +376,7 @@ class ControlBeamsWithoutCoolingAOM(Fragment):
         return self.longest_beam_delay
 
     @kernel
-    def reset(self, light_enabled=False):
+    def reset(self):
         """
         Set the beams to their default:
         - setpoint
@@ -395,4 +395,4 @@ class ControlBeamsWithoutCoolingAOM(Fragment):
                 -1.0 * beam_info.setpoint / 10.0,
             )
 
-            suservo.set_y(beam_info.initial_amplitude)
+            suservo.set_y(suservo.servo_channel, beam_info.initial_amplitude)
