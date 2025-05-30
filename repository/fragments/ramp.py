@@ -38,6 +38,8 @@ class DefaultFlag:
 
 
 default = DefaultFlag()
+
+
 class Ramp(Fragment):
     """
     ------
@@ -50,8 +52,8 @@ class Ramp(Fragment):
     - VDrivenSupply Output
     - Eom Amplitude/Frequency (although frequency takes ~0.4ms per step)
 
-    Any unset values will use the default for that device.
-        - `default`: use the default value for that device
+    Values can be set to:
+        - `default`: explicitly use the default value for that device
         - `ParamHandle`: use the provided parameter handle
         - `Ramp`: use the values from the end of this ramp
         - `float`: use the provided value
@@ -66,7 +68,7 @@ class Ramp(Fragment):
             supplies = VDrivenSupply["X1", "X2", "push_780"]
             supplies_start = [
                 default,
-                default,
+                OTHER_RAMP,
                 -DETUNING["CMOT"],
             supplies_end = [
                 VDrivenSupply["X1"].default_output * 1.5,
