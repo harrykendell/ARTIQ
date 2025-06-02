@@ -1,6 +1,5 @@
 import functools
 import logging
-import sys
 import numpy as np
 from lmfit import Model
 from scipy.ndimage import gaussian_filter
@@ -95,14 +94,12 @@ class AbsImage:
 
     def all_info(self):
         """Returns a string of a dict with all the information about the image."""
-        np.set_printoptions(threshold=sys.maxsize)
         return f"""
             "wavelength": {self.wavelength},
             "detuning": {self.detuning},
             "linewidth": {self.linewidth},
             "pixel_size": {self.pixel_size},
             "magnification": {self.magnification},
-            "od": {self.optical_density},
             "atom_number": {self.atom_number},
             "peak": {self.peak},
             "centroid": {self.centroid},
