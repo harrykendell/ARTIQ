@@ -111,7 +111,7 @@ SUSERVOED_BEAMS = [
         name="MOT",
         suservo_device="suservo_aom_MOT",
         frequency=191.0 * MHz,
-        attenuation=19.0 * dB,
+        attenuation=17.0 * dB,
         shutter_device="shutter_3DMOT",
         shutter_delay=THORLABS_SHUTTER_DELAY,
         setpoint=3.5 * V,
@@ -140,8 +140,8 @@ SUSERVOED_BEAMS = [
     SUServoedBeam(
         name="LATX",
         suservo_device="suservo_aom_LATX",
-        frequency=193.9 * MHz,
-        attenuation=17.0 * dB,
+        frequency=205.0 * MHz,
+        attenuation=18.0 * dB,
     ),
     SUServoedBeam(
         name="LATY",

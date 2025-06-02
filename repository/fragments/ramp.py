@@ -50,7 +50,7 @@ class Ramp(Fragment):
 
     - SUServo Frequency/Setpoint
     - VDrivenSupply Output
-    - Eom Amplitude/Frequency (although frequency takes ~0.4ms per step)
+    - Eom Amplitude/Frequency (**Each freq step takes ~400us and we cannot change amplitude during the relock time**)
 
     Values can be set to:
         - `default`: explicitly use the default value for that device
@@ -82,7 +82,7 @@ class Ramp(Fragment):
             ]
     """
 
-    time_step_default = 50 * us
+    time_step_default = 10 * us
     duration_default: float = None
     add_final_point = True
 
@@ -586,7 +586,9 @@ class Ramp(Fragment):
                         delay_mu(t_one_rtio_cycle_mu)
                         # freq for mirny is very slow so only set 1/10 of the time
                         if self.do_eom_detuning:
+                            # We cannot set att. while the PLL is relocking
                             self.eoms_setters_params[i][0].set_freq(eom_freq_values[i])
+                            delay(400*us)  # Nominal relock time
                         eom_freq_values[i] += eom_freq_steps[i]
 
                 t_total_used_mu = now_mu() - t_start_sequence_mu

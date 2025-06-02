@@ -97,7 +97,6 @@ class ControlBeamsWithoutCoolingAOM(Fragment):
         # Kernel variables
         self.debug_enabled = logger.isEnabledFor(logging.INFO)
 
-        self.unshuttered_suservos: List[SUServoChannel] = []
         self.beam_suservos: List[SUServoChannel] = []
         self.beam_shutters: List[TTLOut] = []
         self.shutter_indexes: List[int] = []

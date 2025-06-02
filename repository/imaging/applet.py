@@ -120,6 +120,8 @@ class AbsorptionView(QtWidgets.QWidget):
         if title is not None:
             self.setWindowTitle(title)
 
+        # if mods["action"] == "setitem" and not mods["key"] == "Images.absorption.BG":
+        #     return
         # Get data from the datasets
         try:
             # Check if all required datasets are available

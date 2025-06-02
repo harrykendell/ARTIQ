@@ -2,8 +2,8 @@ import logging
 
 from artiq.coredevice.core import Core
 from artiq.coredevice.ttl import TTLOut
-from artiq.language import delay, kernel, parallel, sequential
-from artiq.language.units import A, MHz, V, dB, ms, s
+from artiq.language import delay, kernel, parallel
+from artiq.language.units import A, MHz, V, dB, ms, s, us
 from ndscan.experiment import Fragment
 from ndscan.experiment.parameters import FloatParam, FloatParamHandle
 from repository.fragments.beam_setter import ControlBeamsWithoutCoolingAOM
@@ -21,10 +21,10 @@ logger = logging.getLogger(__name__)
 # Default constants - these can be overridden in the experiment
 Γ_Rb = 6.065 * MHz  # Natural linewidth of Rb-87
 DURATION = {"LOADING": 20 * s, "CMOT": 1 * ms, "PGC": 1 * ms, "ODT": 1 * ms}
-SETTLE_TIME = {"CMOT": 3 * ms, "PGC": 3 * ms, "ODT": 3 * ms}
-DETUNING = {"CMOT": 2.5 * Γ_Rb, "PGC": 6 * Γ_Rb}  # This is beyond the normal 2Γ
+SETTLE_TIME = {"CMOT": 1 * ms, "PGC": 1 * ms, "ODT": 1 * ms}
+DETUNING = {"CMOT": 3 * Γ_Rb, "PGC": 8 * Γ_Rb}  # This is beyond the normal 2Γ
 BIASES = {"X1": 0.0 * A, "X2": 0.0 * A, "Y": 0.0 * A, "Z": 0.0 * A}
-CURRENT_COMPRESSION_RATIO = 1.75
+COMPRESSED_GRADIENTS = {"X1": 1.75 * A, "X2": 1.925 * A}
 EOM_REDUCTION = 10 * dB
 
 
@@ -74,8 +74,8 @@ class MOT(Fragment):
                 "MOT",
                 "IMG",
                 "PUMP",
-                "LATX",
-                "LATY",
+                # "LATX",
+                # "LATY",
                 "CDT1",
                 "CDT2",
             ],
@@ -165,20 +165,15 @@ class MOT(Fragment):
             The transition from normal MOT to CMOT
                 - MOT beam detuned red by unlock+push
                 - Coils ramped up
-                - Repump power ramped down
+                - Repump power ramped down - but this must be done manually due to EOM issues
             """
 
             duration_default = DURATION["CMOT"]
             supplies = VDrivenSupply["X1", "X2", "push_780"]
             supplies_end = [
-                VDrivenSupply["X1"].default_output * CURRENT_COMPRESSION_RATIO,
-                VDrivenSupply["X2"].default_output * CURRENT_COMPRESSION_RATIO,
+                COMPRESSED_GRADIENTS["X1"],  # X1
+                COMPRESSED_GRADIENTS["X2"],  # X2
                 self.CMOT_detuning,
-            ]
-
-            eoms = [Eom["repump"]]
-            eom_att_end = [
-                Eom["repump"].attenuation + EOM_REDUCTION,
             ]
 
         self.cmot_ramp: CMOT_Ramp = self.setattr_fragment(
@@ -324,8 +319,6 @@ class MOT(Fragment):
 
         **Timeline:** we break_realtime() after setting the devices
         """
-        self.core.break_realtime()
-
         self.reset()
         self.core.break_realtime()
 
@@ -342,12 +335,16 @@ class MOT(Fragment):
         self.core.break_realtime()
         # Lasers set to defaults and turned off
         self.beam_resetter.turn_on_all(light_enabled=False)
+        self.core.break_realtime()
+        delay(100*ms)  # we're hitting RTIO Underflows here?
+        self.lattice_beams.turn_beams_on()
         # EOM set to defaults
         self.eom.set_to_defaults()
         # Coils set to defaults
         self.coils.set_to_defaults()
         # MOT locked and unpushed
         self.relock_mot()
+        self.core.break_realtime()
 
     @kernel
     def calculate_dma_handles(self):
@@ -366,13 +363,13 @@ class MOT(Fragment):
         self.pgc_ramp.precalculate_dma_handle()
         self.odt_ramp.precalculate_dma_handle()
 
-        # safety check - EOMs take 400us to shift so we cant run faster than that
-        if self.CMOT_settle_time.get() < 400 * us:
+        # safety check - EOMs take 400us to shift so we can't run faster than that
+        if self.cmot_ramp.duration.get() < 400 * us:
             logger.warning(
                 "CMOT ramp is too fast, "
                 "EOMs will not have time to shift before the next operation"
             )
-        if self.PGC_settle_time.get() < 400 * us:
+        if self.pgc_ramp.duration.get() + self.PGC_settle_time.get() < 400 * us:
             logger.warning(
                 "PGC ramp is too fast, "
                 "EOMs will not have time to shift before the next operation"
@@ -403,8 +400,18 @@ class MOT(Fragment):
 
         self.mot_beam.turn_beams_on()
 
+        # We will check the MOT beam power after 10% of the loading time
+        # so that it has settled in
         if wait_for_load:
-            delay(self.loading_time.get())
+            delay(self.loading_time.get() / 10.0)
+            if (
+                self.mot_beam.beam_suservos[-1].get_y(
+                    self.mot_beam.beam_suservos[-1].servo_channel
+                )
+                >= 0.99
+            ):
+                logger.warning("Insufficient power to the MOT beam")
+            delay(9.0 * self.loading_time.get() / 10.0)
 
     @kernel
     def compress(self) -> None:
@@ -415,12 +422,15 @@ class MOT(Fragment):
         """
         # Unlock the MOT
         self.unlock_mot()
-        self.cmot_ramp.do()
 
         with parallel:
             # Fix EOM frequency
             self.eom.set_freq(self.eom.config.frequency + self.CMOT_detuning.get())
-            delay(self.CMOT_settle_time.get())
+            self.cmot_ramp.do()
+            delay(self.cmot_ramp.duration.get())
+
+        self.eom.set_att(self.eom.config.attenuation + EOM_REDUCTION)
+        delay(self.CMOT_settle_time.get())
 
     @kernel
     def pgc(self) -> None:
@@ -430,12 +440,13 @@ class MOT(Fragment):
         **Timeline:** advances by `self.PGC_duration` + `self.PGC_settle_time`
         """
         # Do the ramp - MOT freq, coil to biases
-        self.pgc_ramp.do()
 
         with parallel:
             # Fix EOM frequency
             self.eom.set_freq(self.eom.config.frequency + self.PGC_detuning.get())
-            delay(self.PGC_settle_time.get())
+            self.pgc_ramp.do()
+
+        delay(self.PGC_settle_time.get())
 
     @kernel
     def into_odt(self) -> None:

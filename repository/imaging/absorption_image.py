@@ -88,8 +88,8 @@ class AbsorptionImageExpFrag(ExpFragment):
             self.mot.compress()
             if self.do_pgc.get():
                 self.mot.pgc()
-                if self.do_odt.get():
-                    self.mot.into_odt()
+        if self.do_odt.get():
+            self.mot.into_odt()
 
         self.mot.drop()
         delay(self.expansion_time.get())
