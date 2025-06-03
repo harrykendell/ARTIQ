@@ -4,19 +4,12 @@ import matplotlib
 import PyQt5  # noqa: F401 # make sure pyqtgraph imports Qt5
 from PyQt5 import QtCore, QtWidgets
 
-matplotlib.use("Qt5Agg")
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg  # noqa: E402
-from matplotlib.figure import Figure  # noqa: E402
+from matplotlib.backends.backend_qtagg import FigureCanvas
+from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
+from matplotlib.figure import Figure
 
 from artiq.applets.simple import TitleApplet  # noqa: E402
 from repository.imaging.processor import AbsImage  # noqa: E402
-
-
-class MatplotlibCanvas(FigureCanvasQTAgg):
-    def __init__(self, parent=None, width=8, height=6, dpi=100):
-        self.fig = Figure(figsize=(width, height), dpi=dpi, constrained_layout=True)
-        super(MatplotlibCanvas, self).__init__(self.fig)
-        self.axes = None
 
 
 class AbsorptionView(QtWidgets.QWidget):
@@ -32,8 +25,10 @@ class AbsorptionView(QtWidgets.QWidget):
         self.setLayout(layout)
 
         # Create the matplotlib canvas
-        self.canvas = MatplotlibCanvas(self, width=8, height=8)
+        self.canvas = FigureCanvas(Figure(figsize=(7, 8)))
+        self.toolbar = NavigationToolbar(self.canvas, self)
         layout.addWidget(self.canvas)
+        layout.addWidget(self.toolbar)
 
         # Add status label at the bottom
         self.status_label = QtWidgets.QLabel("Waiting for data...")
@@ -87,7 +82,7 @@ class AbsorptionView(QtWidgets.QWidget):
 
             # Save the visualization
             fig_path = os.path.join(save_dir, f"{timestamp}_plot.png")
-            self.canvas.fig.savefig(fig_path, dpi=300, bbox_inches="tight")
+            self.canvas.figure.savefig(fig_path, dpi=300, bbox_inches="tight")
 
             # Save fit parameters as text file
             fit_path = os.path.join(save_dir, f"{timestamp}_fit_results.txt")
@@ -120,8 +115,8 @@ class AbsorptionView(QtWidgets.QWidget):
         if title is not None:
             self.setWindowTitle(title)
 
-        # if mods["action"] == "setitem" and not mods["key"] == "Images.absorption.BG":
-        #     return
+        if mods[0]["action"] == "setitem" and not mods[0]["key"].startswith("Images.absorption"):
+            return
         # Get data from the datasets
         try:
             # Check if all required datasets are available
@@ -147,23 +142,14 @@ class AbsorptionView(QtWidgets.QWidget):
                 self.save_button.setText("Save")
 
                 # Clear previous plot
-                self.canvas.fig.clear()
+                self.canvas.figure.clear()
 
                 try:
                     # Use the AbsImage plot method to generate the visualization
-                    fig, axes = self.absimg.plot(fig=self.canvas.fig)
-
-                    # Store the axes for potential future reference
-                    self.canvas.axes = axes
+                    self.absimg.plot(fig=self.canvas.figure)
 
                     # Update the canvas
                     self.canvas.draw()
-
-                    # Add save button if it doesn't exist
-                    if not hasattr(self, "save_button"):
-                        self.save_button = QtWidgets.QPushButton("Save Images and Fit")
-                        self.layout().addWidget(self.save_button)
-                        self.save_button.clicked.connect(self.save_data)
 
                     # Enable the button
                     self.save_button.setEnabled(True)
@@ -185,16 +171,15 @@ class AbsorptionView(QtWidgets.QWidget):
                         * self.absimg.physical_scale
                         * 1e3
                     )
+
+                    def bold(text):
+                        return f"<span style='font-weight:bold'>{text}</span>"
                     self.status_label.setText(
                         f"""<div style="text-align:center; margin:0; padding:0">
-                          <span style="font-weight:bold">Atom number:</span>\
-                            {atom_number:.2e} &nbsp;
-                          <span style="font-weight:bold">Expansion time:</span>\
-                            {self.expansion_time:.2f} ms &nbsp;
-                          <span style="font-weight:bold">Sigma:</span>\
-                            ({sigmax:.2f}, {sigmay:.2f}) mm<br>
-                          <span style="color:#CCC"><b>R-squared:</b>\
-                          {r_squared:.2f}</span>
+                          {bold("Atom number:")} {atom_number:.2e} &nbsp;
+                          {bold("Expansion time:")} {self.expansion_time:.2f} ms &nbsp;
+                          {bold("Sigma:")} ({sigmax:.2f}, {sigmay:.2f}) mm<br>
+                          <span style="color:#CCC">{bold("R-squared:")} {r_squared:.2f}</span>
                         </div>"""
                     )
 

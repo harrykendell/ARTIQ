@@ -22,8 +22,11 @@ from PyQt5.QtWidgets import (
 from qasync import QEventLoop
 from sipyco.sync_struct import Subscriber
 
+from matplotlib.backends.backend_qtagg import FigureCanvas
+from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
+from matplotlib.figure import Figure
+
 sys.path.append(__file__.split("artiq")[0] + "artiq")
-from repository.imaging.applet import MatplotlibCanvas  # noqa: E402
 from repository.imaging.processor import AbsImage  # noqa: E402
 
 
@@ -73,14 +76,19 @@ DEVICE_STYLES = {
     },
 }
 
+APP = None
+
 
 class GUIClient:
+
     def __init__(self, server="137.222.69.28", port_control=3251, port_notify=3250):
         self.server = server
         self.port_control = port_control
         self.port_notify = port_notify
         self.subscribers = {}
         self.main_window = None
+        self.reconnecting = False
+        self.tasks = []
 
         # Initialize data dictionaries
         self.datasets = dict()
@@ -88,23 +96,37 @@ class GUIClient:
         self.dlcpro = dict()
         self.booster = dict()
 
+        loop = asyncio.get_event_loop()
+        task = loop.create_task(self.connect())
+        self.tasks.append(task)
+        APP.aboutToQuit.connect(lambda: loop.create_task(self.disconnect()))
+
     def set_main_window(self, window):
         """Set the main window for direct updates."""
         self.main_window = window
 
     async def connect(self):
+        if self.reconnecting:
+            logging.info("Already reconnecting, skipping reconnect attempt")
+            return
+
+        self.reconnecting = True
         loop = asyncio.get_event_loop()
 
-        loop.create_task(
+        task1 = loop.create_task(
             self.connect_subscriber("datasets", self.datasets, self.port_notify)
         )
-        loop.create_task(
+        task2 = loop.create_task(
             self.connect_subscriber("schedule", self.schedule, self.port_notify)
         )
-        loop.create_task(self.connect_subscriber("DLCProState", self.dlcpro, 3271))
+        task3 = loop.create_task(
+            self.connect_subscriber("DLCProState", self.dlcpro, 3271)
+        )
+        task4 = loop.create_task(self.connect_booster())
 
-        loop.create_task(self.connect_booster())
+        self.tasks.extend([task1, task2, task3, task4])
         logging.info("Connecting to services...")
+        self.reconnecting = False
 
     async def connect_subscriber(self, name, db: dict, port=None, server=None):
         port = self.port_notify if port is None else port
@@ -121,7 +143,17 @@ class GUIClient:
                 update_method(mod)
             return
 
-        subscriber = Subscriber(name, _create, _update, None)
+        def disconnect_cb(*args):
+            logging.info(f"Disconnected from {name} at {server}:{port}")
+            if not self.reconnecting and name in self.subscribers:
+                del self.subscribers[name]
+                loop = asyncio.get_event_loop()
+                reconnect_task = loop.create_task(
+                    self.connect_subscriber(name, db, port, server)
+                )
+                self.tasks.append(reconnect_task)
+
+        subscriber = Subscriber(name, _create, _update, disconnect_cb)
         try:
             await asyncio.wait_for(subscriber.connect(server, port), 5)
         except asyncio.TimeoutError:
@@ -131,6 +163,13 @@ class GUIClient:
         logging.info(f"Connected to Sub: {name} at {server}:{port}")
 
     async def connect_booster(self):
+        def reconnect_booster(*_):
+            logging.info("Booster disconnected, reconnecting...")
+            if not self.reconnecting:
+                loop = asyncio.get_event_loop()
+                reconnect_task = loop.create_task(self.connect_booster())
+                self.tasks.append(reconnect_task)
+
         def handle_booster_message(message):
             logging.debug(f"New Booster message: {message.payload.decode()}")
             ch = int(message.topic.value[-1])
@@ -142,32 +181,48 @@ class GUIClient:
 
         try:
             async with aiomqtt.Client(self.server) as client:
+                client._on_message = handle_booster_message
+
+                client._on_disconnect = reconnect_booster
                 await asyncio.wait_for(
                     client.subscribe("dt/sinara/booster/fc-0f-e7-23-77-30/telemetry/#"),
                     5,
                 )
-                client._on_message = handle_booster_message
                 async for message in client.messages:
                     handle_booster_message(message)
-        except (aiomqtt.exceptions.MqttError, asyncio.TimeoutError) as e:
-            logging.error(f"Failed to connect to Booster:\n{e}")
-            return
+
+        except (aiomqtt.exceptions.MqttError, asyncio.TimeoutError):
+            reconnect_booster()
         logging.info("Connected to Booster")
 
     async def disconnect(self):
-        for subscriber in self.subscribers.values():
-            await subscriber.close()
+        self.reconnecting = True  # Prevent reconnection attempts during shutdown
+
+        # Cancel all pending tasks
+        for task in self.tasks:
+            if not task.done() and not task.cancelled():
+                task.cancel()
+
+        # Close all active subscribers
+        for subscriber in list(self.subscribers.values()):
+            try:
+                await subscriber.close()
+            except Exception as e:
+                logging.error(f"Error closing subscriber: {e}")
+
+        self.subscribers.clear()
+        self.tasks.clear()
         logging.info("Disconnected from all connections.")
 
 
 class MainWindow(QWidget):
-    def __init__(self, client: GUIClient):
+    def __init__(self):
         super().__init__()
-        self.client = client
-        self.client.set_main_window(self)  # Set this window for direct updates
+        self.client = GUIClient()
+        self.client.set_main_window(self)
 
-        # Add Active tracking
-        self.last_update_time = None
+        # Initialize with current time instead of None
+        self.last_update_time = time.time()
 
         self.setWindowTitle("ARTIQ GUI")
         self.setGeometry(100, 100, 550, 400)
@@ -314,7 +369,7 @@ class MainWindow(QWidget):
         layout.addWidget(dlc_outer_frame)
 
         # Create the matplotlib canvas
-        self.canvas = MatplotlibCanvas(self, width=8, height=8)
+        self.canvas = FigureCanvas(Figure(figsize=(7, 8)))
 
         # Create a single bottom bar layout
         bottom_bar_layout = QHBoxLayout()
@@ -372,6 +427,7 @@ class MainWindow(QWidget):
         self.elapsed_time_label.setText(f"↻ {time_str}")
 
     def update_datasets(self, mod):
+
         if mod["action"] != "delitem":
             self.update_elapsed_time(True)
         if (
@@ -394,15 +450,44 @@ class MainWindow(QWidget):
             magnification=0.5,  # Set default magnification
         )
 
-        self.canvas.fig.clear()
-        _, axes = self.absimg.plot(fig=self.canvas.fig)
+        self.canvas.figure.clear()
+        _, axes = self.absimg.plot(fig=self.canvas.figure)
         self.canvas.axes = axes
         self.canvas.draw()
+
+        # Update status - atom number, r-squared, sigma_x, sigma_y,
+        # expansion time
+        atom_number = self.absimg.atom_number
+        r_squared = self.absimg.fit.summary()["rsquared"]
+        sigmax = self.absimg.fit.best_values["sx"] * self.absimg.physical_scale * 1e3
+        sigmay = self.absimg.fit.best_values["sy"] * self.absimg.physical_scale * 1e3
+        expansion_time = self.client.datasets.get("Images.absorption.expansion_time")[1]
 
         if not self.save_button.isEnabled():
             self.save_button.setEnabled(True)
             self.layout().addWidget(self.canvas)
+            self.toolbar = NavigationToolbar(self.canvas, self)
+            self.layout().addWidget(self.toolbar)
+            # Add status label at the bottom
+            self.status_label = QLabel("Waiting for data...")
+            self.status_label.setAlignment(Qt.AlignCenter)
+            self.status_label.setStyleSheet("font-size: 10pt;")
+            self.status_label.setWordWrap(True)
+            self.layout().addWidget(self.status_label)
             self.resize(self.width(), self.height() + 500)
+
+        self.status_label.setText(
+            f"""<div style="text-align:center; margin:0; padding:0">
+                <span style="font-weight:bold">Atom number:</span>\
+                {atom_number:.2e} &nbsp;
+                <span style="font-weight:bold">Expansion time:</span>\
+                {expansion_time*1e3:.2f} ms &nbsp;
+                <span style="font-weight:bold">Sigma:</span>\
+                ({sigmax:.2f}, {sigmay:.2f}) mm<br>
+                <span style="color:#CCC"><b>R-squared:</b>\
+                {r_squared:.2f}</span>
+            </div>"""
+        )
 
     def update_schedule(self, mod):
         self.update_elapsed_time(True)
@@ -547,8 +632,8 @@ class MainWindow(QWidget):
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
 
-    app = QApplication(sys.argv)
-    app.setStyle("Fusion")
+    APP = QApplication(sys.argv)
+    APP.setStyle("Fusion")
 
     light_palette = QPalette()
     light_palette.setColor(QPalette.Window, QColor(240, 240, 240))
@@ -564,18 +649,22 @@ if __name__ == "__main__":
     light_palette.setColor(QPalette.Link, QColor(0, 0, 255))
     light_palette.setColor(QPalette.Highlight, QColor(76, 163, 224))
     light_palette.setColor(QPalette.HighlightedText, QColor(255, 255, 255))
-    app.setPalette(light_palette)
+    APP.setPalette(light_palette)
 
-    loop = QEventLoop(app)
+    loop = QEventLoop(APP)
     asyncio.set_event_loop(loop)
 
-    server = "137.222.69.28"
-
-    client = GUIClient(server)
-    main_window = MainWindow(client)
-
-    loop.create_task(client.connect())
-    app.aboutToQuit.connect(lambda: loop.create_task(client.disconnect()))
+    main_window = MainWindow()
 
     main_window.show()
-    loop.run_forever()
+    try:
+        loop.run_forever()
+    except KeyboardInterrupt:
+        logging.info("Keyboard interrupt received. Shutting down...")
+    finally:
+        # Ensure clean shutdown
+        pending = asyncio.all_tasks(loop)
+        for task in pending:
+            task.cancel()
+        loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+        loop.close()

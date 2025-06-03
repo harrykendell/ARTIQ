@@ -1,6 +1,8 @@
 import functools
-import logging
+import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.gridspec import GridSpec
+from matplotlib.ticker import FuncFormatter
 from lmfit import Model
 from scipy.ndimage import gaussian_filter
 
@@ -157,7 +159,7 @@ class AbsImage:
         optical_density = self.optical_density[self.sigma_mask]
 
         if np.max(optical_density) < 0.2:
-            logging.warning("There don't seem to be any atoms in the image")
+            # logging.warning("There don't seem to be any atoms in the image")
             return -np.inf
 
         return (
@@ -203,7 +205,7 @@ class AbsImage:
     @functools.cached_property
     def fit(self):
         """Fits a 2D Gaussian against the absorption."""
-        logging.info("Running 2D fit...")
+        # logging.info("Running 2D fit...")
 
         y_mg, x_mg = self.xy
         model = Model(ravel(gaussian_2D), independent_vars=["x", "y"])
@@ -302,37 +304,42 @@ class AbsImage:
             magnification=0.5,
         )
 
-    def plot(self, fig=None, axes=None):
+    def plot(self, fig=None):
         """
-        Plots raw images, optical density, best fit, and fit stats using a clean layout.
+        Plots raw images, optical density, best fit, and fit stats using a compact layout.
         """
-        import matplotlib.pyplot as plt
-        import numpy as np
-        from matplotlib.gridspec import GridSpec
-        from matplotlib.ticker import FuncFormatter
-
         if fig is None:
-            fig = plt.figure(figsize=(6, 6), constrained_layout=True)
+            fig = plt.figure(figsize=(8, 8))
 
-        if axes is None:
-            gs = GridSpec(2, 3, figure=fig, height_ratios=[1, 3])
+        # Clear the figure to start fresh
+        fig.clf()
 
-            raw_axes = [
-                fig.add_subplot(gs[0, 0:1]),
-                fig.add_subplot(gs[0, 1:2]),
-                fig.add_subplot(gs[0, 2:3]),
-            ]
-            od_ax = fig.add_subplot(gs[1, 0:3])
+        # Common GridSpec parameters
+        grid_params = {
+            "figure": fig,
+            "width_ratios": [1, 1, 1, 0.2],
+            "left": 0.1,
+            "right": 0.85,
+            "wspace": 0.05,
+        }
 
-            axes = raw_axes + [od_ax]
-            for ax in axes:
-                ax.set_facecolor("none")
-        else:
-            raw_axes, od_ax = axes[:3], axes[3]
+        # Create top and bottom grids with specific vertical spacing
+        gs_top = GridSpec(1, 4, top=0.95, bottom=0.75, **grid_params)  # For raw images
+        gs_bottom = GridSpec(1, 4, top=0.68, bottom=0.12, **grid_params)  # For OD plot
+
+        # Create all axes in a more compact way
+        raw_axes = [fig.add_subplot(gs_top[0, i]) for i in range(3)]
+        cax_raw = fig.add_subplot(gs_top[0, 3])
+        od_ax = fig.add_subplot(gs_bottom[0, 0:3])
+        cax_od = fig.add_subplot(gs_bottom[0, 3])
+
+        # Group all content axes for setting properties
+        axes = raw_axes + [od_ax]
+        for ax in axes:
+            ax.set_facecolor("none")
 
         # Prepare data
         raw_images = [self.data_image, self.ref_image, self.bg_image]
-        raw_titles = ["Atoms", "Reference", "Background"]
         input_min, input_max = min(np.min(img) for img in raw_images), max(
             np.max(img) for img in raw_images
         )
@@ -348,22 +355,30 @@ class AbsImage:
                 aspect="equal",
             )
             ax.set(xticks=[], yticks=[], xlabel="", ylabel="")
-            ax.set_title(title, fontweight="bold")
+            ax.set_title(title, fontweight="bold", pad=2)
             return im
 
         # Plot raw images
-        for ax, img, title in zip(raw_axes, raw_images, raw_titles):
+        for ax, img, title in zip(raw_axes, raw_images, ["Atoms", "Reference", "Background"]):
             im = plot_image(ax, img, title)
-
-        # Colorbar for raw images
-        fig.colorbar(
+        cb_raw = fig.colorbar(
             im,
-            ax=raw_axes,
+            cax=cax_raw,
             orientation="vertical",
-            fraction=0.046,
-            pad=0.02,
             label="Electron Count",
         )
+        cb_raw.ax.tick_params(labelsize=8)
+        cb_raw.ax.yaxis.set_label_coords(3, 0.5)
+        e_count_below_max = [v * 1e3 for v in range(0, 16, 5) if v * 1.2e3 <= input_max]
+        cb_raw.set_ticks(sorted(set(e_count_below_max + [input_max])))
+
+        # Get tick labels and make the input_max label red if it saturated
+        tick_labels = cb_raw.ax.get_yticklabels()
+        for label in tick_labels:
+            if float(label.get_text()) > 15999:  # 16k is the saturation point
+                label.set_color("red")
+                label.set_fontweight("bold")
+        cb_raw.ax.set_yticklabels(tick_labels)
 
         # Real-space extent
         scale_mm = self.physical_scale * 1e3
@@ -395,10 +410,15 @@ class AbsImage:
 
         # OD plot
         im1 = od_ax.imshow(self.optical_density, **plot_params)
-        od_ax.set(xlabel="x position (mm)", ylabel="y position (mm)")
+        od_ax.set(xlabel="Horizontal position (mm)", ylabel="Vertical position (mm)")
+        od_ax.xaxis.labelpad = 2
+        od_ax.yaxis.labelpad = 2
+        od_ax.tick_params(axis="both", which="major", labelsize=8)
+
         od_ax.set_title(
             "Optical Density",
             fontweight="bold",
+            pad=2,
         )
         od_ax.contour(
             x_contour,
@@ -417,36 +437,53 @@ class AbsImage:
             colors="green",
             linewidths=1,
         )
-        od_ax.scatter(*fit_center_mm, color="green", label="Fitted Gaussian")
-        od_ax.scatter(*centroid_mm, color="orange", label="Centroid")
-        od_ax.scatter(*peak_mm, color="blue", label="Peak")
+        od_ax.scatter(*fit_center_mm, color="green", s=25)
+        od_ax.scatter(*centroid_mm, color="orange", s=25)
+        od_ax.scatter(*peak_mm, color="blue", s=25)
         od_ax.xaxis.set_major_formatter(formatter)
         od_ax.yaxis.set_major_formatter(formatter)
         od_ax.set_xlim(extent[0], extent[1])
         od_ax.set_ylim(extent[2], extent[3])
+
         from matplotlib.lines import Line2D
 
         legend_elements = [
-            Line2D([0], [0], color="red", lw=1, label="2σ Atom mask"),
-            plt.scatter([], [], color="green", label="Fitted Gaussian"),
-            plt.scatter([], [], color="orange", label="Centroid"),
-            plt.scatter([], [], color="blue", label="Peak"),
+            Line2D([0], [0], color="red", lw=1, label="2σ Atom mask")
+        ] + [
+            Line2D(
+                [0],
+                [0],
+                marker="o",
+                color="w",
+                markerfacecolor=color,
+                markersize=5,
+                label=label,
+            )
+            for color, label in [
+                ("green", "Fitted Gaussian"),
+                ("orange", "Centroid"),
+                ("blue", "Peak"),
+            ]
         ]
 
-        # Create legend with manual entries
-        od_ax.legend(handles=legend_elements, loc="best")
-
-        # OD/fit colorbar
-        fig.colorbar(
-            im1,
-            ax=[od_ax],
-            orientation="vertical",
-            fraction=0.046,
-            pad=0.02,
-            label="Optical Density",
+        od_ax.legend(
+            handles=legend_elements,
+            loc="upper right",
+            fontsize=8,
+            handlelength=1.2,
+            handletextpad=0.5,
         )
 
-        if fig is not None and axes is None:
-            plt.show()
+        cb_od = fig.colorbar(
+            im1,
+            cax=cax_od,
+            orientation="vertical",
+            label="Optical Density",
+        )
+        cb_od.ax.tick_params(labelsize=8)
+        cb_od.ax.yaxis.set_label_coords(3, 0.5)
 
-        return fig, axes
+        # For Qt integration, draw once to calculate sizes
+        fig.canvas.draw_idle()
+
+        return fig, axes + [cax_raw, cax_od]
