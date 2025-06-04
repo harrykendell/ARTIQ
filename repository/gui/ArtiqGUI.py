@@ -18,6 +18,7 @@ from PyQt5.QtWidgets import (
     QPushButton,
     QVBoxLayout,
     QWidget,
+    QSizePolicy,
 )
 from qasync import QEventLoop
 from sipyco.sync_struct import Subscriber
@@ -25,6 +26,12 @@ from sipyco.sync_struct import Subscriber
 from matplotlib.backends.backend_qtagg import FigureCanvas
 from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
+
+from toptica.lasersdk.utils.dlcpro import (
+    extract_float_arrays,
+    extract_lock_points,
+    extract_lock_state,
+)
 
 sys.path.append(__file__.split("artiq")[0] + "artiq")
 from repository.imaging.processor import AbsImage  # noqa: E402
@@ -87,7 +94,6 @@ class GUIClient:
         self.port_notify = port_notify
         self.subscribers = {}
         self.main_window = None
-        self.reconnecting = False
         self.tasks = []
 
         # Initialize data dictionaries
@@ -97,36 +103,32 @@ class GUIClient:
         self.booster = dict()
 
         loop = asyncio.get_event_loop()
-        task = loop.create_task(self.connect())
-        self.tasks.append(task)
-        APP.aboutToQuit.connect(lambda: loop.create_task(self.disconnect()))
+        loop.run_until_complete(self.connect())
+        logging.info("Successfully connected to all services")
 
     def set_main_window(self, window):
         """Set the main window for direct updates."""
         self.main_window = window
 
     async def connect(self):
-        if self.reconnecting:
-            logging.info("Already reconnecting, skipping reconnect attempt")
-            return
-
-        self.reconnecting = True
         loop = asyncio.get_event_loop()
 
-        task1 = loop.create_task(
-            self.connect_subscriber("datasets", self.datasets, self.port_notify)
+        self.tasks.append(
+            loop.create_task(
+                self.connect_subscriber("datasets", self.datasets, self.port_notify)
+            )
         )
-        task2 = loop.create_task(
-            self.connect_subscriber("schedule", self.schedule, self.port_notify)
+        self.tasks.append(
+            loop.create_task(
+                self.connect_subscriber("schedule", self.schedule, self.port_notify)
+            )
         )
-        task3 = loop.create_task(
-            self.connect_subscriber("DLCProState", self.dlcpro, 3271)
+        self.tasks.append(
+            loop.create_task(self.connect_subscriber("DLCProState", self.dlcpro, 3271))
         )
-        task4 = loop.create_task(self.connect_booster())
-
-        self.tasks.extend([task1, task2, task3, task4])
+        self.tasks.append(loop.create_task(self.connect_booster()))
+        asyncio.gather(*self.tasks, return_exceptions=True)
         logging.info("Connecting to services...")
-        self.reconnecting = False
 
     async def connect_subscriber(self, name, db: dict, port=None, server=None):
         port = self.port_notify if port is None else port
@@ -145,13 +147,6 @@ class GUIClient:
 
         def disconnect_cb(*args):
             logging.info(f"Disconnected from {name} at {server}:{port}")
-            if not self.reconnecting and name in self.subscribers:
-                del self.subscribers[name]
-                loop = asyncio.get_event_loop()
-                reconnect_task = loop.create_task(
-                    self.connect_subscriber(name, db, port, server)
-                )
-                self.tasks.append(reconnect_task)
 
         subscriber = Subscriber(name, _create, _update, disconnect_cb)
         try:
@@ -160,15 +155,10 @@ class GUIClient:
             logging.error(f"Failed to connect to Sub: {name} at {server}:{port}")
             return
         self.subscribers[name] = subscriber
-        logging.info(f"Connected to Sub: {name} at {server}:{port}")
 
     async def connect_booster(self):
-        def reconnect_booster(*_):
-            logging.info("Booster disconnected, reconnecting...")
-            if not self.reconnecting:
-                loop = asyncio.get_event_loop()
-                reconnect_task = loop.create_task(self.connect_booster())
-                self.tasks.append(reconnect_task)
+        def disconnected_booster(*_):
+            logging.info("Booster disconnected")
 
         def handle_booster_message(message):
             logging.debug(f"New Booster message: {message.payload.decode()}")
@@ -183,7 +173,7 @@ class GUIClient:
             async with aiomqtt.Client(self.server) as client:
                 client._on_message = handle_booster_message
 
-                client._on_disconnect = reconnect_booster
+                client._on_disconnect = disconnected_booster
                 await asyncio.wait_for(
                     client.subscribe("dt/sinara/booster/fc-0f-e7-23-77-30/telemetry/#"),
                     5,
@@ -192,27 +182,8 @@ class GUIClient:
                     handle_booster_message(message)
 
         except (aiomqtt.exceptions.MqttError, asyncio.TimeoutError):
-            reconnect_booster()
+            disconnected_booster()
         logging.info("Connected to Booster")
-
-    async def disconnect(self):
-        self.reconnecting = True  # Prevent reconnection attempts during shutdown
-
-        # Cancel all pending tasks
-        for task in self.tasks:
-            if not task.done() and not task.cancelled():
-                task.cancel()
-
-        # Close all active subscribers
-        for subscriber in list(self.subscribers.values()):
-            try:
-                await subscriber.close()
-            except Exception as e:
-                logging.error(f"Error closing subscriber: {e}")
-
-        self.subscribers.clear()
-        self.tasks.clear()
-        logging.info("Disconnected from all connections.")
 
 
 class MainWindow(QWidget):
@@ -247,7 +218,7 @@ class MainWindow(QWidget):
 
             channel_layout = QVBoxLayout()
             channel_layout.setSpacing(0)
-            channel_layout.setContentsMargins(2, 2, 2, 10)
+            channel_layout.setContentsMargins(2, 2, 2, 2)
 
             header_layout = QGridLayout()
             header_layout.setSpacing(0)
@@ -315,7 +286,7 @@ class MainWindow(QWidget):
 
             laser_layout = QVBoxLayout()
             laser_layout.setSpacing(0)
-            laser_layout.setContentsMargins(2, 2, 2, 10)
+            laser_layout.setContentsMargins(2, 2, 2, 2)
 
             header_layout = QGridLayout()
             header_layout.setSpacing(0)
@@ -332,7 +303,7 @@ class MainWindow(QWidget):
             laser_layout.addWidget(header_widget)
 
             current_layout = QHBoxLayout()
-            current_layout.setSpacing(5)
+            current_layout.setSpacing(0)
             dl_current_label = QLabel("Laser: --- mA")
             amp_current_label = QLabel("Amp: --- mA")
 
@@ -343,6 +314,30 @@ class MainWindow(QWidget):
             current_widget.setLayout(current_layout)
             laser_layout.addWidget(current_widget)
 
+            # Add spectrum plot for each laser
+            spectrum_fig = Figure(figsize=(4, 2), dpi=100)
+            spectrum_fig.patch.set_alpha(0)
+            # Remove figure padding completely
+            spectrum_fig.subplots_adjust(
+                left=0, right=1, top=1, bottom=0, wspace=0, hspace=0
+            )
+
+            spectrum_canvas = FigureCanvas(spectrum_fig)
+            spectrum_axes = spectrum_fig.add_subplot(111)
+            spectrum_axes.patch.set_alpha(0)
+
+            # Fill the entire axes area
+            spectrum_axes.set_position([0, 0, 1, 1])
+
+            # Allow expansion in both directions
+            spectrum_canvas.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+
+            # Set a minimum height, but allow expansion
+            spectrum_canvas.setMinimumHeight(80)
+
+            # Add to layout with stretch factor
+            laser_layout.addWidget(spectrum_canvas, 1)
+
             frame.setLayout(laser_layout)
             self.dlc_frames.append(
                 {
@@ -352,6 +347,8 @@ class MainWindow(QWidget):
                     "dl_current": dl_current_label,
                     "amp_current": amp_current_label,
                     "lock": lock_label,
+                    "spectrum_canvas": spectrum_canvas,
+                    "spectrum_axes": spectrum_axes,
                 }
             )
 
@@ -369,7 +366,8 @@ class MainWindow(QWidget):
         layout.addWidget(dlc_outer_frame)
 
         # Create the matplotlib canvas
-        self.canvas = FigureCanvas(Figure(figsize=(7, 8)))
+        fig = Figure(figsize=(7, 8))
+        self.canvas = FigureCanvas(fig)
 
         # Create a single bottom bar layout
         bottom_bar_layout = QHBoxLayout()
@@ -427,14 +425,9 @@ class MainWindow(QWidget):
         self.elapsed_time_label.setText(f"↻ {time_str}")
 
     def update_datasets(self, mod):
-
-        if mod["action"] != "delitem":
-            self.update_elapsed_time(True)
-        if (
-            mod["action"] != "init"
-            and "Images.absorption" not in f"{mod['path']}.{mod['key']}"
-        ):
+        if "Images.absorption" not in str(mod):
             return
+        self.update_elapsed_time(True)
 
         # if absorption images changed then redo AbsImage
         tof = self.client.datasets.get("Images.absorption.TOF")
@@ -545,6 +538,106 @@ class MainWindow(QWidget):
                 amp_current_text=f"Amp: {amp_current:.1f} mA",
                 lock_state=DeviceState.LOCKED if lock_enabled else DeviceState.UNLOCKED,
             )
+
+            # Get axes and clear previous plot
+            canvas = self.dlc_frames[i - 1]["spectrum_canvas"]
+            fig = canvas.figure
+            axes = self.dlc_frames[i - 1]["spectrum_axes"]
+            axes.clear()
+            # Get the spectrum data and plot it
+            if self.client.dlcpro.get(f"{laser_prefix}scope:channel1:signal"):
+                scope_data = extract_float_arrays(
+                    "xyY", self.client.dlcpro.get(f"{laser_prefix}scope:data")
+                )
+                raw_lock_candidates = self.client.dlcpro.get(
+                    f"{laser_prefix}dl:lock:candidates"
+                )
+                lock_candidates = extract_lock_points("clt", raw_lock_candidates)
+                lock_state = extract_lock_state(raw_lock_candidates)
+
+                # Plot first channel (red)
+                axes.plot(
+                    scope_data["x"],
+                    scope_data["y"],
+                    linestyle="solid",
+                    color="red",
+                    zorder=1,
+                    linewidth=1.0,
+                )
+
+                # Plot lock candidates if available
+                if "c" in lock_candidates:
+                    axes.plot(
+                        lock_candidates["c"]["x"],
+                        lock_candidates["c"]["y"],
+                        linestyle="None",
+                        marker="o",
+                        markersize=4.0,
+                        color="grey",
+                        zorder=2,
+                    )
+
+                # Plot selected lock point if available
+                if "l" in lock_candidates and lock_state == 3:  # 'Selected'
+                    axes.plot(
+                        lock_candidates["l"]["x"],
+                        lock_candidates["l"]["y"],
+                        linestyle="None",
+                        marker="o",
+                        markersize=6.0,
+                        color="red",
+                        markerfacecolor="none",
+                        zorder=3,
+                    )
+
+                # Plot lock tracking position if available
+                if "t" in lock_candidates:
+                    axes.plot(
+                        lock_candidates["t"]["x"],
+                        lock_candidates["t"]["y"],
+                        linestyle="None",
+                        marker="o",
+                        markersize=8.0,
+                        color="red",
+                        markerfacecolor="none",
+                        zorder=3,
+                    )
+
+                # Plot background if available
+                # if lock_state == 5:
+                background_data = extract_float_arrays(
+                    "xy",
+                    self.client.dlcpro.get(f"{laser_prefix}dl:lock:background_trace"),
+                )
+                axes.plot(
+                    background_data["x"],
+                    background_data["y"],
+                    linestyle="solid",
+                    color="k",
+                    zorder=0,
+                    linewidth=1.0,
+                )
+
+            # Make sure background is transparent
+            axes.patch.set_alpha(0)
+
+            # Remove all margins and padding
+            axes.margins(0, 0)
+
+            # Remove spines and set minimal axis styling
+            for spine in axes.spines.values():
+                spine.set_color("#aaaaaa")
+                spine.set_linewidth(1.0)
+
+            # Remove ticks to save space
+            axes.set_xticks([])
+            axes.set_yticks([])
+
+            # Ensure plot fills the entire figure
+            fig.subplots_adjust(left=0, right=1, top=1, bottom=0)
+
+            # Update the canvas
+            canvas.draw_idle()
 
     def update_booster(self, channel):
         LOW_POWER_THRESHOLD = 5.0

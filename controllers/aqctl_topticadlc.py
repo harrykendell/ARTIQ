@@ -68,11 +68,21 @@ def main():
             "laser1:dl:cc:current-set": dev._dlcpro.laser1.dl.cc.current_set.get(),
             "laser1:amp:cc:current-set": dev._dlcpro.laser1.amp.cc.current_set.get(),
             "laser1:dl:lock:lock-enabled": dev._dlcpro.laser1.dl.lock.lock_enabled.get(),
+            "laser1:scan:enabled": dev._dlcpro.laser1.scan.enabled.get(),
+            "laser1:scope:data": dev._dlcpro.laser1.scope.data.get(),
+            "laser1:scope:channel1:signal": dev._dlcpro.laser1.scope.channel1.signal.get(),
+            "laser1:dl:lock:candidates": dev._dlcpro.laser1.dl.lock.candidates.get(),
+            "laser1:dl:lock:background_trace": dev._dlcpro.laser1.dl.lock.background_trace.get(),
             "laser2:label": dev._dlcpro.laser2.label.get(),
             "laser2:enabled": dev._dlcpro.laser2.enabled.get(),
             "laser2:dl:cc:current-set": dev._dlcpro.laser2.dl.cc.current_set.get(),
             "laser2:amp:cc:current-set": dev._dlcpro.laser2.amp.cc.current_set.get(),
             "laser2:dl:lock:lock-enabled": dev._dlcpro.laser2.dl.lock.lock_enabled.get(),
+            "laser2:scan:enabled": dev._dlcpro.laser2.scan.enabled.get(),
+            "laser2:scope:data": dev._dlcpro.laser2.scope.data.get(),
+            "laser2:scope:channel1:signal": dev._dlcpro.laser2.scope.channel1.signal.get(),
+            "laser2:dl:lock:candidates": dev._dlcpro.laser2.dl.lock.candidates.get(),
+            "laser2:dl:lock:background_trace": dev._dlcpro.laser2.dl.lock.background_trace.get(),
         }
     )
 
