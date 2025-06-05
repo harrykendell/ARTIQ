@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import matplotlib
+import matplotlib  # noqa: F401 # weirdness with import order in PyQt5
 import PyQt5  # noqa: F401 # make sure pyqtgraph imports Qt5
 from PyQt5 import QtCore, QtWidgets
 
@@ -115,7 +115,9 @@ class AbsorptionView(QtWidgets.QWidget):
         if title is not None:
             self.setWindowTitle(title)
 
-        if mods[0]["action"] == "setitem" and not mods[0]["key"].startswith("Images.absorption"):
+        if mods[0]["action"] == "setitem" and not mods[0]["key"].startswith(
+            "Images.absorption"
+        ):
             return
         # Get data from the datasets
         try:
@@ -174,6 +176,7 @@ class AbsorptionView(QtWidgets.QWidget):
 
                     def bold(text):
                         return f"<span style='font-weight:bold'>{text}</span>"
+
                     self.status_label.setText(
                         f"""<div style="text-align:center; margin:0; padding:0">
                           {bold("Atom number:")} {atom_number:.2e} &nbsp;

@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
+from artiq.experiment import EnvExperiment, kernel
+from artiq.language import delay, now_mu, us, ms, parallel, sequential
+from artiq.master.databases import DeviceDB
+from artiq.master.worker_db import DeviceManager
+
 import sys
 
 sys.path.append(
     __file__.split("repository")[0] + "repository"
 )  # link to repository root
-
-from utils.wait_for_enter import is_enter_pressed
-
-from artiq.experiment import *
-from artiq.master.databases import DeviceDB
-from artiq.master.worker_db import DeviceManager
+from utils.wait_for_enter import is_enter_pressed  # noqa: E402
 
 
 def chunker(seq, size):
@@ -57,7 +57,7 @@ class TTLTester(EnvExperiment):
             t = now_mu() - self.core.seconds_to_mu(0.2)
             while self.core.get_rtio_counter_mu() < t:
                 pass
-            for i in range(3):
+            for _ in range(3):
                 led.pulse(100 * ms)
                 delay(100 * ms)
 

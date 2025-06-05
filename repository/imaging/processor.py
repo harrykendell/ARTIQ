@@ -1,4 +1,6 @@
 import functools
+import warnings
+
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.gridspec import GridSpec
@@ -7,6 +9,8 @@ from lmfit import Model
 from scipy.ndimage import gaussian_filter
 
 from artiq.language.units import MHz
+
+warnings.filterwarnings("ignore", message="Using UFloat objects with std_dev==0")
 
 
 def gaussian_2D(x, y, A, x0, y0, sx, sy, theta=0, z0=0):
@@ -359,7 +363,9 @@ class AbsImage:
             return im
 
         # Plot raw images
-        for ax, img, title in zip(raw_axes, raw_images, ["Atoms", "Reference", "Background"]):
+        for ax, img, title in zip(
+            raw_axes, raw_images, ["Atoms", "Reference", "Background"]
+        ):
             im = plot_image(ax, img, title)
         cb_raw = fig.colorbar(
             im,

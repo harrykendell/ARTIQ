@@ -131,7 +131,7 @@ class SingleSUServoReadingFrag(ExpFragment):
 
         self.core.break_realtime()
         while True:
-            for i in range(1000):
+            for _ in range(1000):
                 v = self.adc_reader.read_adc() - self.beam.photodiode_offset
                 delay(self.waittime.get())
                 self.update_data(v)

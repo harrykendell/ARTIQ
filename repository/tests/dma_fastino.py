@@ -2,9 +2,9 @@ from artiq.coredevice.core import Core
 from artiq.coredevice.dma import CoreDMA
 from artiq.coredevice.fastino import Fastino
 from artiq.experiment import EnvExperiment, kernel
-from artiq.language.core import delay, delay_mu, now_mu
+from artiq.language.core import delay
 from artiq.language.environment import NumberValue
-from artiq.language.units import ms, s, us
+from artiq.language.units import ms
 
 
 class DMA_fastino(EnvExperiment):

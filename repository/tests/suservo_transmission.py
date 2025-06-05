@@ -2,8 +2,8 @@ from repository.fragments.suservo_frag import SUServoFrag
 from models.devices import SUServoedBeam
 
 from artiq.coredevice.core import Core
-from artiq.language import delay, kernel, now_mu, parallel
-from artiq.language.units import ms, s
+from artiq.language import delay, kernel
+from artiq.language.units import ms
 from ndscan.experiment import (
     EnumerationValue,
     ExpFragment,
@@ -73,13 +73,13 @@ class DoublePassTransmissionFrag(ExpFragment):
         self.core.break_realtime()
 
         self.suservo.set_dds(
-            frequency=self.config.frequency+self.detuning.get(),
+            frequency=self.config.frequency + self.detuning.get(),
             profile=self.suservo.suservo_profile,
             offset=self.suservo.setpoint_to_offset(self.config.setpoint),
         )
 
         # ensure its settled
-        delay(10*ms)
+        delay(10 * ms)
         volts = self.sampler.read_adc()
         # self.voltage.push(self.sampler.read_adc())
         self.voltage.push(volts)

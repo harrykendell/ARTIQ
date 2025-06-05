@@ -5,7 +5,6 @@ from artiq.language import delay, kernel, now_mu, parallel
 from artiq.language.units import ms, s
 from ndscan.experiment import (
     ExpFragment,
-    FloatParam,
     IntParam,
     OnlineFit,
     make_fragment_scan_exp,

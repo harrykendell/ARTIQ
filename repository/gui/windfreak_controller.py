@@ -118,7 +118,7 @@ class SynthController(QWidget):
             )
 
             # Channel label - in bold
-            label = QLabel(f'<b>Channel {["A","B"][ch]}</b>')
+            label = QLabel(f'<b>Channel {["A", "B"][ch]}</b>')
 
             topline.addWidget(enable_checkbox)
             topline.addWidget(label)
@@ -130,7 +130,7 @@ class SynthController(QWidget):
 
             # Frequency controls
             def set_f(val, channel=self.synth[ch]):
-                setattr(channel, "frequency", val * 1e6)
+                channel.frequency = val * 1e6
 
             def get_f(channel=self.synth[ch]):
                 return channel.frequency / 1e6
@@ -148,7 +148,7 @@ class SynthController(QWidget):
 
             # Power control
             def set_p(val, channel=self.synth[ch]):
-                setattr(channel, "power", val)
+                channel.power = val
 
             def get_p(channel=self.synth[ch]):
                 return channel.power

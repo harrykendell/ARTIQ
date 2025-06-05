@@ -108,9 +108,7 @@ if __name__ == "__main__":
 
             section.setContentLayout(anyLayout)
 
-            self.place_holder = (
-                wd.QWidget()
-            )
+            self.place_holder = wd.QWidget()
             mainLayout = wd.QHBoxLayout(self.place_holder)
             mainLayout.addWidget(section)
             mainLayout.addStretch(1)

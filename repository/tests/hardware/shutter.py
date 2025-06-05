@@ -1,6 +1,7 @@
 from utils.wait_for_enter import is_enter_pressed
 
-from artiq.experiment import *
+from artiq.experiment import EnvExperiment, kernel
+from artiq.language import delay, delay_mu, now_mu, ms
 
 
 class Shutter(EnvExperiment):

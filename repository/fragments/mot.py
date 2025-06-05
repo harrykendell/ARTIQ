@@ -336,7 +336,7 @@ class MOT(Fragment):
         # Lasers set to defaults and turned off
         self.beam_resetter.turn_on_all(light_enabled=False)
         self.core.break_realtime()
-        delay(100*ms)  # we're hitting RTIO Underflows here?
+        delay(100 * ms)  # we're hitting RTIO Underflows here?
         self.lattice_beams.turn_beams_on()
         # EOM set to defaults
         self.eom.set_to_defaults()

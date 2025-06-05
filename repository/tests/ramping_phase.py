@@ -2,11 +2,11 @@ import logging
 
 from artiq.coredevice.core import Core
 from artiq.language import delay, kernel
-from artiq.language.units import MHz, ms, s
+from artiq.language.units import ms, s
 from ndscan.experiment import ExpFragment
 from ndscan.experiment.entry_point import make_fragment_scan_exp
 from repository.fragments.ramp import Ramp, default
-from repository.models.devices import Eom, SUServoedBeam, VDrivenSupply
+from repository.models.devices import Eom, SUServoedBeam, VDrivenSupply  # noqa: F401
 
 logger = logging.getLogger(__name__)
 

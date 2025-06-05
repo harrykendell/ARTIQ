@@ -297,7 +297,8 @@ class SUServoFrag(Fragment):
             at_mu(self.core.get_rtio_counter_mu() + slack_mu)
 
         cpld = self.suservo_channel.dds.cpld  # type: CPLD
-        # TODO: for some reason the `self.bus.read()` in  `cpld.get_att_mu() takes minutes to complete the first time but only in an ndscan scan???
+        # TODO: for some reason the `self.bus.read()` in  `cpld.get_att_mu()
+        # takes minutes to complete the first time but only in an ndscan scan???
         # cpld.get_att_mu()
 
         reg = 0
@@ -440,7 +441,7 @@ class SUServoFrag(Fragment):
     def set_channel_state(self, en_out: TBool, enable_iir: TBool):
         """
         Quickly enable / disable the RF switch and servo.
-        
+
         This method does not advance the timeline.
 
         Automatically sets the profile to the AION lab convention of the channel number.

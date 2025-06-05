@@ -33,6 +33,7 @@ from artiq.coredevice.core import Core
 from artiq.experiment import kernel, EnvExperiment, rpc
 from artiq.language import ms, BooleanValue
 
+
 class Switch(QWidget):
     def __init__(self, default: bool, turn_on, turn_off, on_text="ON", off_text="OFF"):
         super().__init__()

@@ -50,7 +50,7 @@ class ScientificSpin(QtWidgets.QDoubleSpinBox):
 
     def textFromValue(self, v):
         t = self._fmt.format(v)
-        t = re.sub(_exp_shorten, "e", t, 1)
+        t = re.sub(_exp_shorten, "e", string=t, count=1)
         return t
 
     def valueFromText(self, text):

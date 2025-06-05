@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 def make_set_beams_to_default(
-    suservo_beam_infos: List[SUServoedBeam] = [],
+    suservo_beam_infos: List[SUServoedBeam],
     name="",
     use_automatic_setup=False,
     use_automatic_turnon=False,

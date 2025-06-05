@@ -269,12 +269,7 @@ class ControllerManager(TaskObject):
                         await asyncio.wait_for(subscriber.receive_task, None)
                     finally:
                         await subscriber.close()
-                except (
-                    ConnectionAbortedError,
-                    ConnectionError,
-                    ConnectionRefusedError,
-                    ConnectionResetError,
-                ) as e:
+                except ConnectionError as e:
                     logger.warning(
                         "Connection to master failed (%s: %s)",
                         e.__class__.__name__,

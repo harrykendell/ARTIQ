@@ -1,8 +1,8 @@
 from artiq.coredevice.adf5356 import ADF5356
 from artiq.coredevice.almazny import AlmaznyLegacy
 from artiq.coredevice.core import Core
-from artiq.experiment import *
-from artiq.language import MHz, dB, delay, ms
+from artiq.experiment import EnvExperiment, kernel, NumberValue
+from artiq.language import MHz, delay, ms
 
 
 class TestMirny(EnvExperiment):

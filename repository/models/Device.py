@@ -153,8 +153,7 @@ class DEVICE:
                 # we will only deal with values that have changed
                 exec(
                     "from repository.models.devices import *;"
-                    " global duplicate_dev;duplicate_dev="
-                    + definition["definition"],
+                    " global duplicate_dev;duplicate_dev=" + definition["definition"],
                     globals(),
                     locals(),
                 )
@@ -204,8 +203,8 @@ class DEVICE:
             return new_def
 
         except Exception as e:
+            # logging.error(f"Could not save {self.name} back to file.\n{e}")
             raise e
-            logging.error(f"Could not save {getattr(self,'name')} back to file.\n{e}")
 
     def _format_field(self, field_name, old_value, new_value):
         """
@@ -242,8 +241,7 @@ class DEVICE:
             except Exception as e:
                 formatted_value = repr(new_value)
                 logging.warning(
-                    "Could not preserve units for"
-                    f" {getattr(self,'name')}.{field_name}.\n{e}"
+                    "Could not preserve units for" f" {self.name}.{field_name}.\n{e}"
                 )
         else:
             logging.warning(f"Defaulted to repr for {field_name}:  {type(new_value)}")

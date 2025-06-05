@@ -14,9 +14,7 @@ class TelemetryWorker(QObject):
     async def listen(self):
         # we want to listen to updates of channel[0-7]/[state,input power, output power]
         async with aiomqtt.Client(self.server) as client:
-            await client.subscribe(
-                "dt/sinara/booster/fc-0f-e7-23-77-30/telemetry/#"
-            )
+            await client.subscribe("dt/sinara/booster/fc-0f-e7-23-77-30/telemetry/#")
             client._on_message = self.handle_message
             async for message in client.messages:
                 self.handle_message(message)
@@ -69,7 +67,7 @@ class TelemetryWorker(QObject):
             async with aiomqtt.Client(self.server) as client:
                 await client.publish(
                     f"dt/sinara/booster/fc-0f-e7-23-77-30/settings/channel/{ch}/state",
-                    f"\"{state}\"",
+                    f'"{state}"',
                 )
         except aiomqtt.exceptions.MqttError as e:
             logging.error(f"Booster: Setting state failed: {e}")
