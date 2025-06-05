@@ -150,7 +150,7 @@ class GUIClient:
         )
         self.tasks.append(loop.create_task(self.connect_booster()))
         asyncio.gather(*self.tasks, return_exceptions=True)
-        logging.info("Connecting to services...")
+        logging.debug("Connecting to services...")
 
     async def connect_subscriber(self, name, db: dict, port=None, server=None):
         port = self.port_notify if port is None else port
@@ -175,6 +175,8 @@ class GUIClient:
             return
 
         async def reconnect_subscriber():
+            if getattr(APP, "shutdown", False):
+                return
             # Get current backoff delay or initialize it
             current_delay = self.backoff_delays.get(name, self.initial_backoff_delay)
 
@@ -208,7 +210,7 @@ class GUIClient:
             )
 
         def disconnect_cb(*args):
-            logging.info(f"Disconnected from {name} at {server}:{port}")
+            logging.debug(f"Disconnected from {name} at {server}:{port}")
             self.connection_status[name] = "disconnected"
             if self.main_window:
                 self.main_window.update_connection_status()
@@ -223,7 +225,7 @@ class GUIClient:
             self.connection_status[name] = "connected"
             if self.main_window:
                 self.main_window.update_connection_status()
-            logging.info(f"Connected to {name} at {server}:{port}")
+            logging.debug(f"Connected to {name} at {server}:{port}")
         except asyncio.TimeoutError:
             logging.error(f"Failed to connect to Sub: {name} at {server}:{port}")
             self.connection_status[name] = "failed"
@@ -239,6 +241,8 @@ class GUIClient:
             self.main_window.update_connection_status()
 
         async def reconnect_booster():
+            if getattr(APP, "shutdown", False):
+                return
             # Get current backoff delay or initialize it
             current_delay = self.backoff_delays.get(
                 "booster", self.initial_backoff_delay
@@ -259,7 +263,7 @@ class GUIClient:
             )
             self.backoff_delays["booster"] = next_delay
 
-            logging.info("Attempting to reconnect to Booster")
+            logging.debug("Attempting to reconnect to Booster")
             self.connection_status["booster"] = "reconnecting"
             if self.main_window:
                 self.main_window.update_connection_status()
@@ -311,14 +315,14 @@ class GUIClient:
                 self.backoff_delays["booster"] = self.initial_backoff_delay
                 if self.main_window:
                     self.main_window.update_connection_status()
-                logging.info("Connected to Booster")
+                logging.debug("Connected to Booster")
 
                 async for message in client.messages:
                     handle_booster_message(message)
 
         except (aiomqtt.exceptions.MqttError, asyncio.TimeoutError):
             disconnected_booster()
-        logging.info("Connected to Booster")
+        logging.debug("Connected to Booster")
 
 
 class MainWindow(QWidget):
@@ -326,9 +330,6 @@ class MainWindow(QWidget):
         super().__init__()
         self.client = GUIClient()
         self.client.set_main_window(self)
-
-        # Initialize with current time instead of None
-        self.last_update_time = time.time()
 
         self.setWindowTitle("ARTIQ GUI")
         self.setGeometry(100, 100, 550, 400)
@@ -527,7 +528,9 @@ class MainWindow(QWidget):
         right_controls.addWidget(save_button)
 
         # Elapsed time
-        self.elapsed_time_label = QLabel("↻ ... ago")
+        self.elapsed_time_label = QLabel(
+            "<span style='font-size: 200%;'>📷</span> ... ago"
+        )
         self.elapsed_time_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         right_controls.addWidget(self.elapsed_time_label)
 
@@ -538,31 +541,31 @@ class MainWindow(QWidget):
 
         self.setLayout(layout)
 
-    def update_elapsed_time(self, reset=False):
+    def update_elapsed_time(self):
         """Update the elapsed time display"""
-        if reset:
-            self.last_update_time = time.time()
-        if self.last_update_time is None:
-            self.elapsed_time_label.setText("↻ ... ago")
+        now = time.time()
+
+        image_time = self.client.datasets.get("Images.absorption.timestamp")
+
+        if not image_time:
+            self.elapsed_time_label.setText("..m ..s ago")
             return
 
-        elapsed = int(time.time() - self.last_update_time)
+        elapsed = int(now - image_time[1])
         hours, remainder = divmod(elapsed, 3600)
         minutes, seconds = divmod(remainder, 60)
 
-        if hours > 0:
-            time_str = f"{hours}h {minutes}m ago"
-        elif minutes > 0:
-            time_str = f"{minutes}m {seconds}s ago"
-        else:
-            time_str = f"{seconds}s ago"
-
-        self.elapsed_time_label.setText(f"↻ {time_str}")
+        self.elapsed_time_label.setText(
+            f"{hours}h" * (hours > 0)
+            + f" {minutes}m" * (minutes > 0)
+            + f" {seconds}s" * (hours == 0)
+            + " ago"
+        )
 
     def update_datasets(self, mod):
         if "Images.absorption" not in str(mod):
             return
-        self.update_elapsed_time(True)
+        self.update_elapsed_time()
 
         # if absorption images changed then redo AbsImage
         tof = self.client.datasets.get("Images.absorption.TOF")
@@ -606,9 +609,9 @@ class MainWindow(QWidget):
 
         self.status_label.setText(
             f"""<div style="text-align:center; margin:0; padding:0">
-                <span style="font-weight:bold">Atom number:</span>\
+                <span style="font-weight:bold">Atoms:</span>\
                 {atom_number:.2e} &nbsp;
-                <span style="font-weight:bold">Expansion time:</span>\
+                <span style="font-weight:bold">Expansion:</span>\
                 {expansion_time*1e3:.2f} ms &nbsp;
                 <span style="font-weight:bold">Sigma:</span>\
                 ({sigmax:.2f}, {sigmay:.2f}) mm<br>
@@ -618,7 +621,7 @@ class MainWindow(QWidget):
         )
 
     def update_schedule(self, mod):
-        self.update_elapsed_time(True)
+        self.update_elapsed_time()
 
         text = "<b>Running:</b>\t---"
         for _key, value in self.client.schedule.items():
@@ -1005,6 +1008,8 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         logging.info("Keyboard interrupt received. Shutting down...")
     finally:
+        APP.shutdown = True
+        print("Shutting down ARTIQ GUI...")
         # Ensure clean shutdown
         pending = asyncio.all_tasks(loop)
         for task in pending:
