@@ -696,17 +696,17 @@ class MainWindow(QWidget):
 
     def _update_laser_display(self, laser_num):
         """Update a single laser's display elements."""
-        laser_prefix = f"laser{laser_num}:"
+        laser_prefix = f"laser{laser_num}"
 
         # Get laser data
-        laser_enabled = self.client.dlcpro.get(f"{laser_prefix}enabled", False)
+        laser_enabled = self.client.dlcpro.get(f"{laser_prefix}:enabled", False)
         emission_enabled = self.client.dlcpro.get("emission", False)
-        dl_current = self.client.dlcpro.get(f"{laser_prefix}dl:cc:current-set", 0.0)
-        amp_current = self.client.dlcpro.get(f"{laser_prefix}amp:cc:current-set", 0.0)
+        dl_current = self.client.dlcpro.get(f"{laser_prefix}:dl:cc:current_set", 0.0)
+        amp_current = self.client.dlcpro.get(f"{laser_prefix}:amp:cc:current_set", 0.0)
         lock_enabled = self.client.dlcpro.get(
-            f"{laser_prefix}dl:lock:lock-enabled", False
+            f"{laser_prefix}:dl:lock:lock_enabled", False
         )
-        label = self.client.dlcpro.get(f"{laser_prefix}label", f"Laser {laser_num}")
+        label = self.client.dlcpro.get(f"{laser_prefix}:label", f"Laser {laser_num}")
 
         # Update display
         self.dlc_frames[laser_num - 1]["name"].setText(f"<b>{label}</b>")
@@ -726,7 +726,7 @@ class MainWindow(QWidget):
 
     def _update_laser_plot(self, laser_num):
         """Update the laser spectrum plot."""
-        laser_prefix = f"laser{laser_num}:"
+        laser_prefix = f"laser{laser_num}"
         idx = laser_num - 1
 
         # Get canvas and axes
@@ -736,15 +736,15 @@ class MainWindow(QWidget):
         axes.clear()
 
         # Only update if signal is available
-        if not self.client.dlcpro.get(f"{laser_prefix}scope:channel1:signal"):
+        if not self.client.dlcpro.get(f"{laser_prefix}:scope:channel1:signal"):
             return
 
         # Get the spectrum data
         scope_data = extract_float_arrays(
-            "xyY", self.client.dlcpro.get(f"{laser_prefix}scope:data")
+            "xyY", self.client.dlcpro.get(f"{laser_prefix}:scope:data")
         )
         raw_lock_candidates = self.client.dlcpro.get(
-            f"{laser_prefix}dl:lock:candidates"
+            f"{laser_prefix}:dl:lock:candidates"
         )
         lock_candidates = extract_lock_points("clt", raw_lock_candidates)
         lock_state = extract_lock_state(raw_lock_candidates)
@@ -755,7 +755,7 @@ class MainWindow(QWidget):
         # Plot background
         background_data = extract_float_arrays(
             "xy",
-            self.client.dlcpro.get(f"{laser_prefix}dl:lock:background_trace"),
+            self.client.dlcpro.get(f"{laser_prefix}:dl:lock:background_trace"),
         )
         axes.plot(
             background_data["x"],

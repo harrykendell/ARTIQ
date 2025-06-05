@@ -59,51 +59,40 @@ def main():
     loop.run_until_complete(rpc.start(bind, args.port))
     atexit_register_coroutine(rpc.stop, loop=loop)
 
+    vals = {
+        "emission_button_enabled": dev._dlcpro.emission_button_enabled,
+        "emission": dev._dlcpro.emission,
+        "laser1:label": dev._dlcpro.laser1.label,
+        "laser1:enabled": dev._dlcpro.laser1.enabled,
+        "laser1:dl:cc:current_set": dev._dlcpro.laser1.dl.cc.current_set,
+        "laser1:amp:cc:current_set": dev._dlcpro.laser1.amp.cc.current_set,
+        "laser1:dl:lock:lock_enabled": dev._dlcpro.laser1.dl.lock.lock_enabled,
+        "laser1:scan:enabled": dev._dlcpro.laser1.scan.enabled,
+        "laser1:scope:data": dev._dlcpro.laser1.scope.data,
+        "laser1:scope:channel1:signal": dev._dlcpro.laser1.scope.channel1.signal,
+        "laser1:dl:lock:candidates": dev._dlcpro.laser1.dl.lock.candidates,
+        "laser1:dl:lock:background_trace": dev._dlcpro.laser1.dl.lock.background_trace,
+        "laser2:label": dev._dlcpro.laser2.label,
+        "laser2:enabled": dev._dlcpro.laser2.enabled,
+        "laser2:dl:cc:current_set": dev._dlcpro.laser2.dl.cc.current_set,
+        "laser2:amp:cc:current_set": dev._dlcpro.laser2.amp.cc.current_set,
+        "laser2:dl:lock:lock_enabled": dev._dlcpro.laser2.dl.lock.lock_enabled,
+        "laser2:scan:enabled": dev._dlcpro.laser2.scan.enabled,
+        "laser2:scope:data": dev._dlcpro.laser2.scope.data,
+        "laser2:scope:channel1:signal": dev._dlcpro.laser2.scope.channel1.signal,
+        "laser2:dl:lock:candidates": dev._dlcpro.laser2.dl.lock.candidates,
+        "laser2:dl:lock:background_trace": dev._dlcpro.laser2.dl.lock.background_trace,
+    }
     notifier = Notifier(
-        {
-            "emission-button-enabled": dev._dlcpro.emission_button_enabled.get(),
-            "emission": dev._dlcpro.emission.get(),
-            "laser1:label": dev._dlcpro.laser1.label.get(),
-            "laser1:enabled": dev._dlcpro.laser1.enabled.get(),
-            "laser1:dl:cc:current-set": dev._dlcpro.laser1.dl.cc.current_set.get(),
-            "laser1:amp:cc:current-set": dev._dlcpro.laser1.amp.cc.current_set.get(),
-            "laser1:dl:lock:lock-enabled": dev._dlcpro.laser1.dl.lock.lock_enabled.get(),
-            "laser1:scan:enabled": dev._dlcpro.laser1.scan.enabled.get(),
-            "laser1:scope:data": dev._dlcpro.laser1.scope.data.get(),
-            "laser1:scope:channel1:signal": dev._dlcpro.laser1.scope.channel1.signal.get(),
-            "laser1:dl:lock:candidates": dev._dlcpro.laser1.dl.lock.candidates.get(),
-            "laser1:dl:lock:background_trace": dev._dlcpro.laser1.dl.lock.background_trace.get(),
-            "laser2:label": dev._dlcpro.laser2.label.get(),
-            "laser2:enabled": dev._dlcpro.laser2.enabled.get(),
-            "laser2:dl:cc:current-set": dev._dlcpro.laser2.dl.cc.current_set.get(),
-            "laser2:amp:cc:current-set": dev._dlcpro.laser2.amp.cc.current_set.get(),
-            "laser2:dl:lock:lock-enabled": dev._dlcpro.laser2.dl.lock.lock_enabled.get(),
-            "laser2:scan:enabled": dev._dlcpro.laser2.scan.enabled.get(),
-            "laser2:scope:data": dev._dlcpro.laser2.scope.data.get(),
-            "laser2:scope:channel1:signal": dev._dlcpro.laser2.scope.channel1.signal.get(),
-            "laser2:dl:lock:candidates": dev._dlcpro.laser2.dl.lock.candidates.get(),
-            "laser2:dl:lock:background_trace": dev._dlcpro.laser2.dl.lock.background_trace.get(),
-        }
+        {key: val.get() for key, val in vals.items()},
     )
 
     def callback(subscription: Subscription, time: Timestamp, value: SubscriptionValue):
         logging.debug(f"Callback: {subscription.name} = {value.get()}")
         notifier[subscription.name] = value.get()
 
-    dev._dlcpro.emission_button_enabled.subscribe(callback)
-    dev._dlcpro.emission.subscribe(callback)
-
-    dev._dlcpro.laser1.label.subscribe(callback)
-    dev._dlcpro.laser1.enabled.subscribe(callback)
-    dev._dlcpro.laser1.dl.cc.current_set.subscribe(callback)
-    dev._dlcpro.laser1.amp.cc.current_set.subscribe(callback)
-    dev._dlcpro.laser1.dl.lock.lock_enabled.subscribe(callback)
-
-    dev._dlcpro.laser2.label.subscribe(callback)
-    dev._dlcpro.laser2.enabled.subscribe(callback)
-    dev._dlcpro.laser2.dl.cc.current_set.subscribe(callback)
-    dev._dlcpro.laser2.amp.cc.current_set.subscribe(callback)
-    dev._dlcpro.laser2.dl.lock.lock_enabled.subscribe(callback)
+    for val in vals.values():
+        val.subscribe(callback)
 
     publisher = Publisher(notifiers={"DLCProState": notifier})
     loop.run_until_complete(publisher.start(bind, args.port - 1))
