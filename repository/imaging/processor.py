@@ -162,7 +162,7 @@ class AbsImage:
 
         optical_density = self.optical_density[self.sigma_mask]
 
-        if np.max(optical_density) < 0.2:
+        if np.max(optical_density) < 0.1:
             # logging.warning("There don't seem to be any atoms in the image")
             return -np.inf
 
