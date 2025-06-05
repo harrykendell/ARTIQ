@@ -23,7 +23,7 @@ from PyQt5.QtWidgets import (
 from qasync import QEventLoop
 from sipyco.sync_struct import Subscriber
 
-from matplotlib.backends.backend_qtagg import FigureCanvas
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 
@@ -83,6 +83,20 @@ DEVICE_STYLES = {
     },
 }
 
+EMISSION_STYLES = {
+    True: {  # Enabled
+        "color": "green",
+        "text": "ON",
+        "background": "background-color: #e8ffe8;",
+    },
+    False: {  # Disabled
+        "color": "red",
+        "text": "OFF",
+        "background_enabled": "background-color: #fff8e0;",
+        "background_disabled": "background-color: #ffe8e8;",
+    },
+}
+
 APP = None
 
 
@@ -95,6 +109,8 @@ class GUIClient:
         self.subscribers = {}
         self.main_window = None
         self.tasks = []
+        self.reconnect_tasks = {}  # Track reconnection tasks
+        self.connection_status = {}  # Track connection status
 
         # Initialize data dictionaries
         self.datasets = dict()
@@ -112,6 +128,12 @@ class GUIClient:
 
     async def connect(self):
         loop = asyncio.get_event_loop()
+
+        # Initialize backoff tracking dictionary
+        self.backoff_delays = {}
+        self.max_backoff_delay = 60  # Maximum backoff in seconds
+        self.initial_backoff_delay = 1  # Starting delay in seconds
+        self.backoff_factor = 2.0  # Multiply by this each retry
 
         self.tasks.append(
             loop.create_task(
@@ -134,8 +156,15 @@ class GUIClient:
         port = self.port_notify if port is None else port
         server = self.server if server is None else server
 
+        # Set initial connection status
+        self.connection_status[name] = "connecting"
+        if self.main_window:
+            self.main_window.update_connection_status()
+
         def _create(data):
             db.update(data)
+            # Reset backoff delay on successful connection
+            self.backoff_delays[name] = self.initial_backoff_delay
             return db
 
         def _update(mod):
@@ -145,20 +174,116 @@ class GUIClient:
                 update_method(mod)
             return
 
+        async def reconnect_subscriber():
+            # Get current backoff delay or initialize it
+            current_delay = self.backoff_delays.get(name, self.initial_backoff_delay)
+
+            # Log with current delay
+            logging.info(f"Waiting {current_delay}s before reconnecting to {name}")
+            self.connection_status[name] = f"reconnecting ({current_delay}s)"
+            if self.main_window:
+                self.main_window.update_connection_status()
+
+            # Wait before attempting reconnection
+            await asyncio.sleep(current_delay)
+
+            # Calculate next backoff delay (with maximum limit)
+            next_delay = min(
+                current_delay * self.backoff_factor, self.max_backoff_delay
+            )
+            self.backoff_delays[name] = next_delay
+
+            logging.info(f"Attempting to reconnect to {name} at {server}:{port}")
+            self.connection_status[name] = "reconnecting"
+            if self.main_window:
+                self.main_window.update_connection_status()
+
+            # Cancel any existing reconnection task
+            if name in self.reconnect_tasks and not self.reconnect_tasks[name].done():
+                self.reconnect_tasks[name].cancel()
+
+            # Create new reconnection task
+            self.reconnect_tasks[name] = asyncio.create_task(
+                self.connect_subscriber(name, db, port, server)
+            )
+
         def disconnect_cb(*args):
             logging.info(f"Disconnected from {name} at {server}:{port}")
+            self.connection_status[name] = "disconnected"
+            if self.main_window:
+                self.main_window.update_connection_status()
+
+            # Schedule reconnection attempt
+            asyncio.create_task(reconnect_subscriber())
 
         subscriber = Subscriber(name, _create, _update, disconnect_cb)
         try:
             await asyncio.wait_for(subscriber.connect(server, port), 5)
+            self.subscribers[name] = subscriber
+            self.connection_status[name] = "connected"
+            if self.main_window:
+                self.main_window.update_connection_status()
+            logging.info(f"Connected to {name} at {server}:{port}")
         except asyncio.TimeoutError:
             logging.error(f"Failed to connect to Sub: {name} at {server}:{port}")
-            return
-        self.subscribers[name] = subscriber
+            self.connection_status[name] = "failed"
+            if self.main_window:
+                self.main_window.update_connection_status()
+
+            # Schedule reconnection attempt
+            asyncio.create_task(reconnect_subscriber())
 
     async def connect_booster(self):
+        self.connection_status["booster"] = "connecting"
+        if self.main_window:
+            self.main_window.update_connection_status()
+
+        async def reconnect_booster():
+            # Get current backoff delay or initialize it
+            current_delay = self.backoff_delays.get(
+                "booster", self.initial_backoff_delay
+            )
+
+            # Log with current delay
+            logging.info(f"Waiting {current_delay}s before reconnecting to Booster")
+            self.connection_status["booster"] = f"reconnecting ({current_delay}s)"
+            if self.main_window:
+                self.main_window.update_connection_status()
+
+            # Wait before attempting reconnection
+            await asyncio.sleep(current_delay)
+
+            # Calculate next backoff delay (with maximum limit)
+            next_delay = min(
+                current_delay * self.backoff_factor, self.max_backoff_delay
+            )
+            self.backoff_delays["booster"] = next_delay
+
+            logging.info("Attempting to reconnect to Booster")
+            self.connection_status["booster"] = "reconnecting"
+            if self.main_window:
+                self.main_window.update_connection_status()
+
+            # Cancel any existing reconnection task
+            if (
+                "booster" in self.reconnect_tasks
+                and not self.reconnect_tasks["booster"].done()
+            ):
+                self.reconnect_tasks["booster"].cancel()
+
+            # Create new reconnection task
+            self.reconnect_tasks["booster"] = asyncio.create_task(
+                self.connect_booster()
+            )
+
         def disconnected_booster(*_):
             logging.info("Booster disconnected")
+            self.connection_status["booster"] = "disconnected"
+            if self.main_window:
+                self.main_window.update_connection_status()
+
+            # Schedule reconnection attempt
+            asyncio.create_task(reconnect_booster())
 
         def handle_booster_message(message):
             logging.debug(f"New Booster message: {message.payload.decode()}")
@@ -166,18 +291,28 @@ class GUIClient:
             data = message.payload.decode()
             self.booster[ch] = data
 
+            # Reset backoff delay on successful message
+            self.backoff_delays["booster"] = self.initial_backoff_delay
+
             if self.main_window:
+                self.main_window.update_connection_status()
                 self.main_window.update_booster(ch)
 
         try:
             async with aiomqtt.Client(self.server) as client:
                 client._on_message = handle_booster_message
-
                 client._on_disconnect = disconnected_booster
                 await asyncio.wait_for(
                     client.subscribe("dt/sinara/booster/fc-0f-e7-23-77-30/telemetry/#"),
                     5,
                 )
+                self.connection_status["booster"] = "connected"
+                # Reset backoff delay on successful connection
+                self.backoff_delays["booster"] = self.initial_backoff_delay
+                if self.main_window:
+                    self.main_window.update_connection_status()
+                logging.info("Connected to Booster")
+
                 async for message in client.messages:
                     handle_booster_message(message)
 
@@ -486,161 +621,236 @@ class MainWindow(QWidget):
         self.update_elapsed_time(True)
 
         text = "<b>Running:</b>\t---"
-        for key, value in self.client.schedule.items():
+        for _key, value in self.client.schedule.items():
             if value["status"] == "running":
                 text = f"<b>Running:</b>\t{value['expid']['class_name']}"
         self.schedule_text.setText(text)
 
     def update_DLCProState(self, mod):
+        """Update the DLCPro state display."""
         if not self.client.dlcpro:
             return
 
+        # Get emission and connection states
         emission_enabled = self.client.dlcpro.get("emission", False)
         emission_button_enabled = self.client.dlcpro.get(
             "emission-button-enabled", False
         )
 
+        # Update connection and emission status
+        self._update_dlc_connection_status(emission_enabled)
+
+        # Update frame styling based on emission state
+        self._update_dlc_frame_style(emission_enabled, emission_button_enabled)
+
+        # Update laser displays
+        self._update_laser_displays()
+
+    def _update_dlc_connection_status(self, emission_enabled):
+        """Update the DLCPro connection status display."""
+        CONNECTION_COLORS = {
+            "connected": "black",
+            "connecting": "orange",
+            "reconnecting": "orange",
+            "disconnected": "red",
+            "failed": "red",
+        }
+
+        connection_status = self.client.connection_status.get(
+            "DLCProState", "disconnected"
+        )
+        conn_color = CONNECTION_COLORS.get(connection_status, "red")
+
+        # Set emission state color and text
+        on_off_color = "green" if emission_enabled else "red"
+        on_off_text = "ON" if emission_enabled else "OFF"
+
+        # Update label
+        self.dlc_status_label.setText(
+            f"<span style='color:{conn_color};'>DLCPro:</span> <span style='color:{on_off_color};'>{on_off_text}</span>"
+        )
+        self.dlc_status_label.setStyleSheet("font-weight: bold;")
+
+    def _update_dlc_frame_style(self, emission_enabled, emission_button_enabled):
+        """Update the DLCPro frame styling based on emission state."""
         if emission_enabled:
-            self.dlc_status_label.setText("DLCPro: ON")
-            self.dlc_status_label.setStyleSheet("font-weight: bold; color: green;")
             self.dlc_outer_frame.setStyleSheet("background-color: #e8ffe8;")
         else:
-            self.dlc_status_label.setText("DLCPro: OFF")
-            self.dlc_status_label.setStyleSheet("font-weight: bold; color: red;")
             self.dlc_outer_frame.setStyleSheet(
                 "background-color: #fff8e0;"
                 if emission_button_enabled
                 else "background-color: #ffe8e8;"
             )
 
-        for i in range(1, 3):
-            laser_prefix = f"laser{i}:"
-            laser_enabled = self.client.dlcpro.get(f"{laser_prefix}enabled", False)
-            dl_current = self.client.dlcpro.get(f"{laser_prefix}dl:cc:current-set", 0.0)
-            amp_current = self.client.dlcpro.get(
-                f"{laser_prefix}amp:cc:current-set", 0.0
+    def _update_laser_displays(self):
+        """Update the individual laser displays."""
+        # Define number of lasers as a constant
+        NUM_LASERS = 2
+
+        for i in range(1, NUM_LASERS + 1):
+            self._update_laser_display(i)
+            self._update_laser_plot(i)
+
+    def _update_laser_display(self, laser_num):
+        """Update a single laser's display elements."""
+        laser_prefix = f"laser{laser_num}:"
+
+        # Get laser data
+        laser_enabled = self.client.dlcpro.get(f"{laser_prefix}enabled", False)
+        emission_enabled = self.client.dlcpro.get("emission", False)
+        dl_current = self.client.dlcpro.get(f"{laser_prefix}dl:cc:current-set", 0.0)
+        amp_current = self.client.dlcpro.get(f"{laser_prefix}amp:cc:current-set", 0.0)
+        lock_enabled = self.client.dlcpro.get(
+            f"{laser_prefix}dl:lock:lock-enabled", False
+        )
+        label = self.client.dlcpro.get(f"{laser_prefix}label", f"Laser {laser_num}")
+
+        # Update display
+        self.dlc_frames[laser_num - 1]["name"].setText(f"<b>{label}</b>")
+
+        self._update_device_display(
+            "dlc",
+            laser_num - 1,
+            (
+                DeviceState.ENABLED
+                if emission_enabled and laser_enabled
+                else DeviceState.DISABLED
+            ),
+            f"Laser: {dl_current:.1f} mA",
+            amp_current_text=f"Amp: {amp_current:.1f} mA",
+            lock_state=DeviceState.LOCKED if lock_enabled else DeviceState.UNLOCKED,
+        )
+
+    def _update_laser_plot(self, laser_num):
+        """Update the laser spectrum plot."""
+        laser_prefix = f"laser{laser_num}:"
+        idx = laser_num - 1
+
+        # Get canvas and axes
+        canvas = self.dlc_frames[idx]["spectrum_canvas"]
+        fig = canvas.figure
+        axes = self.dlc_frames[idx]["spectrum_axes"]
+        axes.clear()
+
+        # Only update if signal is available
+        if not self.client.dlcpro.get(f"{laser_prefix}scope:channel1:signal"):
+            return
+
+        # Get the spectrum data
+        scope_data = extract_float_arrays(
+            "xyY", self.client.dlcpro.get(f"{laser_prefix}scope:data")
+        )
+        raw_lock_candidates = self.client.dlcpro.get(
+            f"{laser_prefix}dl:lock:candidates"
+        )
+        lock_candidates = extract_lock_points("clt", raw_lock_candidates)
+        lock_state = extract_lock_state(raw_lock_candidates)
+
+        # Plot main spectrum data
+        self._plot_spectrum_data(axes, scope_data, lock_candidates, lock_state)
+
+        # Plot background
+        background_data = extract_float_arrays(
+            "xy",
+            self.client.dlcpro.get(f"{laser_prefix}dl:lock:background_trace"),
+        )
+        axes.plot(
+            background_data["x"],
+            background_data["y"],
+            linestyle="solid",
+            color="k",
+            zorder=0,
+            linewidth=1.0,
+        )
+
+        # Style the plot
+        self._style_spectrum_plot(axes, fig)
+
+        # Update the canvas
+        canvas.draw_idle()
+
+    def _plot_spectrum_data(self, axes, scope_data, lock_candidates, lock_state):
+        """Plot the spectrum data and lock points."""
+        # Define constants
+        LOCK_STATE_SELECTED = 3  # 'Selected' state
+
+        # Plot first channel (red)
+        axes.plot(
+            scope_data["x"],
+            scope_data["y"],
+            linestyle="solid",
+            color="red",
+            zorder=1,
+            linewidth=1.0,
+        )
+
+        # Plot lock candidates if available
+        if "c" in lock_candidates:
+            axes.plot(
+                lock_candidates["c"]["x"],
+                lock_candidates["c"]["y"],
+                linestyle="None",
+                marker="o",
+                markersize=4.0,
+                color="grey",
+                zorder=2,
             )
-            lock_enabled = self.client.dlcpro.get(
-                f"{laser_prefix}dl:lock:lock-enabled", False
-            )
-            label = self.client.dlcpro.get(f"{laser_prefix}label", f"Laser {i}")
-            self.dlc_frames[i - 1]["name"].setText(f"<b>{label}</b>")
 
-            self._update_device_display(
-                "dlc",
-                i - 1,
-                (
-                    DeviceState.ENABLED
-                    if emission_enabled and laser_enabled
-                    else DeviceState.DISABLED
-                ),
-                f"Laser: {dl_current:.1f} mA",
-                amp_current_text=f"Amp: {amp_current:.1f} mA",
-                lock_state=DeviceState.LOCKED if lock_enabled else DeviceState.UNLOCKED,
+        # Plot selected lock point if available
+        if "l" in lock_candidates and lock_state == LOCK_STATE_SELECTED:
+            axes.plot(
+                lock_candidates["l"]["x"],
+                lock_candidates["l"]["y"],
+                linestyle="None",
+                marker="o",
+                markersize=6.0,
+                color="red",
+                markerfacecolor="none",
+                zorder=3,
             )
 
-            # Get axes and clear previous plot
-            canvas = self.dlc_frames[i - 1]["spectrum_canvas"]
-            fig = canvas.figure
-            axes = self.dlc_frames[i - 1]["spectrum_axes"]
-            axes.clear()
-            # Get the spectrum data and plot it
-            if self.client.dlcpro.get(f"{laser_prefix}scope:channel1:signal"):
-                scope_data = extract_float_arrays(
-                    "xyY", self.client.dlcpro.get(f"{laser_prefix}scope:data")
-                )
-                raw_lock_candidates = self.client.dlcpro.get(
-                    f"{laser_prefix}dl:lock:candidates"
-                )
-                lock_candidates = extract_lock_points("clt", raw_lock_candidates)
-                lock_state = extract_lock_state(raw_lock_candidates)
+        # Plot lock tracking position if available
+        if "t" in lock_candidates:
+            axes.plot(
+                lock_candidates["t"]["x"],
+                lock_candidates["t"]["y"],
+                linestyle="None",
+                marker="o",
+                markersize=8.0,
+                color="red",
+                markerfacecolor="none",
+                zorder=3,
+            )
 
-                # Plot first channel (red)
-                axes.plot(
-                    scope_data["x"],
-                    scope_data["y"],
-                    linestyle="solid",
-                    color="red",
-                    zorder=1,
-                    linewidth=1.0,
-                )
+    def _style_spectrum_plot(self, axes, fig):
+        """Apply styling to the spectrum plot."""
+        # Make background transparent
+        axes.patch.set_alpha(0)
 
-                # Plot lock candidates if available
-                if "c" in lock_candidates:
-                    axes.plot(
-                        lock_candidates["c"]["x"],
-                        lock_candidates["c"]["y"],
-                        linestyle="None",
-                        marker="o",
-                        markersize=4.0,
-                        color="grey",
-                        zorder=2,
-                    )
+        # Remove margins and padding
+        axes.margins(0, 0)
 
-                # Plot selected lock point if available
-                if "l" in lock_candidates and lock_state == 3:  # 'Selected'
-                    axes.plot(
-                        lock_candidates["l"]["x"],
-                        lock_candidates["l"]["y"],
-                        linestyle="None",
-                        marker="o",
-                        markersize=6.0,
-                        color="red",
-                        markerfacecolor="none",
-                        zorder=3,
-                    )
+        # Style spines
+        for spine in axes.spines.values():
+            spine.set_color("#aaaaaa")
+            spine.set_linewidth(1.0)
 
-                # Plot lock tracking position if available
-                if "t" in lock_candidates:
-                    axes.plot(
-                        lock_candidates["t"]["x"],
-                        lock_candidates["t"]["y"],
-                        linestyle="None",
-                        marker="o",
-                        markersize=8.0,
-                        color="red",
-                        markerfacecolor="none",
-                        zorder=3,
-                    )
+        # Remove ticks
+        axes.set_xticks([])
+        axes.set_yticks([])
 
-                # Plot background if available
-                # if lock_state == 5:
-                background_data = extract_float_arrays(
-                    "xy",
-                    self.client.dlcpro.get(f"{laser_prefix}dl:lock:background_trace"),
-                )
-                axes.plot(
-                    background_data["x"],
-                    background_data["y"],
-                    linestyle="solid",
-                    color="k",
-                    zorder=0,
-                    linewidth=1.0,
-                )
+        # Ensure plot fills the figure
+        fig.subplots_adjust(left=0, right=1, top=1, bottom=0)
 
-            # Make sure background is transparent
-            axes.patch.set_alpha(0)
+    def update_booster(self, channel: int) -> None:
+        """
+        Update the booster channel display.
 
-            # Remove all margins and padding
-            axes.margins(0, 0)
-
-            # Remove spines and set minimal axis styling
-            for spine in axes.spines.values():
-                spine.set_color("#aaaaaa")
-                spine.set_linewidth(1.0)
-
-            # Remove ticks to save space
-            axes.set_xticks([])
-            axes.set_yticks([])
-
-            # Ensure plot fills the entire figure
-            fig.subplots_adjust(left=0, right=1, top=1, bottom=0)
-
-            # Update the canvas
-            canvas.draw_idle()
-
-    def update_booster(self, channel):
-        LOW_POWER_THRESHOLD = 5.0
+        Args:
+            channel: The booster channel number (0-7)
+        """
+        # Define constants
+        LOW_POWER_THRESHOLD = 5.0  # dBm
 
         state = DeviceState.UNKNOWN
         power_text = "--.- → --.- dBm"
@@ -657,18 +867,21 @@ class MainWindow(QWidget):
                 power_text = f"{input_power:.1f} → {output_power:.1f} dBm"
                 reflected_text = f"↻ {reflected_power:.1f} dBm"
 
-                if state_str == DeviceState.ENABLED.value:
-                    state = (
+                # Map state strings to DeviceState enum using dictionary
+                STATE_MAPPING = {
+                    DeviceState.ENABLED.value: (
                         DeviceState.LOW_POWER
                         if output_power < LOW_POWER_THRESHOLD
                         else DeviceState.ENABLED
-                    )
-                elif state_str == DeviceState.DISABLED.value:
-                    state = DeviceState.DISABLED
-                elif "Tripped" in state_str:
+                    ),
+                    DeviceState.DISABLED.value: DeviceState.DISABLED,
+                }
+
+                # Default to UNKNOWN if not in mapping
+                if "Tripped" in state_str:
                     state = DeviceState.TRIPPED
                 else:
-                    state = DeviceState.UNKNOWN
+                    state = STATE_MAPPING.get(state_str, DeviceState.UNKNOWN)
 
             except (json.JSONDecodeError, KeyError):
                 state = DeviceState.ERROR
@@ -720,6 +933,43 @@ class MainWindow(QWidget):
         data = {key: val[1] for key, val in self.client.datasets.items()}
         print("Saving datasets, type: ", type(data))
         np.save("datasets.npy", data)
+
+    def update_connection_status(self):
+        # Update UI elements for each service
+        for name, status in self.client.connection_status.items():
+            if status == "connected":
+                color = "black"
+            elif status in ["connecting", "reconnecting"]:
+                color = "orange"
+            else:  # disconnected or failed
+                color = "red"
+
+            # Update corresponding UI elements based on the service
+            if name == "booster":
+                self.booster_label.setStyleSheet(f"font-weight: bold; color: {color};")
+
+            elif name == "datasets":
+                self.elapsed_time_label.setStyleSheet(f"color: {color};")
+
+            elif name == "schedule":
+                self.schedule_text.setStyleSheet(f"color: {color};")
+
+            elif name == "DLCProState":
+                # Update only connection status part of DLCPro label
+                # ON/OFF status is handled by update_DLCProState
+                emission_enabled = (
+                    self.client.dlcpro.get("emission", False)
+                    if self.client.dlcpro
+                    else False
+                )
+                on_off_text = "ON" if emission_enabled else "OFF"
+                on_off_color = "green" if emission_enabled else "red"
+
+                self.dlc_status_label.setText(
+                    f"<span style='color:{color};'>DLCPro:</span>"
+                    f" <span style='color:{on_off_color};'>{on_off_text}</span>"
+                )
+                self.dlc_status_label.setStyleSheet("font-weight: bold;")
 
 
 if __name__ == "__main__":
