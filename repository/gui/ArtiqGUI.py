@@ -204,10 +204,14 @@ class GUIClient:
             if name in self.reconnect_tasks and not self.reconnect_tasks[name].done():
                 self.reconnect_tasks[name].cancel()
 
-            # Create new reconnection task
-            self.reconnect_tasks[name] = asyncio.create_task(
-                self.connect_subscriber(name, db, port, server)
-            )
+            try:
+                # Create new reconnection task with timeout
+                self.reconnect_tasks[name] = asyncio.create_task(
+                    self.connect_subscriber(name, db, port, server)
+                )
+                await asyncio.wait_for(self.reconnect_tasks[name], 10)
+            except Exception as e:
+                logging.error(f"Error during reconnection to {name}: {str(e)}")
 
         def disconnect_cb(*args):
             logging.debug(f"Disconnected from {name} at {server}:{port}")
@@ -226,8 +230,10 @@ class GUIClient:
             if self.main_window:
                 self.main_window.update_connection_status()
             logging.debug(f"Connected to {name} at {server}:{port}")
-        except asyncio.TimeoutError:
-            logging.error(f"Failed to connect to Sub: {name} at {server}:{port}")
+        except (asyncio.TimeoutError, OSError) as e:
+            logging.error(
+                f"Failed to connect to Sub: {name} at {server}:{port} - {str(e)}"
+            )
             self.connection_status[name] = "failed"
             if self.main_window:
                 self.main_window.update_connection_status()
@@ -651,18 +657,15 @@ class MainWindow(QWidget):
 
     def _update_dlc_connection_status(self, emission_enabled):
         """Update the DLCPro connection status display."""
-        CONNECTION_COLORS = {
-            "connected": "black",
-            "connecting": "orange",
-            "reconnecting": "orange",
-            "disconnected": "red",
-            "failed": "red",
-        }
-
-        connection_status = self.client.connection_status.get(
+        status = self.client.connection_status.get(
             "DLCProState", "disconnected"
         )
-        conn_color = CONNECTION_COLORS.get(connection_status, "red")
+        if status == "connected":
+            conn_color = "black"
+        elif status in ["connecting", "reconnecting"]:
+            conn_color = "orange"
+        else:  # disconnected or failed
+            conn_color = "red"
 
         # Set emission state color and text
         on_off_color = "green" if emission_enabled else "red"
