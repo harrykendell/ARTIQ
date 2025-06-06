@@ -212,6 +212,8 @@ class GUIClient:
                 await asyncio.wait_for(self.reconnect_tasks[name], 10)
             except Exception as e:
                 logging.error(f"Error during reconnection to {name}: {str(e)}")
+                # Schedule another reconnection attempt
+                asyncio.create_task(reconnect_subscriber())
 
         def disconnect_cb(*args):
             logging.debug(f"Disconnected from {name} at {server}:{port}")
@@ -657,9 +659,7 @@ class MainWindow(QWidget):
 
     def _update_dlc_connection_status(self, emission_enabled):
         """Update the DLCPro connection status display."""
-        status = self.client.connection_status.get(
-            "DLCProState", "disconnected"
-        )
+        status = self.client.connection_status.get("DLCProState", "disconnected")
         if status == "connected":
             conn_color = "black"
         elif status in ["connecting", "reconnecting"]:
