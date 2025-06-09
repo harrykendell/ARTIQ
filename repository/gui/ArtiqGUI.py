@@ -1,9 +1,9 @@
 import asyncio
-import json
 import logging
 import sys
-import time
+import json
 from enum import Enum
+import time
 
 import aiomqtt
 import numpy as np
@@ -468,16 +468,22 @@ class MainWindow(QWidget):
 
             spectrum_canvas = FigureCanvas(spectrum_fig)
             spectrum_axes = spectrum_fig.add_subplot(111)
-            spectrum_axes.patch.set_alpha(0)
-
-            # Fill the entire axes area
-            spectrum_axes.set_position([0, 0, 1, 1])
 
             # Allow expansion in both directions
             spectrum_canvas.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
             # Set a minimum height, but allow expansion
             spectrum_canvas.setMinimumHeight(80)
+
+            spectrum_axes.patch.set_alpha(0)
+
+            # Remove margins and padding
+            spectrum_axes.margins(0, 0)
+
+            # Style spines
+            for spine in spectrum_axes.spines.values():
+                spine.set_color("#aaaaaa")
+                spine.set_linewidth(1.0)
 
             # Add to layout with stretch factor
             laser_layout.addWidget(spectrum_canvas, 1)
@@ -493,6 +499,8 @@ class MainWindow(QWidget):
                     "lock": lock_label,
                     "spectrum_canvas": spectrum_canvas,
                     "spectrum_axes": spectrum_axes,
+                    "x_lim": [np.inf, -np.inf],
+                    "y_lim": [np.inf, -np.inf]
                 }
             )
 
@@ -703,28 +711,39 @@ class MainWindow(QWidget):
 
         # Get laser data
         laser_enabled = self.client.dlcpro.get(f"{laser_prefix}:enabled", False)
+        scan_enabled = self.client.dlcpro.get(f"{laser_prefix}:scan:enabled", False)
         emission_enabled = self.client.dlcpro.get("emission", False)
         dl_current = self.client.dlcpro.get(f"{laser_prefix}:dl:cc:current_set", 0.0)
         amp_current = self.client.dlcpro.get(f"{laser_prefix}:amp:cc:current_set", 0.0)
         lock_enabled = self.client.dlcpro.get(
-            f"{laser_prefix}:dl:lock:lock_enabled", False
+            f"{laser_prefix}:dl:lock:lock_enabled", True
         )
         label = self.client.dlcpro.get(f"{laser_prefix}:label", f"Laser {laser_num}")
 
-        # Update display
+        # Determine state and style the laser label
+        is_active = emission_enabled and laser_enabled
+
+        # Update the label with color indicating enabled/disabled state
         self.dlc_frames[laser_num - 1]["name"].setText(f"<b>{label}</b>")
 
+        # Determine lock status text including scanning information
+        if lock_enabled:
+            lock_state = DeviceState.LOCKED
+            lock_text = DeviceState.LOCKED.value
+        else:
+            lock_state = DeviceState.UNLOCKED
+            lock_text = DeviceState.UNLOCKED.value
+        lock_text += " (Scan)" if scan_enabled else ""
+
+        # Update display
         self._update_device_display(
             "dlc",
             laser_num - 1,
-            (
-                DeviceState.ENABLED
-                if emission_enabled and laser_enabled
-                else DeviceState.DISABLED
-            ),
+            (DeviceState.ENABLED if is_active else DeviceState.DISABLED),
             f"Laser: {dl_current:.1f} mA",
             amp_current_text=f"Amp: {amp_current:.1f} mA",
-            lock_state=DeviceState.LOCKED if lock_enabled else DeviceState.UNLOCKED,
+            lock_state=lock_state,
+            lock_text=lock_text,
         )
 
     def _update_laser_plot(self, laser_num):
@@ -734,7 +753,6 @@ class MainWindow(QWidget):
 
         # Get canvas and axes
         canvas = self.dlc_frames[idx]["spectrum_canvas"]
-        fig = canvas.figure
         axes = self.dlc_frames[idx]["spectrum_axes"]
         axes.clear()
 
@@ -752,25 +770,62 @@ class MainWindow(QWidget):
         lock_candidates = extract_lock_points("clt", raw_lock_candidates)
         lock_state = extract_lock_state(raw_lock_candidates)
 
-        # Plot main spectrum data
-        self._plot_spectrum_data(axes, scope_data, lock_candidates, lock_state)
-
-        # Plot background
+        # Get background data
         background_data = extract_float_arrays(
             "xy",
             self.client.dlcpro.get(f"{laser_prefix}:dl:lock:background_trace"),
         )
-        axes.plot(
-            background_data["x"],
-            background_data["y"],
-            linestyle="solid",
-            color="k",
-            zorder=0,
-            linewidth=1.0,
-        )
 
-        # Style the plot
-        self._style_spectrum_plot(axes, fig)
+        # Reset limits if background data has non-zero length
+        if len(background_data.get("x", [])) > 0:
+            self.dlc_frames[idx]["x_lim"] = [
+                min(background_data["x"])-1e-6,
+                max(background_data["x"])+1e-6,
+            ]
+            self.dlc_frames[idx]["y_lim"] = [
+                min(background_data["y"])-1e-6,
+                max(background_data["y"])+1e-6,
+            ]
+
+        # Update limits monotonically
+        self.dlc_frames[idx]["x_lim"] = [
+            min(self.dlc_frames[idx]["x_lim"][0], min(scope_data["x"])-1e-6),
+            max(self.dlc_frames[idx]["x_lim"][1], max(scope_data["x"])+1e-6),
+        ]
+        self.dlc_frames[idx]["y_lim"] = [
+            min(self.dlc_frames[idx]["y_lim"][0], min(scope_data["y"])-1e-6),
+            max(self.dlc_frames[idx]["y_lim"][1], max(scope_data["y"])+1e-6),
+        ]
+
+        # Plot main spectrum data
+        self._plot_spectrum_data(axes, scope_data, lock_candidates, lock_state)
+
+        # Plot background
+        if len(background_data.get("x", [])) > 0:
+            axes.plot(
+                background_data["x"],
+                background_data["y"],
+                linestyle="solid",
+                color="k",
+                zorder=0,
+                linewidth=1.0,
+            )
+
+        # Calculate x and y ranges
+        x_range = self.dlc_frames[idx]["x_lim"][1] - self.dlc_frames[idx]["x_lim"][0]
+        y_range = self.dlc_frames[idx]["y_lim"][1] - self.dlc_frames[idx]["y_lim"][0]
+
+        # Add 5% padding to both sides
+        padded_x_min = self.dlc_frames[idx]["x_lim"][0] - 0.05 * x_range
+        padded_x_max = self.dlc_frames[idx]["x_lim"][1] + 0.05 * x_range
+        padded_y_min = self.dlc_frames[idx]["y_lim"][0] - 0.05 * y_range
+        padded_y_max = self.dlc_frames[idx]["y_lim"][1] + 0.05 * y_range
+
+        # Set the padded limits
+        axes.set_xlim([padded_x_min, padded_x_max])
+        axes.set_ylim([padded_y_min, padded_y_max])
+
+        axes.patch.set_alpha(0)
 
         # Update the canvas
         canvas.draw_idle()
@@ -810,7 +865,7 @@ class MainWindow(QWidget):
                 linestyle="None",
                 marker="o",
                 markersize=6.0,
-                color="red",
+                color="blue",
                 markerfacecolor="none",
                 zorder=3,
             )
@@ -823,30 +878,10 @@ class MainWindow(QWidget):
                 linestyle="None",
                 marker="o",
                 markersize=8.0,
-                color="red",
+                color="black",
                 markerfacecolor="none",
                 zorder=3,
             )
-
-    def _style_spectrum_plot(self, axes, fig):
-        """Apply styling to the spectrum plot."""
-        # Make background transparent
-        axes.patch.set_alpha(0)
-
-        # Remove margins and padding
-        axes.margins(0, 0)
-
-        # Style spines
-        for spine in axes.spines.values():
-            spine.set_color("#aaaaaa")
-            spine.set_linewidth(1.0)
-
-        # Remove ticks
-        axes.set_xticks([])
-        axes.set_yticks([])
-
-        # Ensure plot fills the figure
-        fig.subplots_adjust(left=0, right=1, top=1, bottom=0)
 
     def update_booster(self, channel: int) -> None:
         """
@@ -905,6 +940,7 @@ class MainWindow(QWidget):
         reflected_text=None,
         amp_current_text=None,
         lock_state=None,
+        lock_text=None,
     ):
         if device_type == "booster":
             frame = self.booster_frames[idx]
@@ -920,15 +956,17 @@ class MainWindow(QWidget):
 
         elif device_type == "dlc":
             frame = self.dlc_frames[idx]
-            frame["state"].setText(state.value)
+            # No need to display state text separately since it's now indicated by label color
+            frame["state"].setText("")  # Clear the state text
             frame["dl_current"].setText(value_text)
             if amp_current_text:
                 frame["amp_current"].setText(amp_current_text)
             if lock_state:
-                frame["lock"].setText(lock_state.value)
+                # Use custom lock text if provided, otherwise use the enum value
+                frame["lock"].setText(lock_text if lock_text else lock_state.value)
 
             styles = DEVICE_STYLES[state]
-            frame["state"].setStyleSheet(styles["state"])
+            # No need to style state text anymore
             frame["frame"].setStyleSheet(styles["frame"])
 
             if lock_state:
