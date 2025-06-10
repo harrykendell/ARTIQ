@@ -33,6 +33,7 @@ from toptica.lasersdk.utils.dlcpro import (
     extract_lock_state,
 )
 
+
 sys.path.append(__file__.split("artiq")[0] + "artiq")
 from repository.imaging.processor import AbsImage  # noqa: E402
 
@@ -106,7 +107,7 @@ class GUIClient:
         self.server = server
         self.port_control = port_control
         self.port_notify = port_notify
-        self.subscribers = {}
+        self.subscribers: dict[str, Subscriber] = {}
         self.main_window = None
         self.tasks = []
         self.reconnect_tasks = {}  # Track reconnection tasks
@@ -500,7 +501,7 @@ class MainWindow(QWidget):
                     "spectrum_canvas": spectrum_canvas,
                     "spectrum_axes": spectrum_axes,
                     "x_lim": [np.inf, -np.inf],
-                    "y_lim": [np.inf, -np.inf]
+                    "y_lim": [np.inf, -np.inf],
                 }
             )
 
@@ -511,8 +512,21 @@ class MainWindow(QWidget):
         dlc_status_label.setStyleSheet("font-weight: bold;")
         self.dlc_status_label = dlc_status_label
 
+        # Create a reset zoom button
+        reset_button = QPushButton("Reset Zoom")
+        reset_button.clicked.connect(self.reset_dlc_plots)
+        reset_button.setToolTip("Reset the zoom level on all laser plots")
+        reset_button.setMaximumWidth(100)  # Limit width to keep it compact
+
+        # Create a horizontal layout for the DLC header
+        dlc_header_layout = QHBoxLayout()
+        dlc_header_layout.addWidget(dlc_status_label, 1)  # Give label more stretch
+        dlc_header_layout.addWidget(reset_button, 0, Qt.AlignRight)  # Right-aligned
+
         outer_layout = QVBoxLayout()
-        outer_layout.addWidget(dlc_status_label)
+        outer_layout.addLayout(
+            dlc_header_layout
+        )  # Add header layout instead of just label
         outer_layout.addLayout(dlc_layout)
         dlc_outer_frame.setLayout(outer_layout)
         layout.addWidget(dlc_outer_frame)
@@ -776,32 +790,9 @@ class MainWindow(QWidget):
             self.client.dlcpro.get(f"{laser_prefix}:dl:lock:background_trace"),
         )
 
-        # Reset limits if background data has non-zero length
-        if len(background_data.get("x", [])) > 0:
-            self.dlc_frames[idx]["x_lim"] = [
-                min(background_data["x"])-1e-6,
-                max(background_data["x"])+1e-6,
-            ]
-            self.dlc_frames[idx]["y_lim"] = [
-                min(background_data["y"])-1e-6,
-                max(background_data["y"])+1e-6,
-            ]
-
-        # Update limits monotonically
-        self.dlc_frames[idx]["x_lim"] = [
-            min(self.dlc_frames[idx]["x_lim"][0], min(scope_data["x"])-1e-6),
-            max(self.dlc_frames[idx]["x_lim"][1], max(scope_data["x"])+1e-6),
-        ]
-        self.dlc_frames[idx]["y_lim"] = [
-            min(self.dlc_frames[idx]["y_lim"][0], min(scope_data["y"])-1e-6),
-            max(self.dlc_frames[idx]["y_lim"][1], max(scope_data["y"])+1e-6),
-        ]
-
-        # Plot main spectrum data
-        self._plot_spectrum_data(axes, scope_data, lock_candidates, lock_state)
-
         # Plot background
-        if len(background_data.get("x", [])) > 0:
+        LOCK_STATE_LOCKED = 5  # 'Locked' state
+        if lock_state == LOCK_STATE_LOCKED and len(background_data.get("x", [])) > 0:
             axes.plot(
                 background_data["x"],
                 background_data["y"],
@@ -810,6 +801,28 @@ class MainWindow(QWidget):
                 zorder=0,
                 linewidth=1.0,
             )
+            # Reset limits if background data has non-zero length
+            self.dlc_frames[idx]["x_lim"] = [
+                min(background_data["x"]) - 1e-6,
+                max(background_data["x"]) + 1e-6,
+            ]
+            self.dlc_frames[idx]["y_lim"] = [
+                min(background_data["y"]) - 1e-6,
+                max(background_data["y"]) + 1e-6,
+            ]
+
+        # Update limits monotonically
+        self.dlc_frames[idx]["x_lim"] = [
+            min(self.dlc_frames[idx]["x_lim"][0], min(scope_data["x"]) - 1e-6),
+            max(self.dlc_frames[idx]["x_lim"][1], max(scope_data["x"]) + 1e-6),
+        ]
+        self.dlc_frames[idx]["y_lim"] = [
+            min(self.dlc_frames[idx]["y_lim"][0], min(scope_data["y"]) - 1e-6),
+            max(self.dlc_frames[idx]["y_lim"][1], max(scope_data["y"]) + 1e-6),
+        ]
+
+        # Plot main spectrum data
+        self._plot_spectrum_data(axes, scope_data, lock_candidates, lock_state)
 
         # Calculate x and y ranges
         x_range = self.dlc_frames[idx]["x_lim"][1] - self.dlc_frames[idx]["x_lim"][0]
@@ -977,6 +990,18 @@ class MainWindow(QWidget):
         data = {key: val[1] for key, val in self.client.datasets.items()}
         print("Saving datasets, type: ", type(data))
         np.save("datasets.npy", data)
+
+    def reset_dlc_plots(self):
+        """Reset the zoom level on all laser plots."""
+        for i, frame in enumerate(self.dlc_frames):
+            # Reset the plot limits
+            frame["x_lim"] = [np.inf, -np.inf]
+            frame["y_lim"] = [np.inf, -np.inf]
+
+            # Redraw the plots by calling update_laser_plot with the laser number (1-based)
+            self._update_laser_plot(i + 1)
+
+        logging.debug("Reset all laser plot zoom levels")
 
     def update_connection_status(self):
         # Update UI elements for each service
