@@ -395,3 +395,59 @@ class ControlBeamsWithoutCoolingAOM(Fragment):
             )
 
             suservo.set_y(suservo.servo_channel, beam_info.initial_amplitude)
+
+    @kernel
+    def set_setpoint_volts(self, beam_name, setpoint):
+        """
+        Set the setpoint in *volts* of the beam with the given name to the given value.
+
+        This method advances the timeline cursor by a few RTIO events ~ 100ns
+
+        Event queueing behaviour:
+        * t = 0: Setpoint is set
+        """
+        offset = -1.0 * setpoint / 10.0
+        suservo = self.get_beam_by_name(beam_name)
+
+        suservo.set_dds_offset(profile=suservo.servo_channel, offset=offset)
+
+    @kernel
+    def set_setpoint_mw(self, beam_name, setpoint):
+        """
+        Set the setpoint in *milliwatts* of the beam with the given name to the given value.
+
+        This method advances the timeline cursor by a few RTIO events ~ 100ns
+
+        Event queueing behaviour:
+        * t = 0: Setpoint is set
+        """
+        beam_info = self.get_beaminfo_by_name(beam_name)
+        setpoint_v = beam_info.calib_gain * setpoint + beam_info.calib_offset
+
+        self.set_setpoint_volts(beam_name, setpoint_v)
+
+    @kernel
+    def get_beam_by_name(self, name):
+        """
+        Get the beam with the given name.
+
+        returns: :class:`~artiq.coredevice.suservo.Channel` for the beam
+        """
+        for i in range(self.num_beams):
+            if self.beam_infos[i].name == name:
+                return self.beam_suservos[i]
+        logger.warning("Cannot get beam [%s]: not found", name)
+        raise ValueError("Beam not found")
+
+    @kernel
+    def get_beaminfo_by_name(self, name):
+        """
+        Get the beam info with the given name.
+
+        returns: :class:`~repository.models.SUServoedBeam` for the beam
+        """
+        for i in range(self.num_beams):
+            if self.beam_infos[i].name == name:
+                return self.beam_infos[i]
+        logger.warning("Cannot get beam info [%s]: not found", name)
+        raise ValueError("Beam info not found")
