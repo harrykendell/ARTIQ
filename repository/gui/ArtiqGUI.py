@@ -5,7 +5,6 @@ import json
 from enum import Enum
 import time
 
-import aiomqtt
 import numpy as np
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QColor, QPalette
@@ -21,7 +20,6 @@ from PyQt5.QtWidgets import (
     QSizePolicy,
 )
 from qasync import QEventLoop
-from sipyco.sync_struct import Subscriber
 
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
@@ -35,6 +33,7 @@ from toptica.lasersdk.utils.dlcpro import (
 
 
 sys.path.append(__file__.split("artiq")[0] + "artiq")
+from repository.gui.gui_client import GUIClient  # noqa: E402
 from repository.imaging.processor import AbsImage  # noqa: E402
 
 
@@ -98,247 +97,18 @@ EMISSION_STYLES = {
     },
 }
 
-APP = None
-
-
-class GUIClient:
-
-    def __init__(self, server="137.222.69.28", port_control=3251, port_notify=3250):
-        self.server = server
-        self.port_control = port_control
-        self.port_notify = port_notify
-        self.subscribers: dict[str, Subscriber] = {}
-        self.main_window = None
-        self.tasks = []
-        self.reconnect_tasks = {}  # Track reconnection tasks
-        self.connection_status = {}  # Track connection status
-
-        # Initialize data dictionaries
-        self.datasets = dict()
-        self.schedule = dict()
-        self.dlcpro = dict()
-        self.booster = dict()
-
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(self.connect())
-        logging.info("Successfully connected to all services")
-
-    def set_main_window(self, window):
-        """Set the main window for direct updates."""
-        self.main_window = window
-
-    async def connect(self):
-        loop = asyncio.get_event_loop()
-
-        # Initialize backoff tracking dictionary
-        self.backoff_delays = {}
-        self.max_backoff_delay = 60  # Maximum backoff in seconds
-        self.initial_backoff_delay = 1  # Starting delay in seconds
-        self.backoff_factor = 2.0  # Multiply by this each retry
-
-        self.tasks.append(
-            loop.create_task(
-                self.connect_subscriber("datasets", self.datasets, self.port_notify)
-            )
-        )
-        self.tasks.append(
-            loop.create_task(
-                self.connect_subscriber("schedule", self.schedule, self.port_notify)
-            )
-        )
-        self.tasks.append(
-            loop.create_task(self.connect_subscriber("DLCProState", self.dlcpro, 3271))
-        )
-        self.tasks.append(loop.create_task(self.connect_booster()))
-        asyncio.gather(*self.tasks, return_exceptions=True)
-        logging.debug("Connecting to services...")
-
-    async def connect_subscriber(self, name, db: dict, port=None, server=None):
-        port = self.port_notify if port is None else port
-        server = self.server if server is None else server
-
-        # Set initial connection status
-        self.connection_status[name] = "connecting"
-        if self.main_window:
-            self.main_window.update_connection_status()
-
-        def _create(data):
-            db.update(data)
-            # Reset backoff delay on successful connection
-            self.backoff_delays[name] = self.initial_backoff_delay
-            return db
-
-        def _update(mod):
-            if self.main_window:
-                # Call the appropriate update method directly
-                update_method = getattr(self.main_window, f"update_{name}")
-                update_method(mod)
-            return
-
-        async def reconnect_subscriber():
-            if getattr(APP, "shutdown", False):
-                return
-            # Get current backoff delay or initialize it
-            current_delay = self.backoff_delays.get(name, self.initial_backoff_delay)
-
-            # Log with current delay
-            logging.info(f"Waiting {current_delay}s before reconnecting to {name}")
-            self.connection_status[name] = f"reconnecting ({current_delay}s)"
-            if self.main_window:
-                self.main_window.update_connection_status()
-
-            # Wait before attempting reconnection
-            await asyncio.sleep(current_delay)
-
-            # Calculate next backoff delay (with maximum limit)
-            next_delay = min(
-                current_delay * self.backoff_factor, self.max_backoff_delay
-            )
-            self.backoff_delays[name] = next_delay
-
-            logging.info(f"Attempting to reconnect to {name} at {server}:{port}")
-            self.connection_status[name] = "reconnecting"
-            if self.main_window:
-                self.main_window.update_connection_status()
-
-            # Cancel any existing reconnection task
-            if name in self.reconnect_tasks and not self.reconnect_tasks[name].done():
-                self.reconnect_tasks[name].cancel()
-
-            try:
-                # Create new reconnection task with timeout
-                self.reconnect_tasks[name] = asyncio.create_task(
-                    self.connect_subscriber(name, db, port, server)
-                )
-                await asyncio.wait_for(self.reconnect_tasks[name], 10)
-            except Exception as e:
-                logging.error(f"Error during reconnection to {name}: {str(e)}")
-                # Schedule another reconnection attempt
-                asyncio.create_task(reconnect_subscriber())
-
-        def disconnect_cb(*args):
-            logging.debug(f"Disconnected from {name} at {server}:{port}")
-            self.connection_status[name] = "disconnected"
-            if self.main_window:
-                self.main_window.update_connection_status()
-
-            # Schedule reconnection attempt
-            asyncio.create_task(reconnect_subscriber())
-
-        subscriber = Subscriber(name, _create, _update, disconnect_cb)
-        try:
-            await asyncio.wait_for(subscriber.connect(server, port), 5)
-            self.subscribers[name] = subscriber
-            self.connection_status[name] = "connected"
-            if self.main_window:
-                self.main_window.update_connection_status()
-            logging.debug(f"Connected to {name} at {server}:{port}")
-        except (asyncio.TimeoutError, OSError) as e:
-            logging.error(
-                f"Failed to connect to Sub: {name} at {server}:{port} - {str(e)}"
-            )
-            self.connection_status[name] = "failed"
-            if self.main_window:
-                self.main_window.update_connection_status()
-
-            # Schedule reconnection attempt
-            asyncio.create_task(reconnect_subscriber())
-
-    async def connect_booster(self):
-        self.connection_status["booster"] = "connecting"
-        if self.main_window:
-            self.main_window.update_connection_status()
-
-        async def reconnect_booster():
-            if getattr(APP, "shutdown", False):
-                return
-            # Get current backoff delay or initialize it
-            current_delay = self.backoff_delays.get(
-                "booster", self.initial_backoff_delay
-            )
-
-            # Log with current delay
-            logging.info(f"Waiting {current_delay}s before reconnecting to Booster")
-            self.connection_status["booster"] = f"reconnecting ({current_delay}s)"
-            if self.main_window:
-                self.main_window.update_connection_status()
-
-            # Wait before attempting reconnection
-            await asyncio.sleep(current_delay)
-
-            # Calculate next backoff delay (with maximum limit)
-            next_delay = min(
-                current_delay * self.backoff_factor, self.max_backoff_delay
-            )
-            self.backoff_delays["booster"] = next_delay
-
-            logging.debug("Attempting to reconnect to Booster")
-            self.connection_status["booster"] = "reconnecting"
-            if self.main_window:
-                self.main_window.update_connection_status()
-
-            # Cancel any existing reconnection task
-            if (
-                "booster" in self.reconnect_tasks
-                and not self.reconnect_tasks["booster"].done()
-            ):
-                self.reconnect_tasks["booster"].cancel()
-
-            # Create new reconnection task
-            self.reconnect_tasks["booster"] = asyncio.create_task(
-                self.connect_booster()
-            )
-
-        def disconnected_booster(*_):
-            logging.info("Booster disconnected")
-            self.connection_status["booster"] = "disconnected"
-            if self.main_window:
-                self.main_window.update_connection_status()
-
-            # Schedule reconnection attempt
-            asyncio.create_task(reconnect_booster())
-
-        def handle_booster_message(message):
-            logging.debug(f"New Booster message: {message.payload.decode()}")
-            ch = int(message.topic.value[-1])
-            data = message.payload.decode()
-            self.booster[ch] = data
-
-            # Reset backoff delay on successful message
-            self.backoff_delays["booster"] = self.initial_backoff_delay
-
-            if self.main_window:
-                self.main_window.update_connection_status()
-                self.main_window.update_booster(ch)
-
-        try:
-            async with aiomqtt.Client(self.server) as client:
-                client._on_message = handle_booster_message
-                client._on_disconnect = disconnected_booster
-                await asyncio.wait_for(
-                    client.subscribe("dt/sinara/booster/fc-0f-e7-23-77-30/telemetry/#"),
-                    5,
-                )
-                self.connection_status["booster"] = "connected"
-                # Reset backoff delay on successful connection
-                self.backoff_delays["booster"] = self.initial_backoff_delay
-                if self.main_window:
-                    self.main_window.update_connection_status()
-                logging.debug("Connected to Booster")
-
-                async for message in client.messages:
-                    handle_booster_message(message)
-
-        except (aiomqtt.exceptions.MqttError, asyncio.TimeoutError):
-            disconnected_booster()
-        logging.debug("Connected to Booster")
-
 
 class MainWindow(QWidget):
-    def __init__(self):
+    def __init__(self, app):
         super().__init__()
-        self.client = GUIClient()
+        self.client = GUIClient(app=app)
         self.client.set_main_window(self)
+
+        # Register for service state change notifications
+        for service_name, service in self.client.services.items():
+            service.state_change_callback = (
+                lambda name, old, new: self.handle_service_state_change(name, old, new)
+            )
 
         self.setWindowTitle("ARTIQ GUI")
         self.setGeometry(100, 100, 550, 400)
@@ -346,8 +116,8 @@ class MainWindow(QWidget):
 
         # Create a timer that updates every second
         self.update_timer = QTimer(self)
-        self.update_timer.timeout.connect(self.update_elapsed_time)
-        self.update_timer.start(1000)  # Update every second
+        self.update_timer.timeout.connect(self.update)
+        self.update_timer.start(250)  # Update every second
 
     def initUI(self):
         layout = QVBoxLayout()
@@ -570,32 +340,85 @@ class MainWindow(QWidget):
         layout.addLayout(bottom_bar_layout)
 
         self.setLayout(layout)
+        self.update()
 
-    def update_elapsed_time(self):
-        """Update the elapsed time display"""
+    def update(self):
+        """Update the elapsed time display and connection status"""
         now = time.time()
 
-        image_time = self.client.datasets.get("Images.absorption.timestamp")
+        # Only try to get data if the datasets service is connected
+        datasets_service = self.client.services.get("datasets")
+        if datasets_service and datasets_service.state.name == "CONNECTED":
+            image_time = self.client.datasets.get("Images.absorption.timestamp")
+        else:
+            image_time = None
 
         if not image_time:
             self.elapsed_time_label.setText("..m ..s ago")
-            return
+        else:
+            elapsed = int(now - image_time[1])
+            hours, remainder = divmod(elapsed, 3600)
+            minutes, seconds = divmod(remainder, 60)
 
-        elapsed = int(now - image_time[1])
-        hours, remainder = divmod(elapsed, 3600)
-        minutes, seconds = divmod(remainder, 60)
+            self.elapsed_time_label.setText(
+                f"{hours}h" * (hours > 0)
+                + f" {minutes}m" * (minutes > 0)
+                + f" {seconds}s" * (hours == 0)
+                + " ago"
+            )
 
-        self.elapsed_time_label.setText(
-            f"{hours}h" * (hours > 0)
-            + f" {minutes}m" * (minutes > 0)
-            + f" {seconds}s" * (hours == 0)
-            + " ago"
-        )
+        # Only try DLCPro update if service is connected
+        dlcpro_service = self.client.services.get("dlcpro")
+        if dlcpro_service and dlcpro_service.state.name == "CONNECTED":
+            try:
+                self.update_DLCProState()
+            except Exception as e:
+                logging.error(f"Failed to update DLCPro state: {e}")
+                # Don't set client.dlcpro to None as the service handles reconnection
+
+    # Always update connection status to show current state
+    def update_connection_status(self):
+        """Update the connection status display for all services."""
+        # Create a mapping from service states to display colors
+        state_colors = {"CONNECTED": "green", "CONNECTING": "orange", "BACKOFF": "red"}
+
+        # Update UI elements for each service
+        for name, service in self.client.services.items():
+            # Get current state and convert to string
+            current_state = service.state.name
+            # Get appropriate color based on state
+            color = state_colors.get(current_state, "red")
+
+            # Update corresponding UI elements based on the service
+            if name == "booster":
+                self.booster_label.setStyleSheet(f"font-weight: bold; color: {color};")
+
+            elif name == "datasets":
+                self.elapsed_time_label.setStyleSheet(f"color: {color};")
+
+            elif name == "schedule":
+                self.schedule_text.setStyleSheet(f"color: {color};")
+
+            elif name == "dlcpro":
+                # Handle DLCPro specially to preserve ON/OFF status
+                emission_enabled = (
+                    self.client.dlcpro.get("emission", False)
+                    if self.client.dlcpro
+                    else False
+                )
+                on_off_text = "ON" if emission_enabled else "OFF"
+                on_off_color = "green" if emission_enabled else "red"
+
+                self.dlc_status_label.setText(
+                    f"<span style='color:{color};'>DLCPro:</span>"
+                    f" <span style='color:{on_off_color};'>{on_off_text}</span>"
+                )
+                self.dlc_status_label.setStyleSheet("font-weight: bold;")
 
     def update_datasets(self, mod):
         if "Images.absorption" not in str(mod):
             return
-        self.update_elapsed_time()
+        self.update()
 
         # if absorption images changed then redo AbsImage
         tof = self.client.datasets.get("Images.absorption.TOF")
@@ -651,7 +474,7 @@ class MainWindow(QWidget):
         )
 
     def update_schedule(self, mod):
-        self.update_elapsed_time()
+        self.update()
 
         text = "<b>Running:</b>\t---"
         for _key, value in self.client.schedule.items():
@@ -659,14 +482,32 @@ class MainWindow(QWidget):
                 text = f"<b>Running:</b>\t{value['expid']['class_name']}"
         self.schedule_text.setText(text)
 
-    def update_DLCProState(self, mod):
-        """Update the DLCPro state display."""
-        if not self.client.dlcpro:
+    def update_DLCProState(self):
+        """Update the DLCPro state display using cached data from the client."""
+        # First check if dlcpro service is connected
+        dlcpro_service = self.client.services.get("dlcpro")
+        if not dlcpro_service or dlcpro_service.state.name != "CONNECTED":
+            # Update UI to show disconnected state
+            self.dlc_status_label.setText(
+                "<span style='color:red;'>DLCPro: Disconnected</span>"
+            )
+            self.dlc_outer_frame.setStyleSheet("background-color: #ffe8e8;")
             return
 
-        # Get emission and connection states
-        emission_enabled = self.client.dlcpro.get("emission", False)
-        emission_button_enabled = self.client.dlcpro.get(
+        # Check if we have cached data in the client
+        dlcpro_cache = self.client.get_dlcpro_cache()
+        if not dlcpro_cache:
+            # If fetch is in progress, show connecting state
+            status = "Connecting..." if self.client.is_dlcpro_fetching() else "No Data"
+            self.dlc_status_label.setText(
+                f"<span style='color:orange;'>DLCPro: {status}</span>"
+            )
+            self.dlc_outer_frame.setStyleSheet("background-color: #fff8e0;")
+            return
+
+        # Get emission and connection states from cache
+        emission_enabled = self.client.get_dlcpro_data("emission", False)
+        emission_button_enabled = self.client.get_dlcpro_data(
             "emission-button-enabled", False
         )
 
@@ -681,12 +522,14 @@ class MainWindow(QWidget):
 
     def _update_dlc_connection_status(self, emission_enabled):
         """Update the DLCPro connection status display."""
-        status = self.client.connection_status.get("DLCProState", "disconnected")
-        if status == "connected":
+        # Get service state directly from services dictionary instead of connection_status
+        dlcpro_service = self.client.services.get("dlcpro")
+
+        if dlcpro_service and dlcpro_service.state.name == "CONNECTED":
             conn_color = "black"
-        elif status in ["connecting", "reconnecting"]:
+        elif dlcpro_service and dlcpro_service.state.name == "CONNECTING":
             conn_color = "orange"
-        else:  # disconnected or failed
+        else:  # BACKOFF or None
             conn_color = "red"
 
         # Set emission state color and text
@@ -720,19 +563,27 @@ class MainWindow(QWidget):
             self._update_laser_plot(i)
 
     def _update_laser_display(self, laser_num):
-        """Update a single laser's display elements."""
+        """Update a single laser's display elements using cached data from client."""
         laser_prefix = f"laser{laser_num}"
 
-        # Get laser data
-        laser_enabled = self.client.dlcpro.get(f"{laser_prefix}:enabled", False)
-        scan_enabled = self.client.dlcpro.get(f"{laser_prefix}:scan:enabled", False)
-        emission_enabled = self.client.dlcpro.get("emission", False)
-        dl_current = self.client.dlcpro.get(f"{laser_prefix}:dl:cc:current_set", 0.0)
-        amp_current = self.client.dlcpro.get(f"{laser_prefix}:amp:cc:current_set", 0.0)
-        lock_enabled = self.client.dlcpro.get(
+        # Get laser data from client cache
+        laser_enabled = self.client.get_dlcpro_data(f"{laser_prefix}:enabled", False)
+        scan_enabled = self.client.get_dlcpro_data(
+            f"{laser_prefix}:scan:enabled", False
+        )
+        emission_enabled = self.client.get_dlcpro_data("emission", False)
+        dl_current = self.client.get_dlcpro_data(
+            f"{laser_prefix}:dl:cc:current_set", 0.0
+        )
+        amp_current = self.client.get_dlcpro_data(
+            f"{laser_prefix}:amp:cc:current_set", 0.0
+        )
+        lock_enabled = self.client.get_dlcpro_data(
             f"{laser_prefix}:dl:lock:lock_enabled", True
         )
-        label = self.client.dlcpro.get(f"{laser_prefix}:label", f"Laser {laser_num}")
+        label = self.client.get_dlcpro_data(
+            f"{laser_prefix}:label", f"Laser {laser_num}"
+        )
 
         # Determine state and style the laser label
         is_active = emission_enabled and laser_enabled
@@ -761,7 +612,7 @@ class MainWindow(QWidget):
         )
 
     def _update_laser_plot(self, laser_num):
-        """Update the laser spectrum plot."""
+        """Update the laser spectrum plot using cached data from client."""
         laser_prefix = f"laser{laser_num}"
         idx = laser_num - 1
 
@@ -771,14 +622,14 @@ class MainWindow(QWidget):
         axes.clear()
 
         # Only update if signal is available
-        if not self.client.dlcpro.get(f"{laser_prefix}:scope:channel1:signal"):
+        if not self.client.get_dlcpro_data(f"{laser_prefix}:scope:channel1:signal"):
             return
 
         # Get the spectrum data
         scope_data = extract_float_arrays(
-            "xyY", self.client.dlcpro.get(f"{laser_prefix}:scope:data")
+            "xyY", self.client.get_dlcpro_data(f"{laser_prefix}:scope:data")
         )
-        raw_lock_candidates = self.client.dlcpro.get(
+        raw_lock_candidates = self.client.get_dlcpro_data(
             f"{laser_prefix}:dl:lock:candidates"
         )
         lock_candidates = extract_lock_points("clt", raw_lock_candidates)
@@ -969,7 +820,6 @@ class MainWindow(QWidget):
 
         elif device_type == "dlc":
             frame = self.dlc_frames[idx]
-            # No need to display state text separately since it's now indicated by label color
             frame["state"].setText("")  # Clear the state text
             frame["dl_current"].setText(value_text)
             if amp_current_text:
@@ -998,47 +848,30 @@ class MainWindow(QWidget):
             frame["x_lim"] = [np.inf, -np.inf]
             frame["y_lim"] = [np.inf, -np.inf]
 
-            # Redraw the plots by calling update_laser_plot with the laser number (1-based)
             self._update_laser_plot(i + 1)
 
         logging.debug("Reset all laser plot zoom levels")
 
-    def update_connection_status(self):
-        # Update UI elements for each service
-        for name, status in self.client.connection_status.items():
-            if status == "connected":
-                color = "black"
-            elif status in ["connecting", "reconnecting"]:
-                color = "orange"
-            else:  # disconnected or failed
-                color = "red"
+    def handle_service_state_change(self, service_name, old_state, new_state):
+        """Handle state changes for services"""
+        logging.info(
+            f"Service {service_name} changed from {old_state.name} to {new_state.name}"
+        )
 
-            # Update corresponding UI elements based on the service
-            if name == "booster":
-                self.booster_label.setStyleSheet(f"font-weight: bold; color: {color};")
+        # Update UI immediately on state change
+        self.update_connection_status()
 
-            elif name == "datasets":
-                self.elapsed_time_label.setStyleSheet(f"color: {color};")
-
-            elif name == "schedule":
-                self.schedule_text.setStyleSheet(f"color: {color};")
-
-            elif name == "DLCProState":
-                # Update only connection status part of DLCPro label
-                # ON/OFF status is handled by update_DLCProState
-                emission_enabled = (
-                    self.client.dlcpro.get("emission", False)
-                    if self.client.dlcpro
-                    else False
-                )
-                on_off_text = "ON" if emission_enabled else "OFF"
-                on_off_color = "green" if emission_enabled else "red"
-
-                self.dlc_status_label.setText(
-                    f"<span style='color:{color};'>DLCPro:</span>"
-                    f" <span style='color:{on_off_color};'>{on_off_text}</span>"
-                )
-                self.dlc_status_label.setStyleSheet("font-weight: bold;")
+        # If a service just connected, refresh relevant UI
+        if old_state.name != "CONNECTED" and new_state.name == "CONNECTED":
+            if service_name == "datasets":
+                # Refresh datasets display
+                self.update()
+            elif service_name == "dlcpro":
+                # Refresh DLCPro display
+                self.update_DLCProState()
+            elif service_name == "schedule":
+                # Refresh schedule display
+                self.update_schedule(None)
 
 
 if __name__ == "__main__":
@@ -1066,7 +899,7 @@ if __name__ == "__main__":
     loop = QEventLoop(APP)
     asyncio.set_event_loop(loop)
 
-    main_window = MainWindow()
+    main_window = MainWindow(app=APP)
 
     main_window.show()
     try:
