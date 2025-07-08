@@ -35,6 +35,7 @@ from toptica.lasersdk.utils.dlcpro import (
 sys.path.append(__file__.split("artiq")[0] + "artiq")
 from repository.gui.gui_client import GUIClient  # noqa: E402
 from repository.imaging.processor import AbsImage  # noqa: E402
+from repository.imaging.absorption_image import MAGNIFICATION  # noqa: E402
 
 
 class DeviceState(Enum):
@@ -431,7 +432,7 @@ class MainWindow(QWidget):
             data=tof[1],
             ref=ref[1],
             bg=bg[1],
-            magnification=0.5,  # Set default magnification
+            magnification=MAGNIFICATION,  # Set default magnification
         )
 
         self.canvas.figure.clear()

@@ -10,6 +10,7 @@ from matplotlib.figure import Figure
 
 from artiq.applets.simple import TitleApplet  # noqa: E402
 from repository.imaging.processor import AbsImage  # noqa: E402
+from repository.imaging.absorption_image import MAGNIFICATION  # noqa: E402
 
 
 class AbsorptionView(QtWidgets.QWidget):
@@ -136,7 +137,7 @@ class AbsorptionView(QtWidgets.QWidget):
                     data=tof_data,
                     ref=ref_data,
                     bg=bg_data,
-                    magnification=0.5,  # Set default magnification
+                    magnification=MAGNIFICATION,  # Set default magnification
                 )
 
                 # Enable save button now that we have data

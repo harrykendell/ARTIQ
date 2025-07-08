@@ -3,6 +3,7 @@ from artiq.coredevice.dma import CoreDMA
 from artiq.experiment import kernel, rpc
 from artiq.language import delay, ms, now_mu, parallel, s, us
 from time import time
+
 # from repository.models.device_db import server_addr
 from ndscan.experiment import (
     BoolParam,
@@ -18,6 +19,8 @@ from repository.fragments.mot import MOT
 from repository.imaging.PCO_Camera import PcoCamera
 from repository.imaging.processor import AbsImage  # noqa: E402
 from repository.models.devices import SUServoedBeam
+
+MAGNIFICATION = 0.5  # Default magnification for absorption imaging
 
 
 class AbsorptionImageExpFrag(ExpFragment):
@@ -152,7 +155,7 @@ class AbsorptionImageExpFrag(ExpFragment):
             data=images[0],
             ref=images[1],
             bg=images[2],
-            magnification=0.5,  # Set default magnification
+            magnification=MAGNIFICATION,  # Set default magnification
         )
 
         self.atom_number.push(self.absimg.atom_number)
