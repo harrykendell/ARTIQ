@@ -54,30 +54,41 @@ VDRIVEN_SUPPLIES = [
         fastino="fastino",
         ch=4,
         gain=222 * MHz / V,
+        min_output=-200 * MHz,  # we are in 150Ω mode so max JP5 open -> +-5V
         max_output=200 * MHz,  # we are in 150Ω mode so max JP5 open -> +-5V
         default_output=0.0 * MHz,
         unit="MHz",
     ),
     VDrivenSupply(
-        name="GreenTA",
+        name="push_852",
         fastino="fastino",
-        ch=6,
-        gain=0.4 * A / V,  # 4A max * V / 10V -> 0.4 A/V
-        max_output=2.0 * A,
-        default_output=1.450 * A,
-        disabled=True,
-        # TODO: Actually set me up
+        ch=5,
+        gain=222 * MHz / V,
+        min_output=-200 * MHz,  # we are in 150Ω mode so max JP5 open -> +-5V
+        max_output=200 * MHz,  # we are in 150Ω mode so max JP5 open -> +-5V
+        default_output=0.0 * MHz,
+        unit="MHz",
     ),
-    VDrivenSupply(
-        name="Dispenser",
-        fastino="fastino",
-        ch=7,
-        gain=1.0 * A / V,
-        max_output=3.0 * A,
-        default_output=2.70 * A,
-        disabled=True,
-        # TODO: Actually set me up
-    ),
+    # VDrivenSupply(
+    #     name="GreenTA",
+    #     fastino="fastino",
+    #     ch=6,
+    #     gain=0.4 * A / V,  # 4A max * V / 10V -> 0.4 A/V
+    #     max_output=2.0 * A,
+    #     default_output=1.450 * A,
+    #     disabled=True,
+    #     # TODO: Actually set me up
+    # ),
+    # VDrivenSupply(
+    #     name="Dispenser",
+    #     fastino="fastino",
+    #     ch=7,
+    #     gain=1.0 * A / V,
+    #     max_output=3.0 * A,
+    #     default_output=2.70 * A,
+    #     disabled=True,
+    #     # TODO: Actually set me up
+    # ),
 ]
 # Convert to dict for ease of use
 VDRIVEN_SUPPLIES = {supply.name: supply for supply in VDRIVEN_SUPPLIES}
@@ -170,15 +181,13 @@ SUSERVOED_BEAMS = [
 SUSERVOED_BEAMS = {beam.name: beam for beam in SUSERVOED_BEAMS}
 
 # map from class to dict for initializing devices
-device_arrays.update(
-    {
-        Eom: EOMS,
-        VDrivenSupply: VDRIVEN_SUPPLIES,
-        Shutter: SHUTTERS,
-        SUServoedBeam: SUSERVOED_BEAMS,
-        # Add other classes as needed
-    }
-)
+device_arrays.update({
+    Eom: EOMS,
+    VDrivenSupply: VDRIVEN_SUPPLIES,
+    Shutter: SHUTTERS,
+    SUServoedBeam: SUSERVOED_BEAMS,
+    # Add other classes as needed
+})
 
 
 class DefaultValues(Fragment):

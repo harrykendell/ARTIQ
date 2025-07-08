@@ -335,6 +335,7 @@ aliases = {
     "shutter_3DMOT": "ttl1",
     "shutter_IMG": "ttl3",
     # 852 Lattice
+    "852_unlock": "ttl5",
     "suservo_aom_LATX": "suservo_ch4",
     "suservo_aom_LATY": "suservo_ch5",
     "shutter_LATTICE": "ttl2",

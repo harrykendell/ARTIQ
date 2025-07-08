@@ -29,6 +29,7 @@ class VDrivenSupply(DEVICE):
     ch: int
 
     gain: float = 1.0  # The Current gain in Amps/Volt
+    min_output: float = 0.0
     max_output: float = inf
     disabled: bool = False
     default_output: float = 0.0
