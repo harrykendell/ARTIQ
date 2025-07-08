@@ -22,10 +22,12 @@ class SetAnalogCurrentSupplyExp(ExpFragment):
         self.setattr_device("core")
         self.core: Core
 
-        default = VDrivenSupply.keys()[0]
+        current_supplies = [dev.name for dev in VDrivenSupply.values() if dev.unit == "A"]
+        default = current_supplies[0]
+
         self.setattr_argument(
             "current_supply",
-            EnumerationValue(VDrivenSupply.keys(), default=default),
+            EnumerationValue(current_supplies, default=default),
         )
         self.current_supply: str
 
