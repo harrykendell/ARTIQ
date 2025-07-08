@@ -153,6 +153,12 @@ class PcoCamera(Fragment):
         self.images = self.rotate_and_flip(self.images).astype(np.float64)
         self.set_dataset("Images.Latest_image", self.images[-1], broadcast=True)
 
+        for num, img in enumerate(self.images):
+            self.set_dataset(
+                f"Images.{now}.{num}",
+                img,
+                broadcast=True,
+            )
         return self.images
 
     @host_only
