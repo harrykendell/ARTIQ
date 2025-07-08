@@ -56,6 +56,7 @@ class PcoCamera(Fragment):
         self.trigger: TTLInOut = self.pco_camera
 
         self.debug = logger.getEffectiveLevel() <= logging.INFO
+        self.counter = 0
 
     def host_setup(self):
         """
@@ -153,12 +154,13 @@ class PcoCamera(Fragment):
         self.images = self.rotate_and_flip(self.images).astype(np.float64)
         self.set_dataset("Images.Latest_image", self.images[-1], broadcast=True)
 
-        for num, img in enumerate(self.images):
+        for img in self.images:
             self.set_dataset(
-                f"Images.{now}.{num}",
+                f"Images.All.{self.counter}",
                 img,
                 broadcast=True,
             )
+            self.counter += 1
         return self.images
 
     @host_only
