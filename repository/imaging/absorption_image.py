@@ -20,7 +20,7 @@ from repository.imaging.PCO_Camera import PcoCamera
 from repository.imaging.processor import AbsImage  # noqa: E402
 from repository.models.devices import SUServoedBeam
 
-MAGNIFICATION = 0.5  # Default magnification for absorption imaging
+MAGNIFICATION = 0.25  # Default magnification for absorption imaging
 
 
 class AbsorptionImageExpFrag(ExpFragment):

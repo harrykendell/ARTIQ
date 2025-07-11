@@ -422,7 +422,7 @@ class MOT(Fragment):
         """
         # Unlock the MOT
         self.unlock_mot()
-
+        #self.odt_beams.turn_beams_on()
         with parallel:
             # Fix EOM frequency
             self.eom.set_freq(self.eom.config.frequency + self.CMOT_detuning.get())
