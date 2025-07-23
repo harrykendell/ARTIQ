@@ -434,12 +434,7 @@ class AbsImage:
             colors="red",
             linewidths=1,
         )
-        # Plot 2d gaussian fit
-        od_ax.imshow(
-            self.best_fit,
-            **plot_params,
-            alpha=0.5,
-        )
+
         # show the 1stdev fitted gaussian outline - contour of A/e
         od_ax.contour(
             x_contour,
