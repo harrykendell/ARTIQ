@@ -333,50 +333,6 @@ class GUIClient:
             logging.error(f"Error in DLCPro ping and data fetch: {e}")
             return False
 
-    async def connect_dlcpro(self):
-        """Connect to DLCPro service."""
-        service = self.services["dlcpro"]
-        logging.info("Connecting to DLCPro...")
-
-        try:
-            # Create DLCPro client with custom get method
-            self.dlcpro = Client(self.server, 3272, "TopticaDLCPro", timeout=1)
-
-            # Define get method to handle attribute access
-            def get_dlcpro(name, default=None):
-                try:
-                    attr_name = name.replace(":", "_").replace("-", "_")
-                    result = self.dlcpro.__getattr__(attr_name)()
-
-                    # On success, update state if needed
-                    if service.state != ConnectionState.CONNECTED:
-                        service.set_state(ConnectionState.CONNECTED)
-                        service.reset_backoff()
-
-                    return result
-                except Exception as e:
-                    # Only trigger reconnection if currently connected
-                    if service.state == ConnectionState.CONNECTED:
-                        logging.error(f"DLCPro communication error: {str(e)}")
-                        asyncio.create_task(service.handle_disconnect(e))
-                    return default
-
-            # Attach custom get method
-            self.dlcpro.get = get_dlcpro
-
-            # Test connection
-            test_result = self.dlcpro.get("time")
-            if test_result is not None:
-                service.set_state(ConnectionState.CONNECTED)
-                service.reset_backoff()
-                logging.debug("Connected to DLCPro")
-            else:
-                raise Exception("Connection test failed")
-
-        except Exception as e:
-            logging.error(f"Failed to connect to DLCPro: {str(e)}")
-            raise
-
     async def connect_subscriber(self, name, db: dict, port=None, server=None):
         """Connect to a subscriber service with state machine-based reconnection."""
         port = self.port_notify if port is None else port
@@ -444,7 +400,8 @@ class GUIClient:
 
     def get_dlcpro_data(self, key: str, default=None):
         """Get data from DLCPro cache with a default value if not found"""
-        return self.dlcpro_cache.get(key, default)
+        val = self.dlcpro_cache.get(key, default)
+        return val if val is not None else default
 
     def get_dlcpro_cache(self):
         """Get a copy of the entire DLCPro cache"""
@@ -474,7 +431,7 @@ class GUIClient:
                 except Exception as e:
                     # Only trigger reconnection if currently connected
                     if service.state == ConnectionState.CONNECTED:
-                        logging.error(f"DLCPro communication error: {str(e)}")
+                        logging.error(f"DLCPro communication error: {name}: {str(e)}")
                         asyncio.create_task(service.handle_disconnect(e))
                     return None
 
