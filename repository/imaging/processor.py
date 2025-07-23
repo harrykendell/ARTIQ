@@ -435,6 +435,37 @@ class AbsImage:
             linewidths=1,
         )
 
+        # show the fitted slices
+        od_ax.plot(
+            x_contour,
+            self.best_fit[self.best_fit.shape[0] // 2, :],
+            color="green",
+            linewidth=2,
+            label="Horizontal fit",
+        )
+        od_ax.plot(
+            self.best_fit[:, self.best_fit.shape[1] // 2],
+            y_contour,
+            color="green",
+            linewidth=2,
+            label="Vertical fit",
+        )
+        # show the od slices too
+        od_ax.plot(
+            x_contour,
+            self.optical_density[self.optical_density.shape[0] // 2, :],
+            color="white",
+            linewidth=2,
+            label="Horizontal OD",
+        )
+        od_ax.plot(
+            self.optical_density[:, self.optical_density.shape[1] // 2],
+            y_contour,
+            color="white",
+            linewidth=2,
+            label="Vertical OD",
+        )
+
         # show the 1stdev fitted gaussian outline - contour of A/e
         od_ax.contour(
             x_contour,
