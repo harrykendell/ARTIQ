@@ -438,13 +438,13 @@ class AbsImage:
         # show the fitted slices
         od_ax.plot(
             x_contour,
-            self.best_fit[self.best_fit.shape[0] // 2, :],
+            self.best_fit[self.peak[0], :],
             color="green",
             linewidth=2,
             label="Horizontal fit",
         )
         od_ax.plot(
-            self.best_fit[:, self.best_fit.shape[1] // 2],
+            self.best_fit[:, self.peak[1]],
             y_contour,
             color="green",
             linewidth=2,
@@ -453,13 +453,13 @@ class AbsImage:
         # show the od slices too
         od_ax.plot(
             x_contour,
-            self.optical_density[self.optical_density.shape[0] // 2, :],
+            self.optical_density[self.peak[0], :],
             color="white",
             linewidth=2,
             label="Horizontal OD",
         )
         od_ax.plot(
-            self.optical_density[:, self.optical_density.shape[1] // 2],
+            self.optical_density[:, self.peak[1]],
             y_contour,
             color="white",
             linewidth=2,
