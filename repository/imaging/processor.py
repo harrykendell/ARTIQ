@@ -107,9 +107,10 @@ class AbsImage:
             "pixel_size": {self.pixel_size},
             "magnification": {self.magnification},
             "atom_number": {self.atom_number},
-            "peak": {self.peak},
-            "centroid": {self.centroid},
-            "best_values": {self.best_values},
+            "peak_pixel": {self.peak},
+            "centroid_pixel": {self.centroid},
+            "best_values_pixel": {self.best_values},
+            "multiply_by_me_to_convert_pixel_to_SI": {self.physical_scale},
         """
 
     @functools.cached_property
@@ -433,7 +434,12 @@ class AbsImage:
             colors="red",
             linewidths=1,
         )
-
+        # Plot 2d gaussian fit
+        od_ax.imshow(
+            self.best_fit,
+            **plot_params,
+            alpha=0.5,
+        )
         # show the 1stdev fitted gaussian outline - contour of A/e
         od_ax.contour(
             x_contour,
