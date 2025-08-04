@@ -29,6 +29,10 @@ from submodules.oitg.oitg.fitting import exponential_decay
 logger = logging.getLogger(__name__)
 
 
+
+
+#This experiment assume that the 3D MOT is already loaded.
+
 class MOTPhotodiodeMeasurement(Fragment):
     def build_fragment(self):
         self.setattr_device("core")
@@ -64,13 +68,14 @@ class MOTPhotodiodeMeasurement(Fragment):
         delay_mu(unload_time_mu)
 
     @kernel
-    def load_MOT(self):  # type: ignore
+    def load_MOT(self, load_time_mu: TInt64):  # type: ignore
         """
         Reload the MOT by turning on the coils.
 
         This starts loading the MOT now.
         """
         self.coil_setter.set_to_defaults()
+        delay_mu(load_time_mu)
 
     @kernel
     def unload_3dMOT(self):  # type: ignore
@@ -88,7 +93,8 @@ class MOTPhotodiodeMeasurement(Fragment):
         delay_between_points_mu: TInt64,  # type: ignore
         unload_time_mu: TInt64,  # type: ignore
         data: TList(TFloat),
-        unload_time_3d: TInt64,  # type: ignore
+        unload_time_3d: TInt64, 
+        load_time_3d: TInt64  # type: ignore
     ) -> None:
         """
         Read the fluorescence out into an array.
@@ -96,7 +102,8 @@ class MOTPhotodiodeMeasurement(Fragment):
         You must pass an array of floats with size <num_points> to `data`.
         """
         
-
+        self.unload_MOT(unload_time_mu)
+        self.load_MOT(load_time_3d)
         for i in range(num_points // 20):
             data[i] = self.adc_reader.read_adc()
             delay_mu(delay_between_points_mu)
@@ -192,7 +199,8 @@ class MeasureMOTWithPDFrag(ExpFragment):
             ),
             unload_time_mu=self.core.seconds_to_mu(self.unload_time.get()),
             data=trace_data,
-            unload_time_3d=self.core.seconds_to_mu(self.MOT3d_unload_time.get()),
+            unload_time_3d=self.core.seconds_to_mu(self.MOT3d_unload_time.get()), 
+            load_time_3d=self.core.seconds_to_mu(self.total_loading_time.get()),
         )
 
         self.photodiode_voltage.push(np.array(trace_data))
