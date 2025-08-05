@@ -111,6 +111,7 @@ class BoosterTelemetry(QThread):
 
 if __name__ == "__main__":
     import sys
+    from time import sleep
     from PyQt5.QtWidgets import QApplication
 
     app = QApplication(sys.argv)

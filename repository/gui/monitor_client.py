@@ -191,7 +191,7 @@ class ServiceConnection:
                 self.state_change_callback(self.name, old_state, new_state)
 
 
-class GUIClient:
+class MonitorClient:
 
     def __init__(
         self, app=None, server="137.222.69.28", port_control=3251, port_notify=3250
@@ -463,7 +463,7 @@ class GUIClient:
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
-    client = GUIClient()
+    client = MonitorClient()
     asyncio.run(client.connect())
     # Keep the event loop running
     try:

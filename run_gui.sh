@@ -69,7 +69,7 @@ fi
 
 # Running locally on a different machine - we run everything locally
 echo -e "${GREEN}Not running on the ARTIQ server${NC}"
-(python repository/gui/ArtiqGUI.py) &
+(python repository/gui/ArtiqMonitor.py) &
 
 # who knows if they have nix installed
 if command -v nix 2>&1 >/dev/null; then

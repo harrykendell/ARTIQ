@@ -33,14 +33,16 @@ from toptica.lasersdk.utils.dlcpro import (
 
 
 sys.path.append(__file__.split("artiq")[0] + "artiq")
-from repository.gui.gui_client import GUIClient  # noqa: E402
+from repository.gui.monitor_client import MonitorClient  # noqa: E402
 from repository.imaging.processor import AbsImage  # noqa: E402
 from repository.imaging.absorption_image import MAGNIFICATION  # noqa: E402
 
 
 class DeviceState(Enum):
     ENABLED = "Enabled"
+    POWERED = "Powered"
     DISABLED = "Disabled"
+    OFF = "Off"
     ERROR = "Error"
     UNKNOWN = "Unknown"
     LOW_POWER = "Low"
@@ -72,8 +74,10 @@ UNKOWN = {
 DEVICE_STYLES = {
     DeviceState.ENABLED: WORKING,
     DeviceState.LOW_POWER: DUBIOUS,
+    DeviceState.POWERED: DUBIOUS,
     DeviceState.UNLOCKED: DUBIOUS,
     DeviceState.ERROR: ERROR,
+    DeviceState.OFF: ERROR,
     DeviceState.DISABLED: ERROR,
     DeviceState.TRIPPED: ERROR,
     DeviceState.UNKNOWN: UNKOWN,
@@ -102,16 +106,16 @@ EMISSION_STYLES = {
 class MainWindow(QWidget):
     def __init__(self, app):
         super().__init__()
-        self.client = GUIClient(app=app)
+        self.client = MonitorClient(app=app)
         self.client.set_main_window(self)
 
         # Register for service state change notifications
-        for service_name, service in self.client.services.items():
+        for _, service in self.client.services.items():
             service.state_change_callback = (
                 lambda name, old, new: self.handle_service_state_change(name, old, new)
             )
 
-        self.setWindowTitle("ARTIQ GUI")
+        self.setWindowTitle("ARTIQ Monitor")
         self.setGeometry(100, 100, 550, 400)
         self.initUI()
 
@@ -774,14 +778,16 @@ class MainWindow(QWidget):
                 reflected_text = f"↻ {reflected_power:.1f} dBm"
 
                 # Map state strings to DeviceState enum using dictionary
-                STATE_MAPPING = {
-                    DeviceState.ENABLED.value: (
-                        DeviceState.LOW_POWER
-                        if output_power < LOW_POWER_THRESHOLD
-                        else DeviceState.ENABLED
-                    ),
-                    DeviceState.DISABLED.value: DeviceState.DISABLED,
-                }
+                STATE_MAPPING = {val.value: val for val in DeviceState}
+                STATE_MAPPING.update(
+                    {
+                        DeviceState.ENABLED.value: (
+                            DeviceState.LOW_POWER
+                            if output_power < LOW_POWER_THRESHOLD
+                            else DeviceState.ENABLED
+                        )
+                    }
+                )
 
                 # Default to UNKNOWN if not in mapping
                 if "Tripped" in state_str:
@@ -909,7 +915,7 @@ if __name__ == "__main__":
         logging.info("Keyboard interrupt received. Shutting down...")
     finally:
         APP.shutdown = True
-        print("Shutting down ARTIQ GUI...")
+        print("Shutting down ARTIQ Monitor...")
         # Ensure clean shutdown
         pending = asyncio.all_tasks(loop)
         for task in pending:
