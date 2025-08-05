@@ -51,27 +51,27 @@ class DeviceState(Enum):
     TRIPPED = "Tripped"
 
 
-ERROR = {
+ERROR: dict[str, str] = {
     "state": "color: red; font-weight: bold;",
     "frame": "background-color: #ffe8e8;",
     "value": "",
 }
-WORKING = {
+WORKING: dict[str, str] = {
     "state": "color: green; font-weight: bold;",
     "frame": "background-color: #e8ffe8;",
     "value": "",
 }
-DUBIOUS = {
+DUBIOUS: dict[str, str] = {
     "state": "color: #aa6600; font-weight: bold;",
     "frame": "background-color: #fff8e0;",
     "value": "font-weight: bold;",
 }
-UNKOWN = {
+UNKOWN: dict[str, str] = {
     "state": "",
     "frame": "background-color: #f0f0f0;",
     "value": "",
 }
-DEVICE_STYLES = {
+DEVICE_STYLES: dict[DeviceState, dict[str, str]] = {
     DeviceState.ENABLED: WORKING,
     DeviceState.LOW_POWER: DUBIOUS,
     DeviceState.POWERED: DUBIOUS,
@@ -104,7 +104,7 @@ EMISSION_STYLES = {
 
 
 class MainWindow(QWidget):
-    def __init__(self, app):
+    def __init__(self, app) -> None:
         super().__init__()
         self.client = MonitorClient(app=app)
         self.client.set_main_window(self)
@@ -124,7 +124,7 @@ class MainWindow(QWidget):
         self.update_timer.timeout.connect(self.update)
         self.update_timer.start(250)  # Update every second
 
-    def initUI(self):
+    def initUI(self) -> None:
         layout = QVBoxLayout()
 
         booster_layout = QGridLayout()
@@ -210,7 +210,7 @@ class MainWindow(QWidget):
 
             header_layout = QGridLayout()
             header_layout.setSpacing(0)
-            name_label = QLabel(f"<b>Laser {i+1}</b>")
+            name_label = QLabel(f"<b>Laser {i + 1}</b>")
             state_label = QLabel(DeviceState.UNKNOWN.value)
             lock_label = QLabel(DeviceState.UNLOCKED.value)
 
@@ -287,16 +287,9 @@ class MainWindow(QWidget):
         dlc_status_label.setStyleSheet("font-weight: bold;")
         self.dlc_status_label = dlc_status_label
 
-        # Create a reset zoom button
-        reset_button = QPushButton("Reset Zoom")
-        reset_button.clicked.connect(self.reset_dlc_plots)
-        reset_button.setToolTip("Reset the zoom level on all laser plots")
-        reset_button.setMaximumWidth(100)  # Limit width to keep it compact
-
         # Create a horizontal layout for the DLC header
         dlc_header_layout = QHBoxLayout()
         dlc_header_layout.addWidget(dlc_status_label, 1)  # Give label more stretch
-        dlc_header_layout.addWidget(reset_button, 0, Qt.AlignRight)  # Right-aligned
 
         outer_layout = QVBoxLayout()
         outer_layout.addLayout(
@@ -347,7 +340,7 @@ class MainWindow(QWidget):
         self.setLayout(layout)
         self.update()
 
-    def update(self):
+    def update(self) -> None:
         """Update the elapsed time display and connection status"""
         now = time.time()
 
@@ -382,7 +375,7 @@ class MainWindow(QWidget):
                 # Don't set client.dlcpro to None as the service handles reconnection
 
     # Always update connection status to show current state
-    def update_connection_status(self):
+    def update_connection_status(self) -> None:
         """Update the connection status display for all services."""
         # Create a mapping from service states to display colors
         state_colors = {"CONNECTED": "green", "CONNECTING": "orange", "BACKOFF": "red"}
@@ -420,7 +413,7 @@ class MainWindow(QWidget):
                 )
                 self.dlc_status_label.setStyleSheet("font-weight: bold;")
 
-    def update_datasets(self, mod):
+    def update_datasets(self, mod) -> None:
         if "Images.absorption" not in str(mod):
             return
         self.update()
@@ -470,7 +463,7 @@ class MainWindow(QWidget):
                 <span style="font-weight:bold">Atoms:</span>\
                 {atom_number:.2e} &nbsp;
                 <span style="font-weight:bold">Expansion:</span>\
-                {expansion_time*1e3:.2f} ms &nbsp;
+                {expansion_time * 1e3:.2f} ms &nbsp;
                 <span style="font-weight:bold">Sigma:</span>\
                 ({sigmax:.2f}, {sigmay:.2f}) mm<br>
                 <span style="color:#CCC"><b>R-squared:</b>\
@@ -478,7 +471,7 @@ class MainWindow(QWidget):
             </div>"""
         )
 
-    def update_schedule(self, mod):
+    def update_schedule(self, mod) -> None:
         self.update()
 
         text = "<b>Running:</b>\t---"
@@ -487,7 +480,7 @@ class MainWindow(QWidget):
                 text = f"<b>Running:</b>\t{value['expid']['class_name']}"
         self.schedule_text.setText(text)
 
-    def update_DLCProState(self):
+    def update_DLCProState(self) -> None:
         """Update the DLCPro state display using cached data from the client."""
         # First check if dlcpro service is connected
         dlcpro_service = self.client.services.get("dlcpro")
@@ -511,8 +504,8 @@ class MainWindow(QWidget):
             return
 
         # Get emission and connection states from cache
-        emission_enabled = self.client.get_dlcpro_data("emission", False)
-        emission_button_enabled = self.client.get_dlcpro_data(
+        emission_enabled: bool = self.client.get_dlcpro_data("emission", False)
+        emission_button_enabled: bool = self.client.get_dlcpro_data(
             "emission-button-enabled", False
         )
 
@@ -657,25 +650,43 @@ class MainWindow(QWidget):
                 zorder=0,
                 linewidth=1.0,
             )
-            # Reset limits if background data has non-zero length
+
+        # Get current data limits (including both scope and background data)
+        all_x_data = list(scope_data["x"])
+        all_y_data = list(scope_data["y"])
+        
+        # Include background data if available and being plotted
+        if lock_state == LOCK_STATE_LOCKED and len(background_data.get("x", [])) > 0:
+            all_x_data.extend(background_data["x"])
+            all_y_data.extend(background_data["y"])
+        
+        current_x_min = min(all_x_data) - 1e-6
+        current_x_max = max(all_x_data) + 1e-6
+        current_y_min = min(all_y_data) - 1e-6
+        current_y_max = max(all_y_data) + 1e-6
+
+        # Check if current data covers less than 50% of total limits
+        current_x_range = current_x_max - current_x_min
+        current_y_range = current_y_max - current_y_min
+        total_x_range = self.dlc_frames[idx]["x_lim"][1] - self.dlc_frames[idx]["x_lim"][0]
+        total_y_range = self.dlc_frames[idx]["y_lim"][1] - self.dlc_frames[idx]["y_lim"][0]
+
+        # Reset limits if current data covers less than 50% of total limits or if limits are not initialized
+        if (total_x_range == 0 or total_y_range == 0 or
+                current_x_range / total_x_range < 0.5 or
+                current_y_range / total_y_range < 0.5):
+            self.dlc_frames[idx]["x_lim"] = [current_x_min, current_x_max]
+            self.dlc_frames[idx]["y_lim"] = [current_y_min, current_y_max]
+        else:
+            # Update limits monotonically
             self.dlc_frames[idx]["x_lim"] = [
-                min(background_data["x"]) - 1e-6,
-                max(background_data["x"]) + 1e-6,
+                min(self.dlc_frames[idx]["x_lim"][0], current_x_min),
+                max(self.dlc_frames[idx]["x_lim"][1], current_x_max),
             ]
             self.dlc_frames[idx]["y_lim"] = [
-                min(background_data["y"]) - 1e-6,
-                max(background_data["y"]) + 1e-6,
+                min(self.dlc_frames[idx]["y_lim"][0], current_y_min),
+                max(self.dlc_frames[idx]["y_lim"][1], current_y_max),
             ]
-
-        # Update limits monotonically
-        self.dlc_frames[idx]["x_lim"] = [
-            min(self.dlc_frames[idx]["x_lim"][0], min(scope_data["x"]) - 1e-6),
-            max(self.dlc_frames[idx]["x_lim"][1], max(scope_data["x"]) + 1e-6),
-        ]
-        self.dlc_frames[idx]["y_lim"] = [
-            min(self.dlc_frames[idx]["y_lim"][0], min(scope_data["y"]) - 1e-6),
-            max(self.dlc_frames[idx]["y_lim"][1], max(scope_data["y"]) + 1e-6),
-        ]
 
         # Plot main spectrum data
         self._plot_spectrum_data(axes, scope_data, lock_candidates, lock_state)
@@ -847,17 +858,6 @@ class MainWindow(QWidget):
         data = {key: val[1] for key, val in self.client.datasets.items()}
         print("Saving datasets, type: ", type(data))
         np.save("datasets.npy", data)
-
-    def reset_dlc_plots(self):
-        """Reset the zoom level on all laser plots."""
-        for i, frame in enumerate(self.dlc_frames):
-            # Reset the plot limits
-            frame["x_lim"] = [np.inf, -np.inf]
-            frame["y_lim"] = [np.inf, -np.inf]
-
-            self._update_laser_plot(i + 1)
-
-        logging.debug("Reset all laser plot zoom levels")
 
     def handle_service_state_change(self, service_name, old_state, new_state):
         """Handle state changes for services"""
