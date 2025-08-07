@@ -1,13 +1,13 @@
 from artiq.language.units import A, MHz, V, dB, ms
+from ndscan.experiment import FloatParam, Fragment
 from repository.models import Eom, Shutter, SUServoedBeam, VDrivenSupply
 from repository.models.Device import device_arrays
-from ndscan.experiment import Fragment, FloatParam
 
 EOMS = [
     Eom(
         name="repump",
         frequency=6580.0 * MHz,
-        attenuation=13.0 * dB,
+        attenuation=21 * dB,
         mirny_ch="mirny_eom_repump",
         almazny_ch="almazny_eom_repump",
         almazny_enabled=True,
@@ -31,7 +31,7 @@ VDRIVEN_SUPPLIES = [
         ch=1,
         gain=2.0 * A / V,
         max_output=2.0 * A,
-        default_output=1.1 * A,
+        default_output=1.0 * A,
     ),
     VDrivenSupply(
         name="Y",
@@ -63,9 +63,9 @@ VDRIVEN_SUPPLIES = [
         name="push_852",
         fastino="fastino",
         ch=5,
-        gain=222 * MHz / V,
-        min_output=-200 * MHz,  # we are in 150Ω mode so max JP5 open -> +-5V
-        max_output=200 * MHz,  # we are in 150Ω mode so max JP5 open -> +-5V
+        gain=83 * MHz / V,
+        min_output=-400 * MHz,  # we are in 150Ω mode so max JP5 open -> +-5V
+        max_output=400 * MHz,  # we are in 150Ω mode so max JP5 open -> +-5V
         default_output=0.0 * MHz,
         unit="MHz",
     ),
