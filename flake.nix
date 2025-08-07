@@ -195,7 +195,7 @@
             aqmain.artiq
             #ps.paramiko  # needed if and only if flashing boards remotely (artiq_flash -H)
             #aqextra.flake8-artiq
-
+            ps.sip
             ps.pip
             ps.pandas
             ps.numpy
