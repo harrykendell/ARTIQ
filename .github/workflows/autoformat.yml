@@ -1,0 +1,72 @@
+name: Ruff check formatting
+on:
+  push:
+    paths:
+      - '**/*.py'
+permissions:
+  contents: write            # allows the workflow to push
+
+jobs:
+  ruff:
+    runs-on: ubuntu-latest
+    steps:
+      # 1 ▸ checkout full history so amend is safe
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 0
+
+      # 2 ▸ auto-format (skip vendor dirs)
+      - name: Ruff format
+        uses: astral-sh/ruff-action@v3
+        with:
+          args: >
+            format .
+            --exclude submodules
+            --exclude ThorlabsPM
+
+      # 3 ▸ lint (concise) and expose exit-code
+      - name: Ruff check (concise)
+        id: rcheck
+        shell: bash
+        run: |
+          set +e
+          OUTPUT=$(ruff check . \
+                    --exclude submodules \
+                    --exclude ThorlabsPM \
+                    --output-format concise)
+          STATUS=$?
+          echo "$OUTPUT"
+          echo "status=$STATUS"   >> "$GITHUB_OUTPUT"
+          echo "errors<<EOF"      >> "$GITHUB_OUTPUT"
+          echo "$OUTPUT" | head -n 40 >> "$GITHUB_OUTPUT"
+          echo "EOF"              >> "$GITHUB_OUTPUT"
+
+      # 4 ▸ amend tip only if formatter changed files
+      - name: Amend last commit & push
+        env:
+          RUFF_STATUS: ${{ steps.rcheck.outputs.status }}
+          RUFF_ERRORS: ${{ steps.rcheck.outputs.errors }}
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "No formatting changes – nothing to commit."
+            exit 0
+          fi
+
+          git config user.name  "ruff-bot"
+          git config user.email "ruff-bot@users.noreply.github.com"
+          ORIGINAL_MSG=$(git log -1 --pretty=%B)
+
+          git add -A
+          if [ "$RUFF_STATUS" -ne 0 ]; then
+            git commit --amend --allow-empty -m "$ORIGINAL_MSG" \
+              -m "style: apply Ruff auto-format (lint errors remain)" \
+              -m "$RUFF_ERRORS"
+          else
+            git commit --amend -allow-empty -m "$ORIGINAL_MSG" \
+              -m "style: apply Ruff auto-format"
+          fi
+
+          # safe history rewrite
+          git push --force-with-lease --force-if-includes
