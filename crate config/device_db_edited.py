@@ -73,15 +73,13 @@ device_db["mirny0_cpld"] = {
 for i in range(4):
     device_db.update(
         {
-            "ttl_mirny0_sw"
-            + str(i): {
+            "ttl_mirny0_sw" + str(i): {
                 "type": "local",
                 "module": "artiq.coredevice.ttl",
                 "class": "TTLOut",
                 "arguments": {"channel": 2 + i},
             },
-            "mirny0_ch"
-            + str(i): {
+            "mirny0_ch" + str(i): {
                 "type": "local",
                 "module": "artiq.coredevice.adf5356",
                 "class": "ADF5356",
@@ -108,8 +106,7 @@ device_db["mirny0_almazny"] = {
 for i in range(4):
     device_db.update(
         {
-            "ttl"
-            + str(i): {
+            "ttl" + str(i): {
                 "type": "local",
                 "module": "artiq.coredevice.ttl",
                 "class": "TTLOut",
@@ -121,16 +118,13 @@ for i in range(4):
 for i in range(4):
     device_db.update(
         {
-            "ttl"
-            + str(i + 4): {
+            "ttl" + str(i + 4): {
                 "type": "local",
                 "module": "artiq.coredevice.ttl",
                 "class": "TTLInOut",
                 "arguments": {"channel": 10 + i},
             },
-            "ttl"
-            + str(i + 4)
-            + "_counter": {
+            "ttl" + str(i + 4) + "_counter": {
                 "type": "local",
                 "module": "artiq.coredevice.edge_counter",
                 "class": "EdgeCounter",
@@ -142,16 +136,13 @@ for i in range(4):
 for i in range(8):
     device_db.update(
         {
-            "ttl"
-            + str(i + 8): {
+            "ttl" + str(i + 8): {
                 "type": "local",
                 "module": "artiq.coredevice.ttl",
                 "class": "TTLInOut",
                 "arguments": {"channel": 18 + i},
             },
-            "ttl"
-            + str(i + 8)
-            + "_counter": {
+            "ttl" + str(i + 8) + "_counter": {
                 "type": "local",
                 "module": "artiq.coredevice.edge_counter",
                 "class": "EdgeCounter",
@@ -183,8 +174,7 @@ device_db["suservo0"] = {
 for i in range(8):
     device_db.update(
         {
-            "suservo0_ch"
-            + str(i): {
+            "suservo0_ch" + str(i): {
                 "type": "local",
                 "module": "artiq.coredevice.suservo",
                 "class": "Channel",
@@ -205,16 +195,13 @@ device_db["spi_sampler0_pgia"] = {
 for i in range(2):
     device_db.update(
         {
-            "spi_urukul"
-            + str(i): {
+            "spi_urukul" + str(i): {
                 "type": "local",
                 "module": "artiq.coredevice.spi2",
                 "class": "SPIMaster",
                 "arguments": {"channel": 44 + i},
             },
-            "urukul"
-            + str(i)
-            + "_cpld": {
+            "urukul" + str(i) + "_cpld": {
                 "type": "local",
                 "module": "artiq.coredevice.urukul",
                 "class": "CPLD",
@@ -224,9 +211,7 @@ for i in range(2):
                     "clk_sel": 2,
                 },
             },
-            "urukul"
-            + str(i)
-            + "_dds": {
+            "urukul" + str(i) + "_dds": {
                 "type": "local",
                 "module": "artiq.coredevice.ad9910",
                 "class": "AD9910",
@@ -243,8 +228,7 @@ for i in range(2):
 for i in range(2):
     device_db.update(
         {
-            "led"
-            + str(i): {
+            "led" + str(i): {
                 "type": "local",
                 "module": "artiq.coredevice.ttl",
                 "class": "TTLOut",

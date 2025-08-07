@@ -62,7 +62,6 @@ class TopticaDLCPro:
         """
 
         def hunt_down(obj, path):
-
             for name in dir(obj):
                 # skip private and special methods
                 if name.startswith("_"):

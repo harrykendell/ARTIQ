@@ -22,7 +22,9 @@ class SetAnalogCurrentSupplyExp(ExpFragment):
         self.setattr_device("core")
         self.core: Core
 
-        current_supplies = [dev.name for dev in VDrivenSupply.values() if dev.unit == "A"]
+        current_supplies = [
+            dev.name for dev in VDrivenSupply.values() if dev.unit == "A"
+        ]
         default = current_supplies[0]
 
         self.setattr_argument(

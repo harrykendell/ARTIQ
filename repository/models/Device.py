@@ -241,7 +241,7 @@ class DEVICE:
             except Exception as e:
                 formatted_value = repr(new_value)
                 logging.warning(
-                    "Could not preserve units for" f" {self.name}.{field_name}.\n{e}"
+                    f"Could not preserve units for {self.name}.{field_name}.\n{e}"
                 )
         else:
             logging.warning(f"Defaulted to repr for {field_name}:  {type(new_value)}")

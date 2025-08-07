@@ -345,8 +345,9 @@ class AbsImage:
 
         # Prepare data
         raw_images = [self.data_image, self.ref_image, self.bg_image]
-        input_min, input_max = min(np.min(img) for img in raw_images), max(
-            np.max(img) for img in raw_images
+        input_min, input_max = (
+            min(np.min(img) for img in raw_images),
+            max(np.max(img) for img in raw_images),
         )
 
         def plot_image(ax, img, title):
@@ -393,8 +394,9 @@ class AbsImage:
         formatter = FuncFormatter(lambda x, pos: f"{x:.1f}")
 
         # Plot parameters
-        vmin, vmax = min(np.min(self.optical_density), np.min(self.best_fit)), max(
-            np.max(self.optical_density), np.max(self.best_fit)
+        vmin, vmax = (
+            min(np.min(self.optical_density), np.min(self.best_fit)),
+            max(np.max(self.optical_density), np.max(self.best_fit)),
         )
         plot_params = {
             "cmap": "gray",
@@ -411,9 +413,10 @@ class AbsImage:
             self.best_values["x0"] * scale_mm,
             self.best_values["y0"] * scale_mm,
         )
-        x_contour, y_contour = np.linspace(
-            extent[0], extent[1], self.width
-        ), np.linspace(extent[2], extent[3], self.height)
+        x_contour, y_contour = (
+            np.linspace(extent[0], extent[1], self.width),
+            np.linspace(extent[2], extent[3], self.height),
+        )
 
         # OD plot
         im1 = od_ax.imshow(self.optical_density, **plot_params)

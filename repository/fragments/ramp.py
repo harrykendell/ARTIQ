@@ -198,7 +198,7 @@ class Ramp(Fragment):
             if values_name.endswith("_end"):
                 start_vals = getattr(self, f"{values_name[:-4]}_start")
                 if not (not start_vals or start_vals[num] is default):
-                    logging.warning(
+                    logging.info(
                         f"Did you mean to use a default for {desc} but not it's start?"
                     )
             # We don't want to expose defaulted values as they follow devices.py
@@ -629,9 +629,7 @@ class Ramp(Fragment):
             logger.info('Saving dma trace as "%s"', self.fqn)
 
     @portable
-    def _calc_step_size(
-        self, start: TFloat, end: TFloat, num_points: TInt32
-    ) -> TFloat:  # noqa
+    def _calc_step_size(self, start: TFloat, end: TFloat, num_points: TInt32) -> TFloat:  # noqa
         if num_points > 1:
             return (end - start) / float(num_points - 1)
         else:

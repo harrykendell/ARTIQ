@@ -34,9 +34,9 @@ class SetSupplies(Fragment):
             configs = [configs]
         self.configs: list[VDrivenSupply] = configs
         self.defaults = [dev.default_output for dev in self.configs]
-        assert all(
-            [c.fastino == self.configs[0].fastino for c in self.configs]
-        ), "All supplies must use the same Fastino"
+        assert all([c.fastino == self.configs[0].fastino for c in self.configs]), (
+            "All supplies must use the same Fastino"
+        )
 
         self.fastino = self.get_device(self.configs[0].fastino)
         self.fastino: Fastino

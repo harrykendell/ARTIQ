@@ -29,9 +29,8 @@ from submodules.oitg.oitg.fitting import exponential_decay
 logger = logging.getLogger(__name__)
 
 
+# This experiment assume that the 3D MOT is already loaded.
 
-
-#This experiment assume that the 3D MOT is already loaded.
 
 class MOTPhotodiodeMeasurement(Fragment):
     def build_fragment(self):
@@ -47,7 +46,6 @@ class MOTPhotodiodeMeasurement(Fragment):
         self.coil_setter: SetSupplies
 
         self.shutter2d: TTLOut = self.get_device("shutter_2DMOT")
-       
 
         # Load the ADC utility subfragment
         self.setattr_fragment(
@@ -93,15 +91,15 @@ class MOTPhotodiodeMeasurement(Fragment):
         delay_between_points_mu: TInt64,  # type: ignore
         unload_time_mu: TInt64,  # type: ignore
         data: TList(TFloat),
-        unload_time_3d: TInt64, 
-        load_time_3d: TInt64  # type: ignore
+        unload_time_3d: TInt64,
+        load_time_3d: TInt64,  # type: ignore
     ) -> None:
         """
         Read the fluorescence out into an array.
 
         You must pass an array of floats with size <num_points> to `data`.
         """
-        
+
         self.unload_MOT(unload_time_mu)
         self.load_MOT(load_time_3d)
         for i in range(num_points // 20):
@@ -113,8 +111,9 @@ class MOTPhotodiodeMeasurement(Fragment):
         for i in range(num_points // 20, num_points):
             data[i] = self.adc_reader.read_adc()
             delay_mu(delay_between_points_mu)
-        
+
         self.shutter2d.on()  # Ensure the shutter is opened after measurement
+
 
 class MeasureMOTWithPDFrag(ExpFragment):
     """
@@ -194,12 +193,11 @@ class MeasureMOTWithPDFrag(ExpFragment):
         self.mot_measurer.measure_MOT_fluorescence(
             num_points=num_points,
             delay_between_points_mu=self.core.seconds_to_mu(
-                (self.MOT3d_unload_time.get())
-                / num_points
+                (self.MOT3d_unload_time.get()) / num_points
             ),
             unload_time_mu=self.core.seconds_to_mu(self.unload_time.get()),
             data=trace_data,
-            unload_time_3d=self.core.seconds_to_mu(self.MOT3d_unload_time.get()), 
+            unload_time_3d=self.core.seconds_to_mu(self.MOT3d_unload_time.get()),
             load_time_3d=self.core.seconds_to_mu(self.total_loading_time.get()),
         )
 

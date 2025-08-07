@@ -107,7 +107,7 @@ class Controller:
                         stdout=subprocess.PIPE,
                         stderr=subprocess.PIPE,
                         env=env,
-                        start_new_session=True
+                        start_new_session=True,
                     )
                     asyncio.ensure_future(
                         LogParser(self._get_log_source).stream_task(self.process.stdout)
@@ -141,7 +141,7 @@ class Controller:
             return
         except Exception:
             logger.warning(
-                "Controller %s did not exit on request, " "ending the process",
+                "Controller %s did not exit on request, ending the process",
                 self.name,
             )
         if os.name != "nt":
@@ -155,7 +155,7 @@ class Controller:
                 return
             except asyncio.TimeoutError:
                 logger.warning(
-                    "Controller process %s did not terminate, " "killing", self.name
+                    "Controller process %s did not terminate, killing", self.name
                 )
         try:
             self.process.kill()

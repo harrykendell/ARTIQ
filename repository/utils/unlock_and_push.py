@@ -2,7 +2,7 @@ import logging
 
 from artiq.coredevice.core import Core
 from artiq.coredevice.ttl import TTLInOut
-from artiq.experiment import A, EnumerationValue, delay, kernel, ms
+from artiq.experiment import EnumerationValue, delay, kernel, ms
 from ndscan.experiment import ExpFragment, FloatParam, BoolParam
 from ndscan.experiment.entry_point import make_fragment_scan_exp
 from ndscan.experiment.parameters import FloatParamHandle, BoolParamHandle
@@ -50,7 +50,7 @@ class UnlockAndPushExp(ExpFragment):
             "time_to_shift",
             FloatParam,
             "Delay for the laser to move",
-            default=5*ms,
+            default=5 * ms,
             unit="ms",
         )
         self.time_to_shift: FloatParamHandle
@@ -94,7 +94,9 @@ class UnlockAndPushExp(ExpFragment):
             """
             self.unlock_ttl.on()
             self.setter.set_outputs([self.offset.get()])
-            logging.warning("%s left unlocked and pushed by %s MHz", self.laser, self.offset.get())
+            logging.warning(
+                "%s left unlocked and pushed by %s MHz", self.laser, self.offset.get()
+            )
 
 
 SetAnalogCurrentSupplyExp = make_fragment_scan_exp(UnlockAndPushExp)

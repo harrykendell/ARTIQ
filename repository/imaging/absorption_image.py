@@ -71,9 +71,9 @@ class AbsorptionImageExpFrag(ExpFragment):
         self.do_odt: BoolParamHandle = self.setattr_param(
             "do_odt", BoolParam, "Do the ODT step", default=False
         )
-        self.do_evaporation_single_beam: BoolParamHandle = self.setattr_param(
-            "do_evaporation_single_beam", BoolParam, "Do the single beam evaporation step", default=False
-        )
+        # self.do_evaporation_single_beam: BoolParamHandle = self.setattr_param(
+        #  "do_evaporation_single_beam", BoolParam, "Do the single beam evaporation step", default=False
+        # )
         self.atom_number: FloatChannel = self.setattr_result("atom_number")
         self.info: OpaqueChannel = self.setattr_result("info", OpaqueChannel)
 
@@ -92,12 +92,12 @@ class AbsorptionImageExpFrag(ExpFragment):
         self.mot.load()
         if self.do_cmot.get():
             self.mot.compress()
-        if self.do_pgc.get():
-            self.mot.pgc()
+            if self.do_pgc.get():
+                self.mot.pgc()
         if self.do_odt.get():
             self.mot.into_odt()
-        if self.do_evaporation_single_beam.get():
-            self.mot.evaporation_single_beam()
+        # if self.do_evaporation_single_beam.get():
+        # self.mot.evaporation_single_beam()
 
         self.mot.drop()
         delay(self.expansion_time.get())
@@ -149,7 +149,7 @@ class AbsorptionImageExpFrag(ExpFragment):
             self.expansion_time.get(),
             broadcast=True,
         )
-        
+
         self.set_dataset(
             "Images.absorption.timestamp",
             time(),

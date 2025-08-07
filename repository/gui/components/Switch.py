@@ -62,7 +62,6 @@ class SwitchCircle(QWidget):
 
 
 class Switch(QCheckBox):
-
     def __init__(
         self,
         parent=None,

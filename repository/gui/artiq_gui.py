@@ -246,11 +246,11 @@ class PIDControl(QWidget):
                 o = self.manager.calib_offsets[ch]
                 if g != 1.0 or o != 0.0:
                     power = g * volt + o
-                    pow = f"{power/1e3 if power>500 else power if power >= 0.1 else power*1e3:.1f} \
-                        <b>{'W' if power>500 else 'mW' if power >= 0.1 else 'uW'}</b>"
+                    pow = f"{power / 1e3 if power > 500 else power if power >= 0.1 else power * 1e3:.1f} \
+                        <b>{'W' if power > 500 else 'mW' if power >= 0.1 else 'uW'}</b>"
                 self.adc_val.setText(
                     f"{pow} | {volt:.2f} <b>V</b> | \
-                        {self.manager.get_y(ch)*100:.0f}%"
+                        {self.manager.get_y(ch) * 100:.0f}%"
                 )
 
         self.adc_val = QLabel("?? <b>mW</b> | ?? <b>V</b> | ??%")
@@ -544,7 +544,6 @@ class SUServoGUI(QWidget):
 
 
 class MirnyGUI(QWidget):
-
     def __init__(self, manager):
         super().__init__()
         self.manager = manager

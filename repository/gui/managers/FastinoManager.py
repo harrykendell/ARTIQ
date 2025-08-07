@@ -125,7 +125,6 @@ class FastinoManager:  # {{{
 
 # superclass FastinoManager to limit voltage output
 class DeltaElektronikaManager(FastinoManager):
-
     # extra init that calls the FastinoManager init too - we need to limit to 0-5V
     def __init__(self, experiment, core, fastino, name="fastino"):
         super().__init__(experiment, core, fastino, name)

@@ -12,7 +12,6 @@ class CheckTopticaFrag(ExpFragment):
     """
 
     def build_fragment(self) -> None:
-
         self.setattr_device("core")
         self.core: Core
 

@@ -20,11 +20,17 @@ logger = logging.getLogger(__name__)
 
 # Default constants - these can be overridden in the experiment
 Γ_Rb = 6.065 * MHz  # Natural linewidth of Rb-87
-DURATION = {"LOADING": 20 * s, "CMOT": 1 * ms, "PGC": 1 * ms, "ODT": 1 * ms, "evaporation": 2 * s}
+DURATION = {
+    "LOADING": 20 * s,
+    "CMOT": 1 * ms,
+    "PGC": 1 * ms,
+    "ODT": 1 * ms,
+    "evaporation": 2 * s,
+}
 SETTLE_TIME = {"CMOT": 1 * ms, "PGC": 1 * ms, "ODT": 1 * ms, "evaporation": 1 * ms}
 DETUNING = {"CMOT": 3 * Γ_Rb, "PGC": 8 * Γ_Rb}  # This is beyond the normal 2Γ
 BIASES = {"X1": 0.0 * A, "X2": 0.0 * A, "Y": 0.0 * A, "Z": 0.0 * A}
-COMPRESSED_GRADIENTS = {"X1": 1.75 * A, "X2": 1.925 * A}
+COMPRESSED_GRADIENTS = {"X1": 1.925 * A, "X2": 1.925 * A}
 EOM_REDUCTION = 10 * dB
 
 
@@ -128,7 +134,7 @@ class MOT(Fragment):
         self._build_cmot()
         self._build_pgc()
         self._build_odt()
-        self.build_evaporation_single_beam()
+        # self.build_evaporation_single_beam()
 
         self.debug_mode = logger.isEnabledFor(logging.DEBUG)
         self.manual_init = manual_init
@@ -299,12 +305,12 @@ class MOT(Fragment):
             description="Duration of the ODT ramp",
         )
 
+    """
     def build_evaporation_single_beam(self):
-        """
-        This function generates the ramp for single beam evaporation
-        It also creates parameters to expose to ndscan
-        """
-
+    
+        # This function generates the ramp for single beam evaporation
+        # It also creates parameters to expose to ndscan
+    
         self.evaporation_duration: FloatParamHandle = self.setattr_param(
             "evaporation_duration",
             FloatParam,
@@ -323,15 +329,15 @@ class MOT(Fragment):
         )
 
         class Evaporation_single_ramp(Ramp):
-            """
+            
             The transition from ODT to single beam evaporation
-                - ODT beams ramped off
-                - Single beam power ramped up
-            """
+                #- ODT beams ramped off
+                #- Single beam power ramped up
+            
             duration_default = DURATION["evaporation"]
 
             suservos = [SUServoedBeam["CDT2"]]
-            suservo_setpoint_end = [0.0 * V]
+            suservo_setpoint_end = [0.1 * V]
 
         self.evaporation_single_ramp: Evaporation_single_ramp = self.setattr_fragment(
             "evaporation_single",
@@ -343,6 +349,7 @@ class MOT(Fragment):
             "duration",
             description="Duration of the single beam evaporation ramp",
         )
+    """
 
     @kernel
     def device_setup(self):
@@ -409,7 +416,7 @@ class MOT(Fragment):
         self.cmot_ramp.precalculate_dma_handle()
         self.pgc_ramp.precalculate_dma_handle()
         self.odt_ramp.precalculate_dma_handle()
-        self.evaporation_single_ramp.precalculate_dma_handle()
+        # self.evaporation_single_ramp.precalculate_dma_handle()
 
         # safety check - EOMs take 400us to shift so we can't run faster than that
         if self.cmot_ramp.duration.get() < 400 * us:
@@ -513,15 +520,17 @@ class MOT(Fragment):
         # Wait for the ODT to settle
         delay(self.ODT_settle_time.get())
 
+    """
     @kernel
     def evaporation_single_beam(self) -> None:
-        """
-        Evaporate in the Optical Dipole Trap
+    
+       # Evaporate in the Optical Dipole Trap
 
-        **Timeline:** advances by `self.evaporation_single.duration` + `self.evaporation_single.settle_time`
-        """
+       # **Timeline:** advances by `self.evaporation_single.duration` + `self.evaporation_single.settle_time`
+        
         self.evaporation_single_ramp.do()
-        delay(self.evaporation_settle_time.settle_time.get())
+        delay(self.evaporation_settle_time.get())
+    """
 
     @kernel
     def into_lattice(self) -> None:

@@ -45,8 +45,9 @@ def main():
     sca.init_logger_from_args(args)
 
     logging.info(
-        "Trying to establish connection "
-        "to Toptica DLCPro at {}...".format(args.ip_address)
+        "Trying to establish connection to Toptica DLCPro at {}...".format(
+            args.ip_address
+        )
     )
     dev = TopticaDLCPro(
         ip=args.ip_address,

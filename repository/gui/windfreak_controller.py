@@ -118,7 +118,7 @@ class SynthController(QWidget):
             )
 
             # Channel label - in bold
-            label = QLabel(f'<b>Channel {["A", "B"][ch]}</b>')
+            label = QLabel(f"<b>Channel {['A', 'B'][ch]}</b>")
 
             topline.addWidget(enable_checkbox)
             topline.addWidget(label)

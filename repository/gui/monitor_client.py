@@ -192,7 +192,6 @@ class ServiceConnection:
 
 
 class MonitorClient:
-
     def __init__(
         self, app=None, server="137.222.69.28", port_control=3251, port_notify=3250
     ):

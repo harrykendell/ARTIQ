@@ -11,7 +11,6 @@ class Shutter(EnvExperiment):
 
     @kernel  # this code runs on the FPGA
     def run(self):
-
         self.core.reset()  # resets core device
         self.shutter.output()
 

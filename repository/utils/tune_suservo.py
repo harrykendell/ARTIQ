@@ -110,7 +110,6 @@ class TuneSUServoExpFrag(ExpFragment):
 
     @kernel
     def run_once(self):
-
         self.SUServoFrag.set_iir_params(
             kp=self.kp.get(), ki=self.ki.get(), gain_limit=self.gain_limit.get()
         )

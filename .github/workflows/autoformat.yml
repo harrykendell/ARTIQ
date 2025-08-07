@@ -31,7 +31,7 @@ jobs:
         shell: bash
         run: |
           set +e
-          OUTPUT=$(ruff check . \
+          OUTPUT=$(ruff check . --fix \
                     --exclude submodules \
                     --exclude ThorlabsPM \
                     --output-format concise)
@@ -54,8 +54,8 @@ jobs:
             exit 0
           fi
 
-          git config user.name  "ruff-bot"
-          git config user.email "ruff-bot@users.noreply.github.com"
+          git config user.name  "autoformat"
+          git config user.email "autoformat@users.noreply.github.com"
           ORIGINAL_MSG=$(git log -1 --pretty=%B)
 
           git add -A

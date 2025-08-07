@@ -135,7 +135,6 @@ class SUServoFrag(Fragment):
 
     @kernel
     def device_setup(self):
-
         # Initiate the suservo itself (i.e. all four channels)
         if self.first_run and not self.mark_suservo_initiated(self.suservo.channel):
             if self.debug_enabled:

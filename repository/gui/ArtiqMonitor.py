@@ -654,12 +654,12 @@ class MainWindow(QWidget):
         # Get current data limits (including both scope and background data)
         all_x_data = list(scope_data["x"])
         all_y_data = list(scope_data["y"])
-        
+
         # Include background data if available and being plotted
         if lock_state == LOCK_STATE_LOCKED and len(background_data.get("x", [])) > 0:
             all_x_data.extend(background_data["x"])
             all_y_data.extend(background_data["y"])
-        
+
         current_x_min = min(all_x_data) - 1e-6
         current_x_max = max(all_x_data) + 1e-6
         current_y_min = min(all_y_data) - 1e-6
@@ -668,13 +668,20 @@ class MainWindow(QWidget):
         # Check if current data covers less than 50% of total limits
         current_x_range = current_x_max - current_x_min
         current_y_range = current_y_max - current_y_min
-        total_x_range = self.dlc_frames[idx]["x_lim"][1] - self.dlc_frames[idx]["x_lim"][0]
-        total_y_range = self.dlc_frames[idx]["y_lim"][1] - self.dlc_frames[idx]["y_lim"][0]
+        total_x_range = (
+            self.dlc_frames[idx]["x_lim"][1] - self.dlc_frames[idx]["x_lim"][0]
+        )
+        total_y_range = (
+            self.dlc_frames[idx]["y_lim"][1] - self.dlc_frames[idx]["y_lim"][0]
+        )
 
         # Reset limits if current data covers less than 50% of total limits or if limits are not initialized
-        if (total_x_range == 0 or total_y_range == 0 or
-                current_x_range / total_x_range < 0.5 or
-                current_y_range / total_y_range < 0.5):
+        if (
+            total_x_range == 0
+            or total_y_range == 0
+            or current_x_range / total_x_range < 0.55
+            or current_y_range / total_y_range < 0.55
+        ):
             self.dlc_frames[idx]["x_lim"] = [current_x_min, current_x_max]
             self.dlc_frames[idx]["y_lim"] = [current_y_min, current_y_max]
         else:

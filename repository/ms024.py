@@ -245,7 +245,6 @@ if __name__ == "__main__":
 
     # Connect to the oscilloscope
     with MSO24(ip_address=args.ip_address) as ms024:
-
         # # Output a sine wave, and read a trace from channel 1
         # ms024.afg_sin(1e6, 1)
         # ms024.set_timebase(1e-6)

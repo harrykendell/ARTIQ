@@ -23,9 +23,11 @@ logging.getLogger("pco").setLevel(logging.WARNING)
 
 class PcoCamera(Fragment):
     FULL_ROI = (1, 1, 1392, 1040)
-    MOT_SIZE = 350
-    MOT_X = 695
-    MOT_Y = 535
+    MOT_SIZE = 300
+    MOT_X = 770
+
+    MOT_Y = 600
+
     MOT_ROI = (MOT_X - MOT_SIZE, MOT_Y - MOT_SIZE, MOT_X + MOT_SIZE, MOT_Y + MOT_SIZE)
     WHOLE_CELL_ROI = (
         MOT_X - 100,
@@ -158,7 +160,7 @@ class PcoCamera(Fragment):
             self.set_dataset(
                 f"Images.All.{self.counter}",
                 img,
-                broadcast=True,
+                broadcast=False,
             )
             self.counter += 1
         return self.images

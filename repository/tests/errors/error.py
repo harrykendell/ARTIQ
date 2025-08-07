@@ -13,7 +13,6 @@ class ErrorInKernel(EnvExperiment):
 
     @kernel
     def run(self):
-
         self.core.reset()
         # this ki is invalid so causes a raise ValueError inside the kernel
         self.suservo_aom_MOT.set_iir(1, 1, -0.001, 1.0)

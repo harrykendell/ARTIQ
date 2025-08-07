@@ -117,7 +117,7 @@ class SetBeamsToDefaults(Fragment):
                 "automatic_turnon requires automatic_setup to be True as well"
             )
 
-        if self.beam_infos is []:
+        if self.beam_infos == []:
             raise TypeError(
                 "You must construct this class using the factory function"
                 "make_set_beams_to_default or by subclassing this class "
