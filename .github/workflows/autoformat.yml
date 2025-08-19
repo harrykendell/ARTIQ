@@ -62,8 +62,7 @@ jobs:
           git add -A
           if [ "$RUFF_STATUS" -ne 0 ]; then
             git commit --amend --allow-empty -m "$ORIGINAL_MSG" \
-              -m "style: apply Ruff auto-format (lint errors remain)" \
-              -m "$RUFF_ERRORS"
+              -m "style: apply Ruff auto-format (lint errors remain)"
           else
             git commit --amend -allow-empty -m "$ORIGINAL_MSG" \
               -m "style: apply Ruff auto-format"
