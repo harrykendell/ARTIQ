@@ -2,15 +2,15 @@
 
 import matplotlib  # noqa: F401 # weirdness with import order in PyQt5
 import PyQt5  # noqa: F401 # make sure pyqtgraph imports Qt5
-from PyQt5 import QtCore, QtWidgets
 
+from PyQt5 import QtCore, QtWidgets  # isort: split
 from matplotlib.backends.backend_qtagg import FigureCanvas
 from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 
 from artiq.applets.simple import TitleApplet  # noqa: E402
-from repository.imaging.processor import AbsImage  # noqa: E402
 from repository.imaging.absorption_image import MAGNIFICATION  # noqa: E402
+from repository.imaging.processor import AbsImage  # noqa: E402
 
 
 class AbsorptionView(QtWidgets.QWidget):
@@ -174,6 +174,12 @@ class AbsorptionView(QtWidgets.QWidget):
                         * self.absimg.physical_scale
                         * 1e3
                     )
+                    # centroid pixel numbers
+                    centroidy = self.absimg.centroid[0]
+                    centroidx = self.absimg.centroid[1]
+
+                    # peak atomic density
+                    # peak_density = self.absimg.peak_atomic_density
 
                     def bold(text):
                         return f"<span style='font-weight:bold'>{text}</span>"
@@ -183,6 +189,7 @@ class AbsorptionView(QtWidgets.QWidget):
                           {bold("Atom number:")} {atom_number:.2e} &nbsp;
                           {bold("Expansion time:")} {self.expansion_time:.2f} ms &nbsp;
                           {bold("Sigma:")} ({sigmax:.2f}, {sigmay:.2f}) mm<br>
+                         {bold("Centroid:")} ({centroidx:.2f}, {centroidy:.2f}) px<br>
                           <span style="color:#CCC">{bold("R-squared:")} {r_squared:.2f}</span>
                         </div>"""
                     )

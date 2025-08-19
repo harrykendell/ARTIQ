@@ -3,14 +3,17 @@ import warnings
 
 import matplotlib.pyplot as plt
 import numpy as np
+from lmfit import Model
 from matplotlib.gridspec import GridSpec
 from matplotlib.ticker import FuncFormatter
-from lmfit import Model
 from scipy.ndimage import gaussian_filter
 
 from artiq.language.units import MHz
 
 warnings.filterwarnings("ignore", message="Using UFloat objects with std_dev==0")
+
+
+# https://core.ac.uk/download/pdf/82969205.pdf, link to the reference absorption imaging
 
 
 def gaussian_2D(x, y, A, x0, y0, sx, sy, theta=0, z0=0):
@@ -57,7 +60,7 @@ class AbsImage:
         wavelength=780.24602089 * nm,
         detuning=0 * MHz,
         linewidth=6.065 * MHz,
-        pixel_size=6.45 * um,
+        pixel_size=32 * um,
         magnification=None,
         fit_downsample=5,
     ):
@@ -111,6 +114,7 @@ class AbsImage:
             "centroid_pixel": {self.centroid},
             "best_values_pixel": {self.best_values},
             "multiply_by_me_to_convert_pixel_to_SI": {self.physical_scale},
+            "physical_scale": {self.physical_scale},
         """
 
     @functools.cached_property
@@ -157,7 +161,7 @@ class AbsImage:
         # light and camera parameters
         sigma_0 = (3 / (2 * np.pi)) * np.square(self.wavelength)  # cross-section
         sigma = sigma_0 * np.reciprocal(
-            1 + np.square(self.detuning / (self.linewidth / 2))
+            1 + np.square(4 * np.square(self.detuning / self.linewidth))
         )  # off resonance
         area = np.square(self.physical_scale)  # pixel area in SI units
 
@@ -170,6 +174,17 @@ class AbsImage:
         return (
             (area / sigma) * np.sum(optical_density) / 0.866
         )  # Divide by 1.5-sigma area
+
+    # @functools.cached_property
+    # def peak_atomic_density(self):
+    #     """Returns the peak atomic density in atoms per m^3"""
+    #     peak_atomic_density = self.atom_number / (
+    #         (2 * np.pi) ** (3 / 2)
+    #         * self.fit.best_values["sy"] * self.physical_scale
+    #         * self.fit.best_values["sx"] * self.physical_scale
+    #         * self.fit.best_values["sx"] * self.physical_scale
+    #     )
+    #     return peak_atomic_density
 
     @functools.cached_property
     def peak(self):

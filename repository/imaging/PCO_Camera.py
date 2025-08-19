@@ -8,14 +8,9 @@ from artiq.coredevice.core import Core
 from artiq.coredevice.ttl import TTLInOut
 from artiq.experiment import delay, delay_mu, host_only, kernel, rpc
 from artiq.language.units import ms, s, us
-from repository.models.device_db import server_addr
-from ndscan.experiment import (
-    ExpFragment,
-    FloatParam,
-    Fragment,
-    make_fragment_scan_exp,
-)
+from ndscan.experiment import ExpFragment, FloatParam, Fragment, make_fragment_scan_exp
 from ndscan.experiment.parameters import FloatParamHandle
+from repository.models.device_db import server_addr
 
 logger = logging.getLogger(__name__)
 logging.getLogger("pco").setLevel(logging.WARNING)
@@ -24,9 +19,9 @@ logging.getLogger("pco").setLevel(logging.WARNING)
 class PcoCamera(Fragment):
     FULL_ROI = (1, 1, 1392, 1040)
     MOT_SIZE = 300
-    MOT_X = 770
+    MOT_X = 700
 
-    MOT_Y = 600
+    MOT_Y = 500
 
     MOT_ROI = (MOT_X - MOT_SIZE, MOT_Y - MOT_SIZE, MOT_X + MOT_SIZE, MOT_Y + MOT_SIZE)
     WHOLE_CELL_ROI = (
