@@ -3,14 +3,12 @@ import logging
 from artiq.coredevice.core import Core
 from artiq.coredevice.ttl import TTLOut
 from artiq.language import delay, kernel, parallel
-from artiq.language.units import A, MHz, V, dB, ms, s, us
+from artiq.language.units import A, MHz, V, dB, ms, s, us, W
 from ndscan.experiment import Fragment
 from ndscan.experiment.parameters import FloatParam, FloatParamHandle
 from repository.fragments.beam_setter import ControlBeamsWithoutCoolingAOM
 from repository.fragments.default_beam_setter import (
-    SetBeamsToDefaults,
-    make_set_beams_to_default,
-)
+    SetBeamsToDefaults, make_set_beams_to_default)
 from repository.fragments.eom_setter import EomFrag
 from repository.fragments.ramp import Ramp, default
 from repository.fragments.supply_setter import SetSupplies
@@ -21,17 +19,19 @@ logger = logging.getLogger(__name__)
 # Default constants - these can be overridden in the experiment
 Γ_Rb = 6.065 * MHz  # Natural linewidth of Rb-87
 DURATION = {
-    "LOADING": 20 * s,
-    "CMOT": 1 * ms,
-    "PGC": 1 * ms,
-    "ODT": 1 * ms,
+    "LOADING": 30 * s,
+    "CMOT": 30 * ms,
+    "PGC": 15 * ms,
+    "ODT": 30 * ms,
     "evaporation": 2 * s,
 }
-SETTLE_TIME = {"CMOT": 1 * ms, "PGC": 1 * ms, "ODT": 1 * ms, "evaporation": 1 * ms}
-DETUNING = {"CMOT": 3 * Γ_Rb, "PGC": 8 * Γ_Rb}  # This is beyond the normal 2Γ
-BIASES = {"X1": 0.0 * A, "X2": 0.0 * A, "Y": 0.0 * A, "Z": 0.0 * A}
-COMPRESSED_GRADIENTS = {"X1": 1.925 * A, "X2": 1.925 * A}
-EOM_REDUCTION = 10 * dB
+SETTLE_TIME = {"CMOT": 0 * ms, "PGC": 0 * ms, "ODT": 0 * ms, "evaporation": 0 * ms}
+DETUNING = {"CMOT": 5 * Γ_Rb, "PGC": 12 * Γ_Rb}  # This is beyond the normal 2Γ
+BIASES = {"X1": 0.0002 * A, "X2": 0.0 * A, "Y": 0.04 * A, "Z": 0.07 * A}
+COMPRESSED_GRADIENTS = {"X1": 0 * A, "X2": 1.98 * A}
+REPUMP_ATTENUATION = {"CMOT": 9 * dB, "PGC": 0.5 * dB}
+POWER_3D_MOT = {"MOT_loading": 3.5 * V, "CMOT": 3.5 * V, "PGC": 3.5 * V}
+
 
 
 class MOT(Fragment):
@@ -56,7 +56,8 @@ class MOT(Fragment):
             min=0,
         )
 
-        # Beam setters
+        # Beam SHUTTERS
+        self.shutter_2d: TTLOut = self.get_device("shutter_2DMOT")
         # Use the resetter ONLY for init/deinit
         self.beam_resetter: SetBeamsToDefaults = self.setattr_fragment(
             "beam_resetter",
@@ -80,8 +81,8 @@ class MOT(Fragment):
                 "MOT",
                 "IMG",
                 "PUMP",
-                # "LATX",
-                # "LATY",
+                #"LATX",
+                #"LATY",
                 "CDT1",
                 "CDT2",
             ],
@@ -91,11 +92,19 @@ class MOT(Fragment):
             ControlBeamsWithoutCoolingAOM,
             beam_infos=[SUServoedBeam["MOT"]],
         )
-        self.odt_beams: ControlBeamsWithoutCoolingAOM = self.setattr_fragment(
-            "odt_beams",
+
+        self.odt_reservoir: ControlBeamsWithoutCoolingAOM = self.setattr_fragment(
+            "odt_reservoir",
             ControlBeamsWithoutCoolingAOM,
-            beam_infos=SUServoedBeam["CDT1", "CDT2"],
+            beam_infos=[SUServoedBeam["CDT1"]],
         )
+
+        self.odt_dimple: ControlBeamsWithoutCoolingAOM = self.setattr_fragment(
+            "odt_dimple",
+            ControlBeamsWithoutCoolingAOM,
+            beam_infos=[SUServoedBeam["CDT2"]],
+        )
+
         self.lattice_beams: ControlBeamsWithoutCoolingAOM = self.setattr_fragment(
             "lattice_beams",
             ControlBeamsWithoutCoolingAOM,
@@ -134,7 +143,7 @@ class MOT(Fragment):
         self._build_cmot()
         self._build_pgc()
         self._build_odt()
-        # self.build_evaporation_single_beam()
+        self.build_evaporation_single_beam()
 
         self.debug_mode = logger.isEnabledFor(logging.DEBUG)
         self.manual_init = manual_init
@@ -167,6 +176,14 @@ class MOT(Fragment):
             unit="Γ",
             scale=Γ_Rb,
         )
+        self.CMOT_Repump_power_attenuation: FloatParamHandle = self.setattr_param(
+            "CMOT_Repump_power_attenuation",
+            FloatParam,
+            "Power of the CMOT Repump beam",
+            default=REPUMP_ATTENUATION["CMOT"],
+            unit="dB",
+            min=0 * dB,
+        )
 
         class CMOT_Ramp(Ramp):
             """
@@ -174,6 +191,7 @@ class MOT(Fragment):
                 - MOT beam detuned red by unlock+push
                 - Coils ramped up
                 - Repump power ramped down - but this must be done manually due to EOM issues
+                - MOT power reduced
             """
 
             duration_default = DURATION["CMOT"]
@@ -183,6 +201,8 @@ class MOT(Fragment):
                 COMPRESSED_GRADIENTS["X2"],  # X2
                 self.CMOT_detuning,
             ]
+            suservos = [SUServoedBeam["MOT"]]
+            suservo_setpoint_end = [1.9 * V]
 
         self.cmot_ramp: CMOT_Ramp = self.setattr_fragment(
             "cmot_ramp",
@@ -305,12 +325,10 @@ class MOT(Fragment):
             description="Duration of the ODT ramp",
         )
 
-    """
     def build_evaporation_single_beam(self):
-    
         # This function generates the ramp for single beam evaporation
         # It also creates parameters to expose to ndscan
-    
+
         self.evaporation_duration: FloatParamHandle = self.setattr_param(
             "evaporation_duration",
             FloatParam,
@@ -329,27 +347,30 @@ class MOT(Fragment):
         )
 
         class Evaporation_single_ramp(Ramp):
-            
-            The transition from ODT to single beam evaporation
-                #- ODT beams ramped off
-                #- Single beam power ramped up
-            
-            duration_default = DURATION["evaporation"]
+            # The transition from ODT to single beam evaporation
+            # - ODT beams ramped off
+            # - Single beam power ramped up
 
-            suservos = [SUServoedBeam["CDT2"]]
-            suservo_setpoint_end = [0.1 * V]
+            duration_default = DURATION["evaporation"]
+            supplies = VDrivenSupply["X1", "X2", "Y", "Z"]
+            supplies_start = [self.pgc_ramp] * len(supplies)
+            supplies_end = [0.0 * A] * len(supplies)
+            #suservos = [SUServoedBeam["CDT2"]]
+            #suservo_setpoint_end = [0.0 * V]
 
         self.evaporation_single_ramp: Evaporation_single_ramp = self.setattr_fragment(
-            "evaporation_single",
+            "evaporation_single_ramp",
             Evaporation_single_ramp,
         )
-        self.evaporation_single_beam_duration: FloatParamHandle = self.setattr_param_rebind(
-            "evaporation_single_beam_duration",
-            self.evaporation_single_ramp,
-            "duration",
-            description="Duration of the single beam evaporation ramp",
+
+        self.evaporation_single_beam_duration: FloatParamHandle = (
+            self.setattr_param_rebind(
+                "evaporation_single_beam_duration",
+                self.evaporation_single_ramp,
+                "duration",
+                description="Duration of the single beam evaporation ramp",
+            )
         )
-    """
 
     @kernel
     def device_setup(self):
@@ -478,14 +499,16 @@ class MOT(Fragment):
         # Unlock the MOT
         self.unlock_mot()
         # turn on odt beams
-        self.odt_beams.turn_beams_on()
+        self.shutter_2d.on()
+        # self.odt_dimple.turn_beams_on()
         with parallel:
             # Fix EOM frequency
             self.eom.set_freq(self.eom.config.frequency + self.CMOT_detuning.get())
+            self.eom.set_att(self.eom.config.attenuation + self.CMOT_Repump_power_attenuation.get())
             self.cmot_ramp.do()
             delay(self.cmot_ramp.duration.get())
-
-        self.eom.set_att(self.eom.config.attenuation + EOM_REDUCTION)
+            
+        #self.eom.set_att(self.eom.config.attenuation + EOM_REDUCTION)
         delay(self.CMOT_settle_time.get())
 
     @kernel
@@ -496,7 +519,7 @@ class MOT(Fragment):
         **Timeline:** advances by `self.PGC_duration` + `self.PGC_settle_time`
         """
         # Do the ramp - MOT freq, coil to biases
-
+        self.odt_dimple.turn_beams_on()
         with parallel:
             # Fix EOM frequency
             self.eom.set_freq(self.eom.config.frequency + self.PGC_detuning.get())
@@ -520,17 +543,12 @@ class MOT(Fragment):
         # Wait for the ODT to settle
         delay(self.ODT_settle_time.get())
 
-    """
     @kernel
     def evaporation_single_beam(self) -> None:
-    
-       # Evaporate in the Optical Dipole Trap
+        # Evaporate in the Optical Dipole Trap
 
-       # **Timeline:** advances by `self.evaporation_single.duration` + `self.evaporation_single.settle_time`
-        
+        # **Timeline:** advances by `self.evaporation_single.duration` + `self.evaporation_single.settle_time`
         self.evaporation_single_ramp.do()
-        delay(self.evaporation_settle_time.get())
-    """
 
     @kernel
     def into_lattice(self) -> None:
