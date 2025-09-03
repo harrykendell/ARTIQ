@@ -3,12 +3,14 @@ import logging
 from artiq.coredevice.core import Core
 from artiq.coredevice.ttl import TTLOut
 from artiq.language import delay, kernel, parallel
-from artiq.language.units import A, MHz, V, dB, ms, s, us, W
+from artiq.language.units import A, MHz, V, dB, ms, s, us
 from ndscan.experiment import Fragment
 from ndscan.experiment.parameters import FloatParam, FloatParamHandle
 from repository.fragments.beam_setter import ControlBeamsWithoutCoolingAOM
 from repository.fragments.default_beam_setter import (
-    SetBeamsToDefaults, make_set_beams_to_default)
+    SetBeamsToDefaults,
+    make_set_beams_to_default,
+)
 from repository.fragments.eom_setter import EomFrag
 from repository.fragments.ramp import Ramp, default
 from repository.fragments.supply_setter import SetSupplies
@@ -31,7 +33,6 @@ BIASES = {"X1": 0.0002 * A, "X2": 0.0 * A, "Y": 0.04 * A, "Z": 0.07 * A}
 COMPRESSED_GRADIENTS = {"X1": 0 * A, "X2": 1.98 * A}
 REPUMP_ATTENUATION = {"CMOT": 9 * dB, "PGC": 0.5 * dB}
 POWER_3D_MOT = {"MOT_loading": 3.5 * V, "CMOT": 3.5 * V, "PGC": 3.5 * V}
-
 
 
 class MOT(Fragment):
@@ -81,8 +82,8 @@ class MOT(Fragment):
                 "MOT",
                 "IMG",
                 "PUMP",
-                #"LATX",
-                #"LATY",
+                # "LATX",
+                # "LATY",
                 "CDT1",
                 "CDT2",
             ],
@@ -355,8 +356,8 @@ class MOT(Fragment):
             supplies = VDrivenSupply["X1", "X2", "Y", "Z"]
             supplies_start = [self.pgc_ramp] * len(supplies)
             supplies_end = [0.0 * A] * len(supplies)
-            #suservos = [SUServoedBeam["CDT2"]]
-            #suservo_setpoint_end = [0.0 * V]
+            # suservos = [SUServoedBeam["CDT2"]]
+            # suservo_setpoint_end = [0.0 * V]
 
         self.evaporation_single_ramp: Evaporation_single_ramp = self.setattr_fragment(
             "evaporation_single_ramp",
@@ -504,11 +505,13 @@ class MOT(Fragment):
         with parallel:
             # Fix EOM frequency
             self.eom.set_freq(self.eom.config.frequency + self.CMOT_detuning.get())
-            self.eom.set_att(self.eom.config.attenuation + self.CMOT_Repump_power_attenuation.get())
+            self.eom.set_att(
+                self.eom.config.attenuation + self.CMOT_Repump_power_attenuation.get()
+            )
             self.cmot_ramp.do()
             delay(self.cmot_ramp.duration.get())
-            
-        #self.eom.set_att(self.eom.config.attenuation + EOM_REDUCTION)
+
+        # self.eom.set_att(self.eom.config.attenuation + EOM_REDUCTION)
         delay(self.CMOT_settle_time.get())
 
     @kernel
