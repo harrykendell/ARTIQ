@@ -1,37 +1,36 @@
-import sys
-import os
 import json
+import os
+import sys
+
+from PyQt5.QtCore import Qt, QTimer, pyqtSignal
+from PyQt5.QtGui import QDoubleValidator, QIcon
 from PyQt5.QtWidgets import (
-    QWidget,
-    QGroupBox,
-    QVBoxLayout,
-    QPushButton,
+    QApplication,
     QDoubleSpinBox,
     QGridLayout,
-    QApplication,
-    QLabel,
+    QGroupBox,
     QHBoxLayout,
+    QLabel,
     QLineEdit,
+    QPushButton,
     QSlider,
     QTabWidget,
+    QVBoxLayout,
+    QWidget,
 )
-from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtGui import QDoubleValidator, QIcon
-from PyQt5.QtCore import QTimer
-
 
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
+from managers.boosterTelemetry import BoosterTelemetry
+from managers.FastinoManager import DeltaElektronikaManager, FastinoManager
+from managers.MirnyManager import MirnyManager
+
 # disable formatting
 # flake8: noqa
 from managers.SUServoManager import SUServoManager
-from managers.boosterTelemetry import BoosterTelemetry
-from managers.MirnyManager import MirnyManager
-from managers.FastinoManager import FastinoManager, DeltaElektronikaManager
 
 from artiq.coredevice.core import Core
-
-from artiq.experiment import kernel, EnvExperiment, rpc
-from artiq.language import ms, BooleanValue
+from artiq.experiment import EnvExperiment, kernel, rpc
+from artiq.language import BooleanValue, ms
 
 
 class Switch(QWidget):
@@ -249,7 +248,7 @@ class PIDControl(QWidget):
                     pow = f"{power / 1e3 if power > 500 else power if power >= 0.1 else power * 1e3:.1f} \
                         <b>{'W' if power > 500 else 'mW' if power >= 0.1 else 'uW'}</b>"
                 self.adc_val.setText(
-                    f"{pow} | {volt:.2f} <b>V</b> | \
+                    f"{pow} | {volt:.4f} <b>V</b> | \
                         {self.manager.get_y(ch) * 100:.0f}%"
                 )
 

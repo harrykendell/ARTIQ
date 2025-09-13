@@ -3,9 +3,9 @@ import logging
 from artiq.coredevice.core import Core
 from artiq.coredevice.ttl import TTLInOut
 from artiq.experiment import EnumerationValue, delay, kernel, ms
-from ndscan.experiment import ExpFragment, FloatParam, BoolParam
+from ndscan.experiment import BoolParam, ExpFragment, FloatParam
 from ndscan.experiment.entry_point import make_fragment_scan_exp
-from ndscan.experiment.parameters import FloatParamHandle, BoolParamHandle
+from ndscan.experiment.parameters import BoolParamHandle, FloatParamHandle
 from repository.fragments.supply_setter import SetSupplies
 from repository.models.devices import VDrivenSupply
 from repository.utils.get_local_devices import get_local_devices
@@ -27,10 +27,7 @@ class UnlockAndPushExp(ExpFragment):
         lasers = [dev.name for dev in VDrivenSupply.values() if dev.unit == "MHz"]
         default = lasers[0]
 
-        self.setattr_argument(
-            "laser",
-            EnumerationValue(lasers, default=default),
-        )
+        self.setattr_argument("laser", EnumerationValue(lasers, default=default))
         self.laser: str
 
         if self.laser is not None:

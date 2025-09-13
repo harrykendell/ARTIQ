@@ -565,7 +565,6 @@ class Ramp(Fragment):
             t_start_this_step_mu = now_mu()
             t_one_rtio_cycle_mu = int64(self.core.ref_multiplier)
             num_points_for_loop = num_points if self.add_final_point else num_points - 1
-
             # Play the ramp
             for i_step in range(num_points_for_loop):
                 # First the Fastino as it writes into the past
@@ -575,6 +574,7 @@ class Ramp(Fragment):
                             [supply_values[i]]
                         )
                         supply_values[i] += supply_steps[i]
+                       
 
                 delay_mu(14 * 7 * 4)  # Avoid using multiple lanes
 
@@ -605,7 +605,6 @@ class Ramp(Fragment):
                         eom_freq_values[i] += eom_freq_steps[i]
 
                 t_total_used_mu = now_mu() - t_start_sequence_mu
-
                 if t_total_used_mu >= time_step_mu * (1 + i_step):
                     logger.error(
                         "Ramper writes up to step %s / %s took %.3f us which is "

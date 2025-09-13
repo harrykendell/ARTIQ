@@ -122,7 +122,7 @@ class SetSupplies(Fragment):
         self._outputs_to_volts(outputs, voltages)
 
         if self.debug_enabled:
-            slack_mu = now_mu() - self.core.get_rtio_counter_mu()
+            slack_mu = now_mu() - self.core.get_rtio_counter_mu()   
             logger.info(
                 "Setting outputs = %s via voltages = %s on channels %s",
                 outputs,

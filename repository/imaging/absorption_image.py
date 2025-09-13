@@ -1,8 +1,9 @@
+from time import time
+
 from artiq.coredevice.core import Core
 from artiq.coredevice.dma import CoreDMA
 from artiq.experiment import kernel, rpc
 from artiq.language import delay, ms, now_mu, parallel, s, us
-from time import time
 
 # from repository.models.device_db import server_addr
 from ndscan.experiment import (
@@ -10,8 +11,8 @@ from ndscan.experiment import (
     ExpFragment,
     FloatChannel,
     FloatParam,
-    make_fragment_scan_exp,
     OpaqueChannel,
+    make_fragment_scan_exp,
 )
 from ndscan.experiment.parameters import BoolParamHandle, FloatParamHandle
 from repository.fragments.beam_setter import ControlBeamsWithoutCoolingAOM
@@ -20,7 +21,8 @@ from repository.imaging.PCO_Camera import PcoCamera
 from repository.imaging.processor import AbsImage  # noqa: E402
 from repository.models.devices import SUServoedBeam
 
-MAGNIFICATION = 0.25  # Default magnification for absorption imaging
+
+MAGNIFICATION = 1  # Default magnification for absorption imaging
 
 
 class AbsorptionImageExpFrag(ExpFragment):
@@ -40,7 +42,7 @@ class AbsorptionImageExpFrag(ExpFragment):
         self.setattr_fragment("pco_camera", PcoCamera, num_images=3)
         self.pco_camera: PcoCamera
         self.setattr_param_rebind(
-            "exposure_time", self.pco_camera, "exposure_time", default=0.1 * ms
+            "exposure_time", self.pco_camera, "exposure_time", default=0.11 * ms
         )
         self.exposure_time: FloatParamHandle
 
@@ -59,9 +61,14 @@ class AbsorptionImageExpFrag(ExpFragment):
             unit="ms",
         )
         self.expansion_time: FloatParamHandle
-
+        self.imaging_ODT: BoolParamHandle = self.setattr_param(
+            "imaging_setup",
+            BoolParam,
+            "Imaging setup (True for ODT, False for free MOT)",
+            default=False,
+        )
         self.do_cmot: BoolParamHandle = self.setattr_param(
-            "do_cmot", BoolParam, "Do the CMOT step", default=True
+            "do_cmot", BoolParam, "Do the CMOT step", default=False
         )
 
         self.do_pgc: BoolParamHandle = self.setattr_param(
@@ -71,9 +78,12 @@ class AbsorptionImageExpFrag(ExpFragment):
         self.do_odt: BoolParamHandle = self.setattr_param(
             "do_odt", BoolParam, "Do the ODT step", default=False
         )
-        # self.do_evaporation_single_beam: BoolParamHandle = self.setattr_param(
-        #  "do_evaporation_single_beam", BoolParam, "Do the single beam evaporation step", default=False
-        # )
+        self.do_evaporation_single_beam: BoolParamHandle = self.setattr_param(
+            "do_evaporation_single_beam",
+            BoolParam,
+            "Do the single beam evaporation step",
+            default=False,
+        )
         self.atom_number: FloatChannel = self.setattr_result("atom_number")
         self.info: OpaqueChannel = self.setattr_result("info", OpaqueChannel)
 
@@ -96,10 +106,20 @@ class AbsorptionImageExpFrag(ExpFragment):
                 self.mot.pgc()
         if self.do_odt.get():
             self.mot.into_odt()
-        # if self.do_evaporation_single_beam.get():
-        # self.mot.evaporation_single_beam()
-
+        if self.do_evaporation_single_beam.get():
+            self.mot.evaporation_single_beam()
+        
         self.mot.drop()
+        #self.mot.clear_background_atoms_around_odt()
+        #delay(10 * ms)  # wait for eddy currents to settle
+        
+        #delay(30 * ms)
+        #evaporation
+        #self.mot.evaporation_single_beam()
+       
+        #self.mot.drop_reservoir()
+        #delay(10 * ms)  # wait for eddy currents to settle
+        #self.mot.drop_dimple()
         delay(self.expansion_time.get())
 
         # image cloud
@@ -109,8 +129,8 @@ class AbsorptionImageExpFrag(ExpFragment):
         delay(self.exposure_time.get())
         self.img_beam.turn_beams_off()
         delay(self.pco_camera.BUSY_TIME - self.exposure_time.get())
-
         self.mot.clear_atoms()
+        #self.mot.clear_odt()
 
         # reference image
         with parallel:
@@ -130,6 +150,7 @@ class AbsorptionImageExpFrag(ExpFragment):
 
         self.core.wait_until_mu(now_mu())
         self.update_images()
+        
 
     @rpc(flags={"async"})
     def update_images(self):
@@ -174,3 +195,4 @@ class AbsorptionImageExpFrag(ExpFragment):
 
 
 AbsorptionImage = make_fragment_scan_exp(AbsorptionImageExpFrag)
+

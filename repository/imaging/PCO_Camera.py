@@ -19,13 +19,14 @@ logging.getLogger("pco").setLevel(logging.WARNING)
 class PcoCamera(Fragment):
     FULL_ROI = (1, 1, 1392, 1040)
     MOT_SIZE = 300
-    MOT_X = 700
+    MOT_X = 850
 
-    MOT_Y = 500
+    MOT_Y = 450
 
     MOT_ROI = (MOT_X - MOT_SIZE, MOT_Y - MOT_SIZE, MOT_X + MOT_SIZE, MOT_Y + MOT_SIZE)
     WHOLE_CELL_ROI = (
         MOT_X - 100,
+
         MOT_Y - 150,
         MOT_X + 100,
         MOT_Y + 150,
@@ -52,7 +53,7 @@ class PcoCamera(Fragment):
         self.setattr_device("pco_camera")
         self.trigger: TTLInOut = self.pco_camera
 
-        self.debug = logger.getEffectiveLevel() <= logging.INFO
+        self.debug = logger.getEffectiveLevel() <= logging.WARNING
         self.counter = 0
 
     def host_setup(self):

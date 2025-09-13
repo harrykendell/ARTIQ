@@ -444,6 +444,12 @@ class MainWindow(QWidget):
         sigmax = self.absimg.fit.best_values["sx"] * self.absimg.physical_scale * 1e3
         sigmay = self.absimg.fit.best_values["sy"] * self.absimg.physical_scale * 1e3
         expansion_time = self.client.datasets.get("Images.absorption.expansion_time")[1]
+        centroid_y = self.absimg.centroid[0]
+        centroid_x = self.absimg.centroid[1]
+        PSD = self.absimg.phase_space_density[2]
+        number_density = self.absimg.phase_space_density[0]
+        lambda_db = self.absimg.phase_space_density[1]
+
 
         if not self.save_button.isEnabled():
             self.save_button.setEnabled(True)
@@ -468,6 +474,15 @@ class MainWindow(QWidget):
                 ({sigmax:.2f}, {sigmay:.2f}) mm<br>
                 <span style="color:#CCC"><b>R-squared:</b>\
                 {r_squared:.2f}</span>
+                <span style="font-weight:bold">Centroid:</span>\
+                ({centroid_x:.2f}, {centroid_y:.2f}) px
+                <span style="font-weight:bold">λ_dB:</span>\
+                {lambda_db:.2f} nm &nbsp;
+                <span style="font-weight:bold">n:</span>\
+                {number_density:.2f} m^-3 &nbsp;
+                <span style="font-weight:bold">PSD:</span>\
+                {PSD:.2f} m^-3 &nbsp;
+
             </div>"""
         )
 

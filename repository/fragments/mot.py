@@ -3,12 +3,14 @@ import logging
 from artiq.coredevice.core import Core
 from artiq.coredevice.ttl import TTLOut
 from artiq.language import delay, kernel, parallel
-from artiq.language.units import A, MHz, V, dB, ms, s, us, W
+from artiq.language.units import A, MHz, V, W, dB, ms, s, us
 from ndscan.experiment import Fragment
 from ndscan.experiment.parameters import FloatParam, FloatParamHandle
 from repository.fragments.beam_setter import ControlBeamsWithoutCoolingAOM
 from repository.fragments.default_beam_setter import (
-    SetBeamsToDefaults, make_set_beams_to_default)
+    SetBeamsToDefaults,
+    make_set_beams_to_default,
+)
 from repository.fragments.eom_setter import EomFrag
 from repository.fragments.ramp import Ramp, default
 from repository.fragments.supply_setter import SetSupplies
@@ -33,7 +35,6 @@ REPUMP_ATTENUATION = {"CMOT": 9 * dB, "PGC": 0.5 * dB}
 POWER_3D_MOT = {"MOT_loading": 3.5 * V, "CMOT": 3.5 * V, "PGC": 3.5 * V}
 
 
-
 class MOT(Fragment):
     """
     Methods for making and controlling the MOT
@@ -55,6 +56,7 @@ class MOT(Fragment):
             unit="s",
             min=0,
         )
+
 
         # Beam SHUTTERS
         self.shutter_2d: TTLOut = self.get_device("shutter_2DMOT")
@@ -81,8 +83,8 @@ class MOT(Fragment):
                 "MOT",
                 "IMG",
                 "PUMP",
-                #"LATX",
-                #"LATY",
+                # "LATX",
+                # "LATY",
                 "CDT1",
                 "CDT2",
             ],
@@ -138,14 +140,14 @@ class MOT(Fragment):
             init=False,
         )
         self.unlock_ttl: TTLOut = self.get_device("780_unlock")
-
+        
         # Ramps
         self._build_cmot()
         self._build_pgc()
         self._build_odt()
         self.build_evaporation_single_beam()
 
-        self.debug_mode = logger.isEnabledFor(logging.DEBUG)
+        self.debug_mode = logger.isEnabledFor(logging.INFO)
         self.manual_init = manual_init
 
         # Kernel invariants
@@ -202,6 +204,7 @@ class MOT(Fragment):
                 self.CMOT_detuning,
             ]
             suservos = [SUServoedBeam["MOT"]]
+            suservo_setpoint_start = [POWER_3D_MOT["MOT_loading"]]
             suservo_setpoint_end = [1.9 * V]
 
         self.cmot_ramp: CMOT_Ramp = self.setattr_fragment(
@@ -266,6 +269,7 @@ class MOT(Fragment):
                 self.PGC_detuning,
             ]
 
+
         self.pgc_ramp: PGC_Ramp = self.setattr_fragment(
             "pgc_ramp",
             PGC_Ramp,
@@ -309,10 +313,11 @@ class MOT(Fragment):
             duration_default = DURATION["ODT"]
             supplies = VDrivenSupply["X1", "X2", "Y", "Z"]
             supplies_start = [self.pgc_ramp] * len(supplies)
-            supplies_end = [0.0 * A] * len(supplies)
-
-            suservos = [SUServoedBeam["MOT"]]
-            suservo_setpoint_end = [0.0 * V]
+            supplies_end = [*BIASES.values()] * len(supplies)
+            
+            suservos = [SUServoedBeam["CDT1"], SUServoedBeam["CDT2"]]
+            suservo_setpoint_start = [3 * V, 3 * V]
+            suservo_setpoint_end = [0.0 * V, 0.0 * V]
 
         self.odt_ramp: ODT_Ramp = self.setattr_fragment(
             "odt_ramp",
@@ -352,11 +357,14 @@ class MOT(Fragment):
             # - Single beam power ramped up
 
             duration_default = DURATION["evaporation"]
-            supplies = VDrivenSupply["X1", "X2", "Y", "Z"]
-            supplies_start = [self.pgc_ramp] * len(supplies)
+
+
+            supplies = [VDrivenSupply["X1"], VDrivenSupply["X2"], VDrivenSupply["Y"], VDrivenSupply["Z"]]
+            supplies_start = [self.odt_ramp] * len(supplies)
             supplies_end = [0.0 * A] * len(supplies)
-            #suservos = [SUServoedBeam["CDT2"]]
-            #suservo_setpoint_end = [0.0 * V]
+
+            suservos = [SUServoedBeam["CDT2"], SUServoedBeam["CDT1"]]
+            suservo_setpoint_end = [0 * V, 0 * V]
 
         self.evaporation_single_ramp: Evaporation_single_ramp = self.setattr_fragment(
             "evaporation_single_ramp",
@@ -450,6 +458,18 @@ class MOT(Fragment):
                 "PGC ramp is too fast, "
                 "EOMs will not have time to shift before the next operation"
             )
+    
+    @kernel
+    def clear_background_atoms_around_odt(self, clearout_time=0.5 * ms) -> None:
+        """
+        Clear out atoms from the background around the ODT
+
+        **Timeline:** advances by approx `clearout_time` seconds
+        """
+
+        self.y_coil.set_outputs([1 * A])
+        delay(clearout_time)
+        self.y_coil.set_to_defaults()
 
     @kernel
     def clear_atoms(self, clearout_time=100 * ms) -> None:
@@ -458,9 +478,32 @@ class MOT(Fragment):
 
         **Timeline:** advances by approx `clearout_time` seconds
         """
+
+        # self.odt_dimple.turn_beams_off()
         self.y_coil.set_outputs([1.0 * A])
         delay(clearout_time)
         self.y_coil.set_to_defaults()
+
+    @kernel
+    def drop_dimple(self, clearout_time=0 * ms) -> None:
+        """
+        Clear out atoms from the ODT dimple
+
+        **Timeline:** advances by approx `clearout_time` seconds
+        """
+        delay(clearout_time)
+        self.odt_dimple.turn_beams_off()
+
+    @kernel
+    def drop_reservoir(self, clearout_time=0 * ms) -> None:
+        """
+        Clear out atoms from the ODT reservoir
+
+        **Timeline:** advances by approx `clearout_time` seconds
+        """
+        delay(clearout_time)
+        self.odt_reservoir.turn_beams_off()
+
 
     @kernel
     def load(self, clearout=True, clearout_time=1000 * ms, wait_for_load=True) -> None:
@@ -471,6 +514,9 @@ class MOT(Fragment):
 
         **Timeline:** advances by approx `loading_time` seconds
         """
+        self.all_beams.turn_beams_off()
+        self.shutter_2d.on()
+        
         if clearout:
             self.clear_atoms(clearout_time=clearout_time)
 
@@ -499,16 +545,19 @@ class MOT(Fragment):
         # Unlock the MOT
         self.unlock_mot()
         # turn on odt beams
-        self.shutter_2d.on()
-        # self.odt_dimple.turn_beams_on()
+        self.odt_reservoir.turn_beams_on()
+        self.odt_dimple.turn_beams_on()
+        self.shutter_2d.off()
         with parallel:
             # Fix EOM frequency
             self.eom.set_freq(self.eom.config.frequency + self.CMOT_detuning.get())
-            self.eom.set_att(self.eom.config.attenuation + self.CMOT_Repump_power_attenuation.get())
+            self.eom.set_att(
+                self.eom.config.attenuation + self.CMOT_Repump_power_attenuation.get()
+            )
             self.cmot_ramp.do()
             delay(self.cmot_ramp.duration.get())
-            
-        #self.eom.set_att(self.eom.config.attenuation + EOM_REDUCTION)
+
+        # self.eom.set_att(self.eom.config.attenuation + EOM_REDUCTION)
         delay(self.CMOT_settle_time.get())
 
     @kernel
@@ -519,7 +568,6 @@ class MOT(Fragment):
         **Timeline:** advances by `self.PGC_duration` + `self.PGC_settle_time`
         """
         # Do the ramp - MOT freq, coil to biases
-        self.odt_dimple.turn_beams_on()
         with parallel:
             # Fix EOM frequency
             self.eom.set_freq(self.eom.config.frequency + self.PGC_detuning.get())
@@ -589,9 +637,7 @@ class MOT(Fragment):
     def drop(self) -> None:
         """
         Drop the MOT immediately
-
         Turn off all beams and coils
-
         We also relock the MOT to ensure the ECDL is in a known state
         """
 
@@ -599,6 +645,9 @@ class MOT(Fragment):
         self.coils.turn_off()
         # Turn off beams
         self.all_beams.turn_beams_off()
+        #self.mot_beam.turn_beams_off()
 
         # For imaging we need to be back on resonance
         self.relock_mot()
+        
+

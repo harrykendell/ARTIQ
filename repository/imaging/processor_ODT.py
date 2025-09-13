@@ -1,7 +1,6 @@
 import functools
 import warnings
-import numpy as np
-import scipy.constants as const
+
 import matplotlib.pyplot as plt
 import numpy as np
 from lmfit import Model
@@ -51,7 +50,7 @@ def ravel(func):
 class AbsImage:
     nm = 1e-9
     um = 1e-6
-    threshold = 0.02  # multiple of maximum light to count as in the beam
+    threshold = 0.01  # multiple of maximum light to count as in the beam
 
     def __init__(
         self,
@@ -61,7 +60,7 @@ class AbsImage:
         wavelength=780.24602089 * nm,
         detuning=0 * MHz,
         linewidth=6.065 * MHz,
-        pixel_size=25.52 * um,  # 1.85 * um,
+        pixel_size=1.548 * um,  # 31.25 * um,
         magnification=None,
         fit_downsample=5,
     ):
@@ -195,7 +194,6 @@ class AbsImage:
         )
         z = self.optical_density[y, x]
         return y, x, z
-    
 
     @functools.cached_property
     def centroid(self):
@@ -257,66 +255,10 @@ class AbsImage:
         )
 
         return result
-    
-    @functools.cached_property
-    def bimodal_fit(self, slice):
-        """Returns the parameters of the bimodal fit."""
-        # Implement bimodal fitting logic here
-        pass
 
     @functools.cached_property
     def best_values(self):
         return self.fit.best_values
-    
-
-    @functools.cached_property
-    def phase_space_density(self, N, sigma_x, sigma_y, sigma_z, T, m):
-        """
-        Calculate phase-space density for a thermal atomic cloud.
-
-        Parameters
-        ----------
-        N : float
-            Total number of atoms in the cloud.
-        sigma_x, sigma_y, sigma_z : floats
-            Position-space 1/e standard deviations (meters) along x, y, z.
-        T : float
-            Temperature in Kelvin.
-        m : float
-            Mass of one atom in kilograms.
-
-        Returns
-        -------
-        n : float
-            Number density (atoms per cubic meter).
-        lambda_db : float
-            Thermal de Broglie wavelength (meters).
-        PSD : float
-            Phase-space density (dimensionless, N λ³ / V).
-        """
-        m = 1.443e-25 # mass of Rb87 in kg
-        T = 30e-6 # temperature in K
-
-        sigma_x = self.fit.best_values["sx"] * self.physical_scale
-        sigma_y = self.fit.best_values["sy"] * self.physical_scale
-        sigma_z = self.fit.best_values["sz"] * self.physical_scale
-
-        # Volume of the cloud assuming Gaussian distribution, 3D
-        # V = (2π)^(3/2) σx σy σz
-        V = (2 * np.pi)**(3/2) * sigma_x * sigma_y * sigma_z
-
-        # Number density
-        n = self.atom_number / V
-
-        # Thermal de Broglie wavelength
-        # λ_dB = h / sqrt(2 π m k_B T)
-        lambda_db = const.h / np.sqrt(2 * np.pi * m * const.k * T)
-
-        # Phase-space density: n * λ_dB^3
-        PSD = n * lambda_db**3
-
-        return n, lambda_db, PSD
-
 
     @property
     def best_fit(self):
@@ -329,7 +271,7 @@ class AbsImage:
     def eval(self, *, x, y):
         """Evaluates the fit at the given coordinates."""
         return self.fit.eval(x=x, y=y)
-    
+
     @staticmethod
     def fake(num_gaussians=1):
         """
@@ -526,24 +468,22 @@ class AbsImage:
         ##    linewidth=2,
         #    label="Vertical fit",
         #)
-
+        
         # show the od slices too
         #od_ax.plot(
         #    x_contour,
-         #   self.optical_density[self.peak[0], :],
-         #   color="white",
-         #   linewidth=2,
-         #   label="Horizontal OD",
+        #    self.optical_density[self.peak[0], :],
+        #    color="white",
+        #    linewidth=2,
+        #    label="Horizontal OD",
         #)
-       # od_ax.plot(
+        #od_ax.plot(
         #    self.optical_density[:, self.peak[1]],
         #    y_contour,
         #    color="white",
         #    linewidth=2,
         #    label="Vertical OD",
         #)
-
-
 
         # show the 1stdev fitted gaussian outline - contour of A/e
         od_ax.contour(
