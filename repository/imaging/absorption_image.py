@@ -113,6 +113,16 @@ class AbsorptionImageExpFrag(ExpFragment):
         #self.mot.clear_background_atoms_around_odt()
         #delay(10 * ms)  # wait for eddy currents to settle
         
+        #delay(30 * ms)
+        #evaporation
+        #self.mot.evaporation_single_beam()
+       
+        #self.mot.drop_reservoir()
+        #delay(10 * ms)  # wait for eddy currents to settle
+        #self.mot.drop_dimple()
+        #self.mot.clear_background_atoms_around_odt()
+        #delay(10 * ms)  # wait for eddy currents to settle
+        
         delay(50 * ms)
         #evaporation
         self.mot.evaporation_single_beam()
@@ -130,8 +140,7 @@ class AbsorptionImageExpFrag(ExpFragment):
         self.img_beam.turn_beams_off()
         delay(self.pco_camera.BUSY_TIME - self.exposure_time.get())
         self.mot.clear_atoms()
-        
-        
+        #self.mot.clear_odt()
 
         # reference image
         with parallel:
@@ -151,6 +160,7 @@ class AbsorptionImageExpFrag(ExpFragment):
 
         self.core.wait_until_mu(now_mu())
         self.update_images()
+        
         
 
     @rpc(flags={"async"})
