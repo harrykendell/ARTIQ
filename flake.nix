@@ -208,7 +208,7 @@
             ps.lmfit
             ps.toptica-lasersdk
             ps.pyvisa
-            ps.pyqt5Full
+            #ps.pyqt5Full
             ps.pyqt5_sip 
             windfreak
             booster
