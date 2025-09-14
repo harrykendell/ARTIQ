@@ -195,25 +195,24 @@
             aqmain.artiq
             #ps.paramiko  # needed if and only if flashing boards remotely (artiq_flash -H)
             #aqextra.flake8-artiq
-            #ps.sip
+            ps.sip
             ps.pip
             ps.pandas
             ps.numpy
             ps.scipy
             ps.matplotlib
-            #ps.pyqt5
+            ps.pyqt5
             ps.pydantic
             ps.ifaddr
             ps.pint
             ps.lmfit
             ps.toptica-lasersdk
             ps.pyvisa
-            #ps.pyqt5Full
+            ps.pyqt5Full
             ps.pyqt5_sip 
             windfreak
             booster
             pco
-            (ps.pyqt5.override { withSip = true; })
 
 
 
