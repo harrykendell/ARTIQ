@@ -270,7 +270,7 @@ class AbsImage:
     
 
     @functools.cached_property
-    def phase_space_density(self, N, sigma_x, sigma_y, sigma_z, T, m):
+    def phase_space_density(self):
         """
         Calculate phase-space density for a thermal atomic cloud.
 
@@ -299,7 +299,7 @@ class AbsImage:
 
         sigma_x = self.fit.best_values["sx"] * self.physical_scale
         sigma_y = self.fit.best_values["sy"] * self.physical_scale
-        sigma_z = self.fit.best_values["sz"] * self.physical_scale
+        sigma_z = self.fit.best_values["sx"] * self.physical_scale
 
         # Volume of the cloud assuming Gaussian distribution, 3D
         # V = (2π)^(3/2) σx σy σz
@@ -511,6 +511,9 @@ class AbsImage:
             linewidths=1,
         )
 
+        #add text box with fit parameters
+         
+
         # show the fitted slices
         #od_ax.plot(
          #   x_contour,
@@ -602,5 +605,26 @@ class AbsImage:
 
         # For Qt integration, draw once to calculate sizes
         fig.canvas.draw_idle()
+
+
+        #add seperate table with fit parameters left side of the od plot, use greek letters for sigma
+        textstr = "\n".join(
+            (
+                rf"Atom number: $\mathbf{{{self.atom_number:.2e}}}$",
+                rf"Peak OD: $\mathbf{{{self.optical_density[self.peak[0], self.peak[1]]:.2f}}}$",
+                rf"Centroid (mm): ($\mathbf{{{centroid_mm[0]:.2f}}}$, $\mathbf{{{centroid_mm[1]:.2f}}}$)",
+                rf"Peak center (mm): ($\mathbf{{{peak_mm[0]:.2f}}}$, $\mathbf{{{peak_mm[1]:.2f}}}$)",
+                rf"$\sigma_x$ (mm): $\mathbf{{{self.best_values['sx'] * scale_mm:.2f}}}$",
+                rf"$\sigma_y$ (mm): $\mathbf{{{self.best_values['sy'] * scale_mm:.2f}}}$",
+                rf"Phase-space density: $\mathbf{{{self.phase_space_density[2]:.2e}}}$",
+                rf"$\lambda_{{\mathrm{{dB}}}}$ (m): $\mathbf{{{self.phase_space_density[1]:.2e}}}$",
+                rf"Peak density (atoms/cm$^3$): $\mathbf{{{self.phase_space_density[0]*1e-6:.2e}}}$",
+            )
+        )
+
+        od_ax.text(1.05, 0.5, textstr, transform=od_ax.transAxes, fontsize=10,
+                verticalalignment='center', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+        plt.tight_layout()
+
 
         return fig, axes + [cax_raw, cax_od]
