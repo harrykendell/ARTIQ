@@ -124,7 +124,7 @@ class DummyEomFrag:
 
 
 class DummySetSupplies:
-    def set_currents(self, currents):
+    def set_outputs(self, currents):
         pass
 
 
