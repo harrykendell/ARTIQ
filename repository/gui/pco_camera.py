@@ -8,6 +8,7 @@ import time
 import numpy as np
 import pco
 
+
 from PyQt6.QtWidgets import (
     QApplication,
     QWidget,

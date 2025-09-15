@@ -51,7 +51,7 @@ def ravel(func):
 class AbsImage:
     nm = 1e-9
     um = 1e-6
-    threshold = 0.02  # multiple of maximum light to count as in the beam
+    threshold = 0.05  # multiple of maximum light to count as in the beam
 
     def __init__(
         self,
@@ -61,7 +61,7 @@ class AbsImage:
         wavelength=780.24602089 * nm,
         detuning=0 * MHz,
         linewidth=6.065 * MHz,
-        pixel_size=25.52 * um,  # 1.85 * um,
+        pixel_size=1.85 * um,  #25.52 * um
         magnification=None,
         fit_downsample=5,
     ):

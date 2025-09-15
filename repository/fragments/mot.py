@@ -644,8 +644,8 @@ class MOT(Fragment):
         # Turn off the coils
         self.coils.turn_off()
         # Turn off beams
-        self.all_beams.turn_beams_off()
-        #self.mot_beam.turn_beams_off()
+        #self.all_beams.turn_beams_off()
+        self.mot_beam.turn_beams_off()
 
         # For imaging we need to be back on resonance
         self.relock_mot()
