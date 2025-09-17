@@ -70,10 +70,16 @@ class AbsorptionImageExpFrag(ExpFragment):
             "do_pgc", BoolParam, "Do the PGC step", default=False
         )
 
-        self.do_evaporation: BoolParamHandle = self.setattr_param(
-            "do_evaporation",
+        self.do_evaporation1: BoolParamHandle = self.setattr_param(
+            "do_evaporation1",
             BoolParam,
-            "Do the evaporation step",
+            "Do the evaporation step 1",
+            default=False,
+        )
+        self.do_evaporation2: BoolParamHandle = self.setattr_param(
+            "do_evaporation2",
+            BoolParam,
+            "Do the evaporation step 2",
             default=False,
         )
 
@@ -95,15 +101,18 @@ class AbsorptionImageExpFrag(ExpFragment):
         self.mot.load()
         if self.do_cmot.get():
             #we are also turning on the dimple and reservoir beams in the start of the cmot got to compress to see
-            self.mot.compress(Evaporation_step=self.do_evaporation.get())
+            self.mot.compress(Evaporation_step=self.do_evaporation1.get())
             if self.do_pgc.get():
                 self.mot.pgc()
         #dropping and locking mot again to resonance for imaging
         self.mot.drop()
         
-        # evaporation and then switch off odt beams
-        if self.do_evaporation.get():
-            self.mot.evaporation()
+        # Evaporation and then switch off odt beams
+        if self.do_evaporation1.get():
+            self.mot.evaporation1(single_step_evaporation=not self.do_evaporation2.get())
+            if self.do_evaporation2.get():
+                self.mot.evaporation2()
+        
         delay(self.expansion_time.get())
         
         # image cloud
