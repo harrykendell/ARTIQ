@@ -23,11 +23,10 @@ logger = logging.getLogger(__name__)
 DURATION = {
     "LOADING": 30 * s,
     "CMOT": 30 * ms,
-    "PGC": 15 * ms,
-    "ODT": 30 * ms,
-    "evaporation": 2 * s,
+    "PGC": 20 * ms,
+    "EVAPORATION": 100 * ms,
 }
-SETTLE_TIME = {"CMOT": 0 * ms, "PGC": 0 * ms, "ODT": 0 * ms, "evaporation": 0 * ms}
+SETTLE_TIME = {"CMOT": 0 * ms, "PGC": 0 * ms, "ODT": 0 * ms, "EVAPORATION": 0 * ms}
 DETUNING = {"CMOT": 5 * Γ_Rb, "PGC": 12 * Γ_Rb}  # This is beyond the normal 2Γ
 BIASES = {"X1": 0.0002 * A, "X2": 0.0 * A, "Y": 0.04 * A, "Z": 0.07 * A}
 COMPRESSED_GRADIENTS = {"X1": 0 * A, "X2": 1.98 * A}
@@ -144,8 +143,7 @@ class MOT(Fragment):
         # Ramps
         self._build_cmot()
         self._build_pgc()
-        self._build_odt()
-        self.build_evaporation_single_beam()
+        self.build_evaporation()
 
         self.debug_mode = logger.isEnabledFor(logging.INFO)
         self.manual_init = manual_init
@@ -281,56 +279,8 @@ class MOT(Fragment):
             description="Duration of the PGC ramp",
         )
 
-    def _build_odt(self):
-        """
-        This function generates the ramp from the PGC to the ODT
-        It also creates parameters to expose to ndscan
-        """
-        self.ODT_overlap_time: FloatParamHandle = self.setattr_param(
-            "ODT_overlap_time",
-            FloatParam,
-            "Time to keep the ODT and MOT beams on together",
-            default=100 * ms,
-            unit="ms",
-            min=0,
-        )
-        self.ODT_settle_time: FloatParamHandle = self.setattr_param(
-            "ODT_settle_time",
-            FloatParam,
-            "Time to wait after ODT ramp",
-            default=SETTLE_TIME["ODT"],
-            unit="ms",
-            min=0,
-        )
 
-        class ODT_Ramp(Ramp):
-            """
-            The transition from PGC to ODT
-                - MOT ramped off
-                - Bias ramped off
-            """
-
-            duration_default = DURATION["ODT"]
-            supplies = VDrivenSupply["X1", "X2", "Y", "Z"]
-            supplies_start = [self.pgc_ramp] * len(supplies)
-            supplies_end = [*BIASES.values()] * len(supplies)
-            
-            suservos = [SUServoedBeam["CDT1"], SUServoedBeam["CDT2"]]
-            suservo_setpoint_start = [3 * V, 3 * V]
-            suservo_setpoint_end = [0.0 * V, 0.0 * V]
-
-        self.odt_ramp: ODT_Ramp = self.setattr_fragment(
-            "odt_ramp",
-            ODT_Ramp,
-        )
-        self.ODT_duration: FloatParamHandle = self.setattr_param_rebind(
-            "ODT_duration",
-            self.odt_ramp,
-            "duration",
-            description="Duration of the ODT ramp",
-        )
-
-    def build_evaporation_single_beam(self):
+    def build_evaporation(self):
         # This function generates the ramp for single beam evaporation
         # It also creates parameters to expose to ndscan
 
@@ -338,7 +288,7 @@ class MOT(Fragment):
             "evaporation_duration",
             FloatParam,
             "Duration of the evaporation ramp",
-            default=2 * s,
+            default=DURATION["EVAPORATION"],
             unit="ms",
             min=0,
         )
@@ -346,38 +296,24 @@ class MOT(Fragment):
             "evaporation_settle_time",
             FloatParam,
             "Time to wait after evaporation ramp",
-            default=SETTLE_TIME["evaporation"],
+            default=SETTLE_TIME["EVAPORATION"],
             unit="ms",
             min=0,
         )
 
-        class Evaporation_single_ramp(Ramp):
+        class Evaporation_RAMP(Ramp):
             # The transition from ODT to single beam evaporation
             # - ODT beams ramped off
             # - Single beam power ramped up
 
-            duration_default = DURATION["evaporation"]
-
-
-            supplies = [VDrivenSupply["X1"], VDrivenSupply["X2"], VDrivenSupply["Y"], VDrivenSupply["Z"]]
-            supplies_start = [self.odt_ramp] * len(supplies)
-            supplies_end = [0.0 * A] * len(supplies)
+            duration_default = DURATION["EVAPORATION"]
 
             suservos = [SUServoedBeam["CDT2"], SUServoedBeam["CDT1"]]
-            suservo_setpoint_end = [0 * V, 0 * V]
+            suservo_setpoint_end = [0.01 * V, 0.00 * V]
 
-        self.evaporation_single_ramp: Evaporation_single_ramp = self.setattr_fragment(
-            "evaporation_single_ramp",
-            Evaporation_single_ramp,
-        )
-
-        self.evaporation_single_beam_duration: FloatParamHandle = (
-            self.setattr_param_rebind(
-                "evaporation_single_beam_duration",
-                self.evaporation_single_ramp,
-                "duration",
-                description="Duration of the single beam evaporation ramp",
-            )
+        self.evaporation_ramp: Evaporation_RAMP = self.setattr_fragment(
+            "evaporation_ramp",
+            Evaporation_RAMP,
         )
 
     @kernel
@@ -444,7 +380,7 @@ class MOT(Fragment):
         self.core.break_realtime()
         self.cmot_ramp.precalculate_dma_handle()
         self.pgc_ramp.precalculate_dma_handle()
-        self.odt_ramp.precalculate_dma_handle()
+        self.evaporation_ramp.precalculate_dma_handle()
         # self.evaporation_single_ramp.precalculate_dma_handle()
 
         # safety check - EOMs take 400us to shift so we can't run faster than that
@@ -516,12 +452,13 @@ class MOT(Fragment):
         """
         self.all_beams.turn_beams_off()
         self.shutter_2d.on()
+       
         
         if clearout:
             self.clear_atoms(clearout_time=clearout_time)
 
         self.mot_beam.turn_beams_on()
-
+        
         # We will check the MOT beam power after 10% of the loading time
         # so that it has settled in
         if wait_for_load:
@@ -536,7 +473,7 @@ class MOT(Fragment):
             delay(9.0 * self.loading_time.get() / 10.0)
 
     @kernel
-    def compress(self) -> None:
+    def compress(self, Evaporation_step) -> None:
         """
         Compress into a CMOT
 
@@ -544,9 +481,12 @@ class MOT(Fragment):
         """
         # Unlock the MOT
         self.unlock_mot()
-        # turn on odt beams
-        self.odt_reservoir.turn_beams_on()
-        self.odt_dimple.turn_beams_on()
+
+        #if we are doing evaporation then only turn on the dimple and reservior in cmot step
+        if Evaporation_step:
+            self.odt_reservoir.turn_beams_on()
+            self.odt_dimple.turn_beams_on()
+        
         self.shutter_2d.off()
         with parallel:
             # Fix EOM frequency
@@ -576,27 +516,13 @@ class MOT(Fragment):
         delay(self.PGC_settle_time.get())
 
     @kernel
-    def into_odt(self) -> None:
-        """
-        Load into the Optical Dipole Trap
-
-        **Timeline:** advances by `self.ODT_duration` + `self.ODT_settle_time`
-        """
-
-        # ODT beam comes on and we let atoms transfer
-        # self.odt_beams.turn_beams_on()
-        delay(self.ODT_overlap_time.get())
-        # ramp off the MOT
-        self.odt_ramp.do()
-        # Wait for the ODT to settle
-        delay(self.ODT_settle_time.get())
-
-    @kernel
-    def evaporation_single_beam(self) -> None:
+    def evaporation(self) -> None:
         # Evaporate in the Optical Dipole Trap
 
-        # **Timeline:** advances by `self.evaporation_single.duration` + `self.evaporation_single.settle_time`
-        self.evaporation_single_ramp.do()
+        # **Timeline:** advances by `self.evaporation.duration` + `self.evaporation.settle_time`
+        self.evaporation_ramp.do()
+        self.odt_dimple.turn_beams_off()
+        self.odt_reservoir.turn_beams_off()
 
     @kernel
     def into_lattice(self) -> None:
@@ -632,6 +558,7 @@ class MOT(Fragment):
         delay(time_to_shift)
         self.unlock_ttl.off()
         delay(-time_to_shift)
+        
 
     @kernel
     def drop(self) -> None:
@@ -646,8 +573,20 @@ class MOT(Fragment):
         # Turn off beams
         #self.all_beams.turn_beams_off()
         self.mot_beam.turn_beams_off()
-
         # For imaging we need to be back on resonance
         self.relock_mot()
-        
 
+    @kernel
+    def pump_intoF2(self) -> None:
+        """
+        Set the repump EOM to go into F=2
+        """
+        self.eom.set_freq(6650 * MHz)
+        delay(0.4 * ms)  # wait for EOM to shift
+
+    @kernel
+    def turn_on_mot_beam(self) -> None:
+        """
+        Turn on the MOT beam only
+        """
+        self.mot_beam.turn_beams_on()

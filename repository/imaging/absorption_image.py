@@ -61,12 +61,7 @@ class AbsorptionImageExpFrag(ExpFragment):
             unit="ms",
         )
         self.expansion_time: FloatParamHandle
-        self.imaging_ODT: BoolParamHandle = self.setattr_param(
-            "imaging_setup",
-            BoolParam,
-            "Imaging setup (True for ODT, False for free MOT)",
-            default=False,
-        )
+       
         self.do_cmot: BoolParamHandle = self.setattr_param(
             "do_cmot", BoolParam, "Do the CMOT step", default=False
         )
@@ -75,15 +70,13 @@ class AbsorptionImageExpFrag(ExpFragment):
             "do_pgc", BoolParam, "Do the PGC step", default=False
         )
 
-        self.do_odt: BoolParamHandle = self.setattr_param(
-            "do_odt", BoolParam, "Do the ODT step", default=False
-        )
-        self.do_evaporation_single_beam: BoolParamHandle = self.setattr_param(
-            "do_evaporation_single_beam",
+        self.do_evaporation: BoolParamHandle = self.setattr_param(
+            "do_evaporation",
             BoolParam,
-            "Do the single beam evaporation step",
+            "Do the evaporation step",
             default=False,
         )
+
         self.atom_number: FloatChannel = self.setattr_result("atom_number")
         self.info: OpaqueChannel = self.setattr_result("info", OpaqueChannel)
 
@@ -101,37 +94,18 @@ class AbsorptionImageExpFrag(ExpFragment):
 
         self.mot.load()
         if self.do_cmot.get():
-            self.mot.compress()
+            #we are also turning on the dimple and reservoir beams in the start of the cmot got to compress to see
+            self.mot.compress(Evaporation_step=self.do_evaporation.get())
             if self.do_pgc.get():
                 self.mot.pgc()
-        if self.do_odt.get():
-            self.mot.into_odt()
-        if self.do_evaporation_single_beam.get():
-            self.mot.evaporation_single_beam()
-        
+        #dropping and locking mot again to resonance for imaging
         self.mot.drop()
-        #self.mot.clear_background_atoms_around_odt()
-        #delay(10 * ms)  # wait for eddy currents to settle
         
-        delay(50 * ms)
-        #evaporation
-        #self.mot.evaporation_single_beam()
-       
-        #self.mot.drop_reservoir()
-        #delay(10 * ms)  # wait for eddy currents to settle
-        #self.mot.drop_dimple()
-        #self.mot.clear_background_atoms_around_odt()
-        #delay(10 * ms)  # wait for eddy currents to settle
-        
-        delay(50 * ms)
-        #evaporation
-        self.mot.evaporation_single_beam()
-      
-        self.mot.drop_dimple()
-        self.mot.drop_reservoir()
+        # evaporation and then switch off odt beams
+        if self.do_evaporation.get():
+            self.mot.evaporation()
         delay(self.expansion_time.get())
         
-
         # image cloud
         with parallel:
             self.img_beam.turn_beams_on()
@@ -141,8 +115,6 @@ class AbsorptionImageExpFrag(ExpFragment):
         delay(self.pco_camera.BUSY_TIME - self.exposure_time.get())
         self.mot.clear_atoms()
         
-        
-
         # reference image
         with parallel:
             self.img_beam.turn_beams_on()
