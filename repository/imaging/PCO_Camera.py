@@ -17,11 +17,12 @@ logging.getLogger("pco").setLevel(logging.WARNING)
 
 
 class PcoCamera(Fragment):
+    ODT_Reservoir_ROI = (1, 500, 1392, 650)
+    ODT_Dimple_ROI = (1, 530, 1392, 630)
     FULL_ROI = (1, 1, 1392, 1040)
-    MOT_SIZE = 300
-    MOT_X = 850
-
-    MOT_Y = 450
+    MOT_SIZE = 450
+    MOT_X = 630
+    MOT_Y = 500
 
     MOT_ROI = (MOT_X - MOT_SIZE, MOT_Y - MOT_SIZE, MOT_X + MOT_SIZE, MOT_Y + MOT_SIZE)
     WHOLE_CELL_ROI = (
