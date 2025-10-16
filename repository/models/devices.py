@@ -1,4 +1,4 @@
-from artiq.language.units import A, MHz, V, dB, ms
+from artiq.language.units import A, MHz, V, dB, ms, mV
 from ndscan.experiment import FloatParam, Fragment
 from repository.models import Eom, Shutter, SUServoedBeam, VDrivenSupply
 from repository.models.Device import device_arrays
@@ -64,8 +64,8 @@ VDRIVEN_SUPPLIES = [
         fastino="fastino",
         ch=5,
         gain=83 * MHz / V,
-        min_output=-400 * MHz,  # we are in 150Ω mode so max JP5 open -> +-5V
-        max_output=400 * MHz,  # we are in 150Ω mode so max JP5 open -> +-5V
+        min_output=-300 * MHz,  # we are in 150Ω mode so max JP5 open -> +-5V
+        max_output=300 * MHz,  # we are in 150Ω mode so max JP5 open -> +-5V
         default_output=0.0 * MHz,
         unit="MHz",
     ),
@@ -145,8 +145,8 @@ SUSERVOED_BEAMS = [
     SUServoedBeam(
         name="PUMP",
         suservo_device="suservo_aom_PUMP",
-        frequency=64.7 * MHz,
-        attenuation=19 * dB,
+        frequency=205 * MHz,
+        attenuation=18 * dB,
     ),
     SUServoedBeam(
         name="LATX",
@@ -167,20 +167,23 @@ SUSERVOED_BEAMS = [
         suservo_device="suservo_aom_CDT1",
         frequency=110.0 * MHz,
         attenuation=18.0 * dB,
-        # calib_gain=926.76,
-        # calib_offset=-45.877,
-        # setpoint=8.0 * V,
-        # servo_enabled=True,
+        servo_enabled=True,
+        calib_gain=14696.973513,
+        calib_offset=-443.552294,
+        setpoint= 3.0 * V         #0.324 * V,
+        #shutter_device="dummy_shutter",  # we don't have a shutter for this beam but need something to avoid errors
     ),
     SUServoedBeam(
         name="CDT2",
         suservo_device="suservo_aom_CDT2",
         frequency=110.0 * MHz,
         attenuation=18.0 * dB,
-        # calib_gain=4251.73,
-        # calib_offset=-38.471,
-        # setpoint=8.0 * V,
-        # servo_enabled=True,
+        servo_enabled=True,
+        photodiode_offset=0.0115 * V,
+        calib_gain=4251,
+        calib_offset=-38.0,
+        setpoint=3.4 * V,
+        # shutter_device="dummy_shutter",  # we don't have a shutter for this beam but need something to avoid errors
     ),
 ]
 # Convert to dict for ease of use

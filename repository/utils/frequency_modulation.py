@@ -14,7 +14,7 @@ from ndscan.experiment.parameters import FloatParamHandle, IntParamHandle
 from repository.fragments.supply_setter import SetSupplies
 from repository.models.devices import VDrivenSupply
 from repository.utils.get_local_devices import get_local_devices
-from artiq.language.core import kernel, delay_mu
+from artiq.language.core import kernel, now_mu, at_mu, delay_mu
 from artiq.coredevice.core import Core
 from artiq.coredevice.fastino import Fastino
 
@@ -42,7 +42,8 @@ class SinusoidalFrequencyModulation(ExpFragment):
         default = lasers[1]
         self.setattr_argument("laser", EnumerationValue(lasers, default=default))
         self.laser: str
-        self.gain = VDrivenSupply[self.laser].gain
+        # self.gain = VDrivenSupply[self.laser].gain
+        self.gain = 83.0 * MHz / V
 
         if self.laser is not None:
             current_config = VDrivenSupply[self.laser]
@@ -50,6 +51,16 @@ class SinusoidalFrequencyModulation(ExpFragment):
             current_config = VDrivenSupply[default]
         self.setattr_fragment("setter", SetSupplies, [current_config], init=False)
         self.setter: SetSupplies
+
+        # Unlock the laser
+        unlocks = [dev for dev in get_local_devices(self, TTLInOut) if "unlock" in dev]
+        default = unlocks[0]
+        self.setattr_argument("ttl", EnumerationValue(unlocks))  # ttl 5
+        self.ttl: str
+        if self.ttl is not None:
+            self.unlock_ttl: TTLInOut = self.get_device(self.ttl)
+        else:
+            self.unlock_ttl: TTLInOut = self.get_device(default)
 
         # Experimental parameters
 
@@ -68,10 +79,10 @@ class SinusoidalFrequencyModulation(ExpFragment):
             name="f_m",
             param_class=FloatParam,
             description="Modulation frequency",
-            default=1.0 * MHz,
-            unit="MHz",
-            min=0.0 * MHz,
-            max=10.0 * MHz,
+            default=10.0 * kHz,
+            unit="kHz",
+            min=0.0 * kHz,
+            max=1000.0 * kHz,
         )
         self.f_m: FloatParamHandle
 
@@ -80,8 +91,8 @@ class SinusoidalFrequencyModulation(ExpFragment):
             param_class=IntParam,
             description="Samples per cycle",
             default=64,
-            min=16,
-            max=64,
+            min=8,
+            max=100,
         )
         self.N: IntParamHandle
 
@@ -94,24 +105,47 @@ class SinusoidalFrequencyModulation(ExpFragment):
         )
         self.V0: FloatParamHandle
 
-        # Unlock the laser
-        unlocks = [dev for dev in get_local_devices(self, TTLInOut) if "unlock" in dev]
-        self.setattr_argument("ttl", EnumerationValue(unlocks))  # ttl 5
-        self.ttl: str
-        if self.ttl is not None:
-            self.unlock_ttl: TTLInOut = self.get_device(self.ttl)
-        else:
-            self.unlock_ttl: TTLInOut = self.get_device(unlocks[1])
-
     @kernel
     def run_once(self):
         self.core.reset()
 
         # Example Parameters
         # N = 16                  # samples per cycle (typ. 16–64)
-        # f_m = 5 MHz            # modulation frequency (up to 10 MHz)
+        # f_m = 10 kHz            # modulation frequency (up to 1000 kHz)
         # f_dev = 166.55 MHz      # frequency deviation (up to ±210 MHz)
 
+        # ------------------------------------------------------------------------------#
+        # Method 1
+        # # Compute timing
+        # samples_per_sec = (
+        #     self.N.get() * self.f_m.get()
+        # )  # sample_rate ≤ 0.9e6 (safety margin)
+
+        # # Precompute kernel-invariant timing
+        # dt = 1.0 / samples_per_sec  # seconds between sample/ time-steps
+
+        # # hardware timing constraints (use mu to avoid float drift)
+        # t_frame_mu = self.fastino.t_frame
+        # margin_mu = self.core.seconds_to_mu(0 * us)  # small safety margin
+        # step_mu = max(self.core.seconds_to_mu(dt), t_frame_mu + margin_mu)
+
+        # # Precompute phase step for efficiency
+        # phase_step = 2.0 * np.pi / float(self.N.get())
+
+        # #  Record DMA sequence
+        # with self.core_dma.record("sine_wave"):
+        #     # phase = 0.0
+        #     for i in range(self.N.get()):
+        #         # t = i * self.dt
+        #         phase = i * phase_step
+        #         self.setter.set_outputs([self.f_dev.get() * np.sin(phase)])
+        #         delay_mu(step_mu)
+
+        #     # let the last write settle
+        #     delay_mu(t_frame_mu + margin_mu)
+
+        # ------------------------------------------------------------------------------#
+        # Method 2
         # Compute timing
         samples_per_sec = (
             self.N.get() * self.f_m.get()
@@ -120,29 +154,34 @@ class SinusoidalFrequencyModulation(ExpFragment):
         # Precompute kernel-invariant timing
         dt = 1.0 / samples_per_sec  # seconds between sample/ time-steps
 
-        # hardware timing constraints (use mu to avoid float drift)
-        t_frame_mu = self.fastino.t_frame
-        margin_mu = self.core.seconds_to_mu(2 * us)  # small safety margin
-        step_mu = max(self.core.seconds_to_mu(dt), t_frame_mu + margin_mu)
+        # # hardware timing constraints (use mu to avoid float drift)
+        # t_frame_mu = self.fastino.t_frame
+        # step_mu = max(
+        #     self.core.seconds_to_mu(dt), t_frame_mu
+        # )  # "Sample rate exceeds Fastino capability" - but check you cant go faster or anything
+        
+        
+        step_mu = self.core.seconds_to_mu(dt)
+        assert step_mu > self.fastino.t_frame
 
         # Precompute phase step for efficiency
         phase_step = 2.0 * np.pi / float(self.N.get())
 
         #  Record DMA sequence
         with self.core_dma.record("sine_wave"):
-            # phase = 0.0
             for i in range(self.N.get()):
-                # t = i * self.dt
                 phase = i * phase_step
-                f = self.f_dev.get() * np.sin(phase)
-                print(f" V = {f / self.gain} V")
                 self.setter.set_outputs([self.f_dev.get() * np.sin(phase)])
+
                 delay_mu(step_mu)
+                print([self.f_dev.get() * np.sin(phase)])
+                print(step_mu)
 
             # let the last write settle
-            delay_mu(t_frame_mu + margin_mu)
+            # delay_mu(t_frame_mu)
+        # ------------------------------------------------------------------------------#
 
-        #  Play it back continuously
+        # Play it back continuously
         handle = self.core_dma.get_handle("sine_wave")
         self.core.break_realtime()
         for _ in range(6000):  # play it back (n x 1e3) times, then return
@@ -153,18 +192,18 @@ class SinusoidalFrequencyModulation(ExpFragment):
         self.setter.set_to_defaults()
         # Relock the laser
 
-        if self.reset.get():
-            """
-            Relock an ECDL
+        # if self.reset.get():
+        #     """
+        #     Relock an ECDL
 
-            Unpush and then after `time_to_shift` seconds, turn the TTL off
-            """
-            self.setter.set_to_defaults()
-            delay(self.time_to_shift.get())
-            self.unlock_ttl.off()
-            logging.warning("Relocking %s", self.laser)
-        else:
-            pass
+        #     Unpush and then after `time_to_shift` seconds, turn the TTL off
+        #     """
+        #     self.setter.set_to_defaults()
+        #     delay(self.time_to_shift.get())
+        #     self.unlock_ttl.off()
+        #     logging.warning("Relocking %s", self.laser)
+        # else:
+        #     pass
 
 
 Frequency_Modulation = make_fragment_scan_exp(SinusoidalFrequencyModulation)

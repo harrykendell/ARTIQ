@@ -61,7 +61,7 @@ class AbsImage:
         wavelength=780.24602089 * nm,
         detuning=0 * MHz,
         linewidth=6.065 * MHz,
-        pixel_size=1.85 * um,  #25.52 * um
+        pixel_size=1.55 * um,  # 25.52 * um
         magnification=None,
         fit_downsample=5,
     ):
@@ -116,6 +116,10 @@ class AbsImage:
             "best_values_pixel": {self.best_values},
             "multiply_by_me_to_convert_pixel_to_SI": {self.physical_scale},
             "physical_scale": {self.physical_scale},
+            "phase_space_density": {self.phase_space_density},
+            "peak_optical_density": {self.peak[2]},
+            "Peak density (atoms/cm^3): {self.phase_space_density[0] * 1e-6:.2e}
+
         """
 
     @functools.cached_property
@@ -195,7 +199,6 @@ class AbsImage:
         )
         z = self.optical_density[y, x]
         return y, x, z
-    
 
     @functools.cached_property
     def centroid(self):
@@ -257,7 +260,7 @@ class AbsImage:
         )
 
         return result
-    
+
     @functools.cached_property
     def bimodal_fit(self, slice):
         """Returns the parameters of the bimodal fit."""
@@ -267,7 +270,6 @@ class AbsImage:
     @functools.cached_property
     def best_values(self):
         return self.fit.best_values
-    
 
     @functools.cached_property
     def phase_space_density(self):
@@ -294,8 +296,8 @@ class AbsImage:
         PSD : float
             Phase-space density (dimensionless, N λ³ / V).
         """
-        m = 1.443e-25 # mass of Rb87 in kg
-        T = 30e-6 # temperature in K
+        m = 1.443e-25  # mass of Rb87 in kg
+        T = 10e-6  # temperature in K
 
         sigma_x = self.fit.best_values["sx"] * self.physical_scale
         sigma_y = self.fit.best_values["sy"] * self.physical_scale
@@ -303,7 +305,7 @@ class AbsImage:
 
         # Volume of the cloud assuming Gaussian distribution, 3D
         # V = (2π)^(3/2) σx σy σz
-        V = (2 * np.pi)**(3/2) * sigma_x * sigma_y * sigma_z
+        V = (2 * np.pi) ** (3 / 2) * sigma_x * sigma_y * sigma_z
 
         # Number density
         n = self.atom_number / V
@@ -317,7 +319,6 @@ class AbsImage:
 
         return n, lambda_db, PSD
 
-
     @property
     def best_fit(self):
         """Returns the evaluated best fit.
@@ -329,7 +330,7 @@ class AbsImage:
     def eval(self, *, x, y):
         """Evaluates the fit at the given coordinates."""
         return self.fit.eval(x=x, y=y)
-    
+
     @staticmethod
     def fake(num_gaussians=1):
         """
@@ -472,7 +473,7 @@ class AbsImage:
             max(np.max(self.optical_density), np.max(self.best_fit)),
         )
         plot_params = {
-            "cmap": "gray",
+            "cmap": "viridis",
             "origin": "lower",
             "extent": extent,
             "vmin": vmin,
@@ -511,42 +512,39 @@ class AbsImage:
             linewidths=1,
         )
 
-        #add text box with fit parameters
-         
+        # add text box with fit parameters
 
         # show the fitted slices
-        #od_ax.plot(
-         #   x_contour,
-         #   self.best_fit[self.peak[0], :],
-          #  color="green",
-          #  linewidth=2,
-           # label="Horizontal fit",
-        #)
-        #od_ax.plot(
+        # od_ax.plot(
+        #   x_contour,
+        #   self.best_fit[self.peak[0], :],
+        #  color="green",
+        #  linewidth=2,
+        # label="Horizontal fit",
+        # )
+        # od_ax.plot(
         #    self.best_fit[:, self.peak[1]],
         #    y_contour,
         ##    color="green",
         ##    linewidth=2,
         #    label="Vertical fit",
-        #)
+        # )
 
         # show the od slices too
-        #od_ax.plot(
+        # od_ax.plot(
         #    x_contour,
-         #   self.optical_density[self.peak[0], :],
-         #   color="white",
-         #   linewidth=2,
-         #   label="Horizontal OD",
-        #)
-       # od_ax.plot(
+        #   self.optical_density[self.peak[0], :],
+        #   color="white",
+        #   linewidth=2,
+        #   label="Horizontal OD",
+        # )
+        # od_ax.plot(
         #    self.optical_density[:, self.peak[1]],
         #    y_contour,
         #    color="white",
         #    linewidth=2,
         #    label="Vertical OD",
-        #)
-
-
+        # )
 
         # show the 1stdev fitted gaussian outline - contour of A/e
         od_ax.contour(
@@ -606,8 +604,7 @@ class AbsImage:
         # For Qt integration, draw once to calculate sizes
         fig.canvas.draw_idle()
 
-
-        #add seperate table with fit parameters left side of the od plot, use greek letters for sigma
+        # add seperate table with fit parameters left side of the od plot, use greek letters for sigma
         textstr = "\n".join(
             (
                 rf"Atom number: $\mathbf{{{self.atom_number:.2e}}}$",
@@ -618,13 +615,19 @@ class AbsImage:
                 rf"$\sigma_y$ (mm): $\mathbf{{{self.best_values['sy'] * scale_mm:.2f}}}$",
                 rf"Phase-space density: $\mathbf{{{self.phase_space_density[2]:.2e}}}$",
                 rf"$\lambda_{{\mathrm{{dB}}}}$ (m): $\mathbf{{{self.phase_space_density[1]:.2e}}}$",
-                rf"Peak density (atoms/cm$^3$): $\mathbf{{{self.phase_space_density[0]*1e-6:.2e}}}$",
+                rf"Peak density (atoms/cm$^3$): $\mathbf{{{self.phase_space_density[0] * 1e-6:.2e}}}$",
             )
         )
 
-        od_ax.text(1.05, 0.5, textstr, transform=od_ax.transAxes, fontsize=10,
-                verticalalignment='center', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+        od_ax.text(
+            1.05,
+            0.5,
+            textstr,
+            transform=od_ax.transAxes,
+            fontsize=10,
+            verticalalignment="center",
+            bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.5),
+        )
         plt.tight_layout()
-
 
         return fig, axes + [cax_raw, cax_od]

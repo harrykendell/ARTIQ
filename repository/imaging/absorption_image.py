@@ -14,7 +14,11 @@ from ndscan.experiment import (
     OpaqueChannel,
     make_fragment_scan_exp,
 )
-from ndscan.experiment.parameters import BoolParamHandle, FloatParamHandle
+
+
+from ndscan.experiment.default_analysis import DefaultAnalysis
+from ndscan.experiment.default_analysis import CustomAnalysis
+from ndscan.experiment.parameters import BoolParamHandle, FloatParamHandle, ParamHandle
 from repository.fragments.beam_setter import ControlBeamsWithoutCoolingAOM
 from repository.fragments.mot import MOT
 from repository.imaging.PCO_Camera import PcoCamera
@@ -56,18 +60,29 @@ class AbsorptionImageExpFrag(ExpFragment):
             "expansion_time",
             FloatParam,
             "Expansion time before imaging",
-            default=1.0 * ms,
+            default=0.5 * ms,
             min=1.0 * us,
             unit="ms",
         )
         self.expansion_time: FloatParamHandle
-       
+
         self.do_cmot: BoolParamHandle = self.setattr_param(
             "do_cmot", BoolParam, "Do the CMOT step", default=False
         )
 
         self.do_pgc: BoolParamHandle = self.setattr_param(
             "do_pgc", BoolParam, "Do the PGC step", default=False
+        )
+
+        self.trap_frequency_odt: BoolParamHandle = self.setattr_param(
+            "trap_frequency", BoolParam, "Do the trap frequency step", default=False
+        )
+
+        self.odt_active: BoolParamHandle = self.setattr_param(
+            "ODT_active",
+            BoolParam,
+            "ODT beams active",
+            default=False,
         )
 
         self.do_evaporation1: BoolParamHandle = self.setattr_param(
@@ -81,6 +96,30 @@ class AbsorptionImageExpFrag(ExpFragment):
             BoolParam,
             "Do the evaporation step 2",
             default=False,
+        )
+        self.odt_hold_time: FloatParamHandle = self.setattr_param(
+            "ODT_hold_time",
+            FloatParam,
+            "Hold time in ODT after CMOT/PGC before imaging",
+            default=50.0 * ms,
+            min=0.0 * ms,
+            unit="ms",
+        )
+        self.release_time: FloatParamHandle = self.setattr_param(
+            "release_time",
+            FloatParam,
+            "Time to release the atoms",
+            default=1.0 * ms,
+            min=0.0 * ms,
+            unit="ms",
+        )
+        self.hold_timeafter_release: FloatParamHandle = self.setattr_param(
+            "hold_timeafter_release",
+            FloatParam,
+            "Hold time after releasing the atoms",
+            default=1.0 * ms,
+            min=0.0 * ms,
+            unit="ms",
         )
 
         self.atom_number: FloatChannel = self.setattr_result("atom_number")
@@ -97,33 +136,62 @@ class AbsorptionImageExpFrag(ExpFragment):
 
         self.mot.calculate_dma_handles()
         self.core.break_realtime()
+        #self.mot.set_dimple_trap_power()
+        #self.mot.get_dimple_trap_power()
+        #self.mot.get_reservoir_trap_power(ch=7)
+
+        #self.mot.set_dimple_trap_power(self.mot.power_dimple.get())
+        self.mot.set_reservoir_trap_power(self.mot.power_reservoir.get())
+        self.mot.odt_reservoir.turn_beams_on()
 
         self.mot.load()
         if self.do_cmot.get():
-            #we are also turning on the dimple and reservoir beams in the start of the cmot got to compress to see
-            self.mot.compress(Evaporation_step=self.do_evaporation1.get())
+            self.mot.compress(
+                evaporation_active=self.do_evaporation1.get()
+                or self.do_evaporation2.get(),
+                odt_active=self.odt_active.get(),
+            )
             if self.do_pgc.get():
                 self.mot.pgc()
-        #dropping and locking mot again to resonance for imaging
-        self.mot.drop()
-        
+        # dropping and locking mot again to resonance for imaging
+        self.mot.drop(
+            evaporation_active=self.do_evaporation1.get() or self.do_evaporation2.get(),
+            odt_active=self.odt_active.get(),
+        )
+
+        # if odt is active turn on odt beams
+        if self.odt_active.get():
+            delay(self.odt_hold_time.get())  # hold time in odt before imaging
+            if not self.do_evaporation1.get() or self.do_evaporation2.get():
+                self.mot.drop_dimple()  # turn off dimple beam for imaging
+                self.mot.drop_reservoir()  # turn off reservoir beam for imaging
+
+        if self.trap_frequency_odt.get():
+            delay(self.release_time.get())
+            self.mot.on_reservoir()  # turn off reservoir beam for imaging
+            delay(self.hold_timeafter_release.get())
+            self.mot.drop_reservoir()  # turn off reservoir beam for imaging
+
         # Evaporation and then switch off odt beams
         if self.do_evaporation1.get():
-            self.mot.evaporation1(single_step_evaporation=not self.do_evaporation2.get())
+            self.mot.evaporation1(
+                single_step_evaporation=not self.do_evaporation2.get()
+            )
             if self.do_evaporation2.get():
                 self.mot.evaporation2()
         
         delay(self.expansion_time.get())
-        
+    
         # image cloud
         with parallel:
             self.img_beam.turn_beams_on()
             self.pco_camera.capture_image()
         delay(self.exposure_time.get())
+      
         self.img_beam.turn_beams_off()
         delay(self.pco_camera.BUSY_TIME - self.exposure_time.get())
         self.mot.clear_atoms()
-        
+
         # reference image
         with parallel:
             self.img_beam.turn_beams_on()
@@ -142,13 +210,11 @@ class AbsorptionImageExpFrag(ExpFragment):
 
         self.core.wait_until_mu(now_mu())
         self.update_images()
-        
-        
 
     @rpc(flags={"async"})
     def update_images(self):
         images = self.pco_camera.retrieve_images(
-            roi=self.pco_camera.FULL_ROI, timeout=1 * s
+            roi=self.pco_camera.MOT_ROI, timeout=1 * s
         )
         if images is None:
             raise RuntimeError("Failed to retrieve images from camera")
@@ -188,4 +254,3 @@ class AbsorptionImageExpFrag(ExpFragment):
 
 
 AbsorptionImage = make_fragment_scan_exp(AbsorptionImageExpFrag)
-

@@ -1,0 +1,104 @@
+{
+  "crates": [
+    {
+      "items": [
+        {
+          "pn": "1106",
+          "options": null
+        },
+        {
+          "pn": "1124",
+          "options": {
+            "drtio_role": "standalone",
+            "ipv4": "192.168.1.75/24",
+            "ipv6": {
+              "text": "",
+              "checked": false,
+              "valid": true
+            },
+            "ext_clk": {
+              "text": "125 MHz",
+              "checked": false,
+              "valid": true
+            }
+          }
+        },
+        {
+          "pn": "4410",
+          "options": {
+            "mono_eem": false,
+            "sync": true
+          }
+        },
+        {
+          "pn": "4410",
+          "options": {
+            "mono_eem": false,
+            "sync": true
+          }
+        },
+        {
+          "pn": "4457",
+          "options": {
+            "ext_clk": {
+              "text": "125 MHz",
+              "checked": false,
+              "valid": true
+            }
+          }
+        },
+        {
+          "pn": "5108",
+          "options": {
+            "mono_eem": false,
+            "suservo": true,
+            "config_term": false
+          }
+        },
+        {
+          "pn": "5632",
+          "options": null
+        },
+        {
+          "pn": "5518",
+          "options": null
+        },
+        {
+          "pn": "2128",
+          "options": {
+            "out_first_bank": false,
+            "term_0": false,
+            "term_1": false,
+            "term_2": false,
+            "term_3": false,
+            "out_second_bank": true,
+            "edge_counter": false
+          }
+        },
+        {
+          "pn": "2128",
+          "options": {
+            "out_first_bank": true,
+            "out_second_bank": true
+          }
+        }
+      ],
+      "type": "rack",
+      "options": {
+        "fan_tray": false
+      }
+    },
+    {
+      "items": [],
+      "type": "no_crate",
+      "options": {}
+    }
+  ],
+  "options": {
+    "nuc": false,
+    "include_usb_stick": true,
+    "shipping": "Incoterms 2020 FCA",
+    "shipping_instructions": "",
+    "outside_hk": false
+  }
+}

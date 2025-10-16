@@ -85,6 +85,7 @@ device_db["mirny_cpld"] = {
     "arguments": {"spi_device": "spi_mirny", "refclk": 125000000.0, "clk_sel": "mmcx"},
 }
 
+
 for i in range(4):
     device_db.update(
         {
@@ -334,3 +335,4 @@ aliases = {
 }
 
 device_db |= aliases
+
