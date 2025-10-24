@@ -20,6 +20,7 @@ jobs:
       # 2 ▸ auto-format (skip vendor dirs)
       - name: Ruff format
         uses: astral-sh/ruff-action@v3
+        continue-on-error: true
         with:
           args: >
             format .
