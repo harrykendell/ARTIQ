@@ -133,7 +133,7 @@ class MainWindow(QWidget):
 
         for i in range(8):
             frame = QFrame()
-            frame.setFrameStyle(QFrame.StyledPanel | QFrame.Raised)
+            frame.setFrameStyle(QFrame.Shape.StyledPanel | QFrame.Shadow.Raised)
             frame.setLineWidth(2)
 
             channel_layout = QVBoxLayout()
@@ -145,18 +145,18 @@ class MainWindow(QWidget):
             ch_label = QLabel(f"<b>Ch {i}</b>")
             state_label = QLabel(DeviceState.UNKNOWN.value)
             header_layout.addWidget(ch_label, 0, 0)
-            header_layout.addWidget(state_label, 0, 1, Qt.AlignRight)
+            header_layout.addWidget(state_label, 0, 1, Qt.AlignmentFlag.AlignRight)
 
             header_widget = QWidget()
             header_widget.setLayout(header_layout)
             channel_layout.addWidget(header_widget)
 
             power_label = QLabel("--.- → --.- dBm")
-            power_label.setAlignment(Qt.AlignCenter)
+            power_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             channel_layout.addWidget(power_label)
 
             reflected_label = QLabel("↻ --.- dBm")
-            reflected_label.setAlignment(Qt.AlignCenter)
+            reflected_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             channel_layout.addWidget(reflected_label)
 
             frame.setLayout(channel_layout)
@@ -175,12 +175,14 @@ class MainWindow(QWidget):
             booster_layout.addWidget(frame, row, col)
 
         booster_outer_frame = QFrame()
-        booster_outer_frame.setFrameStyle(QFrame.StyledPanel | QFrame.Raised)
+        booster_outer_frame.setFrameStyle(
+            QFrame.Shape.StyledPanel | QFrame.Shadow.Raised
+        )
         booster_outer_frame.setLineWidth(2)
         self.booster_outer_frame = booster_outer_frame
 
         booster_label = QLabel("Booster")
-        booster_label.setAlignment(Qt.AlignCenter)
+        booster_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         booster_label.setStyleSheet("font-weight: bold;")
         self.booster_label = booster_label
 
@@ -191,7 +193,7 @@ class MainWindow(QWidget):
         layout.addWidget(booster_outer_frame)
 
         dlc_outer_frame = QFrame()
-        dlc_outer_frame.setFrameStyle(QFrame.StyledPanel | QFrame.Raised)
+        dlc_outer_frame.setFrameStyle(QFrame.Shape.StyledPanel | QFrame.Shadow.Raised)
         dlc_outer_frame.setLineWidth(2)
         self.dlc_outer_frame = dlc_outer_frame
 
@@ -201,7 +203,7 @@ class MainWindow(QWidget):
 
         for i in range(2):
             frame = QFrame()
-            frame.setFrameStyle(QFrame.StyledPanel | QFrame.Raised)
+            frame.setFrameStyle(QFrame.Shape.StyledPanel | QFrame.Shadow.Raised)
             frame.setLineWidth(2)
 
             laser_layout = QVBoxLayout()
@@ -215,8 +217,8 @@ class MainWindow(QWidget):
             lock_label = QLabel(DeviceState.UNLOCKED.value)
 
             header_layout.addWidget(name_label, 0, 0)
-            header_layout.addWidget(state_label, 0, 1, Qt.AlignRight)
-            header_layout.addWidget(lock_label, 0, 2, Qt.AlignRight)
+            header_layout.addWidget(state_label, 0, 1, Qt.AlignmentFlag.AlignRight)
+            header_layout.addWidget(lock_label, 0, 2, Qt.AlignmentFlag.AlignRight)
 
             header_widget = QWidget()
             header_widget.setLayout(header_layout)
@@ -246,7 +248,9 @@ class MainWindow(QWidget):
             spectrum_axes = spectrum_fig.add_subplot(111)
 
             # Allow expansion in both directions
-            spectrum_canvas.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+            spectrum_canvas.setSizePolicy(
+                QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+            )
 
             # Set a minimum height, but allow expansion
             spectrum_canvas.setMinimumHeight(80)
@@ -283,7 +287,7 @@ class MainWindow(QWidget):
             dlc_layout.addWidget(frame, 0, i)
 
         dlc_status_label = QLabel("DLCPro")
-        dlc_status_label.setAlignment(Qt.AlignCenter)
+        dlc_status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         dlc_status_label.setStyleSheet("font-weight: bold;")
         self.dlc_status_label = dlc_status_label
 
@@ -308,7 +312,9 @@ class MainWindow(QWidget):
 
         # Experiment status (left side)
         self.schedule_text = QLabel("<b>Running:</b>\t---")
-        self.schedule_text.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        self.schedule_text.setAlignment(
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
+        )
         bottom_bar_layout.addWidget(self.schedule_text, 1)  # Takes stretch priority 1
 
         # Add spacer to push everything else to the right
@@ -329,7 +335,9 @@ class MainWindow(QWidget):
         self.elapsed_time_label = QLabel(
             "<span style='font-size: 200%;'>📷</span> ... ago"
         )
-        self.elapsed_time_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self.elapsed_time_label.setAlignment(
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+        )
         right_controls.addWidget(self.elapsed_time_label)
 
         # Add right controls to main layout
@@ -450,7 +458,6 @@ class MainWindow(QWidget):
         number_density = self.absimg.phase_space_density[0]
         lambda_db = self.absimg.phase_space_density[1]
 
-
         if not self.save_button.isEnabled():
             self.save_button.setEnabled(True)
             self.layout().addWidget(self.canvas)
@@ -458,7 +465,7 @@ class MainWindow(QWidget):
             self.layout().addWidget(self.toolbar)
             # Add status label at the bottom
             self.status_label = QLabel("Waiting for data...")
-            self.status_label.setAlignment(Qt.AlignCenter)
+            self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.status_label.setStyleSheet("font-size: 10pt;")
             self.status_label.setWordWrap(True)
             self.layout().addWidget(self.status_label)
