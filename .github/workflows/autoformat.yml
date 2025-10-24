@@ -43,8 +43,8 @@ jobs:
           echo "$OUTPUT" | head -n 40 >> "$GITHUB_OUTPUT"
           echo "EOF"              >> "$GITHUB_OUTPUT"
 
-      # 4 ▸ amend tip only if formatter changed files
-      - name: Amend last commit & push
+      # 4 ▸ commit only if formatter changed files
+      - name: Format last commit & push
         env:
           RUFF_STATUS: ${{ steps.rcheck.outputs.status }}
           RUFF_ERRORS: ${{ steps.rcheck.outputs.errors }}
@@ -57,16 +57,12 @@ jobs:
 
           git config user.name  "autoformat"
           git config user.email "autoformat@users.noreply.github.com"
-          ORIGINAL_MSG=$(git log -1 --pretty=%B)
 
           git add -A
           if [ "$RUFF_STATUS" -ne 0 ]; then
-            git commit --amend --allow-empty -m "$ORIGINAL_MSG" \
-              -m "style: apply Ruff auto-format (lint errors remain)"
+            git commit -m "style: apply Ruff auto-format (lint errors remain)"
           else
-            git commit --amend -allow-empty -m "$ORIGINAL_MSG" \
-              -m "style: apply Ruff auto-format"
+            git commit -m "style: apply Ruff auto-format"
           fi
 
-          # safe history rewrite
-          git push --force-with-lease --force-if-includes
+          git push
