@@ -329,10 +329,11 @@ aliases = {
     # PCO camera
     "pco_camera": "ttl8",
     # probe - generic use
-    "probe_ttl": "ttl11",
+    "moving_stage_ttl": "ttl11",
     # we need the dummy to also be a TTLOut not TTLInOut for typing reasons
     "dummy_shutter": "ttl0",
+    # moving stage
+    # "moving_stage": "ttl11",
 }
 
 device_db |= aliases
-
