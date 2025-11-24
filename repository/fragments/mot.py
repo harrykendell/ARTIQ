@@ -68,6 +68,7 @@ class MOT(Fragment):
 
         # Beam SHUTTERS
         self.shutter_2d: TTLOut = self.get_device("shutter_2DMOT")
+        self.cpt_shutter: TTLOut = self.get_device("shutter_LATTICE")
         # Use the resetter ONLY for init/deinit
         self.beam_resetter: SetBeamsToDefaults = self.setattr_fragment(
             "beam_resetter",
