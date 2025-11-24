@@ -157,7 +157,7 @@ class MOT(Fragment):
             default=0.1 * V,
             unit="V",
             min=0.0 * V,
-            max=0.5 * V,
+            max=15 * V,
         )
         self.power_reservoir: FloatParamHandle = self.setattr_param(
             "power_reservoir",
@@ -166,7 +166,7 @@ class MOT(Fragment):
             default=0.1 * V,
             unit="V",
             min=0.0 * V,
-            max=0.5 * V,
+            max=15 * V,
         )
 
         self.unlock_ttl: TTLOut = self.get_device("780_unlock")
@@ -233,9 +233,9 @@ class MOT(Fragment):
                 COMPRESSED_GRADIENTS["X2"],  # X2
                 self.CMOT_detuning,
             ]
-            suservos = [SUServoedBeam["MOT"]]
-            suservo_setpoint_start = [POWER_3D_MOT["MOT_loading"]]
-            suservo_setpoint_end = [1.9 * V]
+            suservos = [SUServoedBeam["MOT"], SUServoedBeam["CDT2"]]
+            suservo_setpoint_start = [POWER_3D_MOT["MOT_loading"], 0.0 * V]
+            suservo_setpoint_end = [1.9 * V, 1.2 * V]
 
         self.cmot_ramp: CMOT_Ramp = self.setattr_fragment(
             "cmot_ramp",
@@ -615,8 +615,8 @@ class MOT(Fragment):
         """
         self.evaporation_ramp1.do()
         if single_step_evaporation:
-            #self.odt_dimple.turn_beams_off()
-            #self.odt_reservoir.turn_beams_off()
+            self.odt_dimple.turn_beams_off()
+            self.odt_reservoir.turn_beams_off()
             pass
         delay(self.evaporation_settle_time1.get())
 
@@ -667,7 +667,7 @@ class MOT(Fragment):
         delay(-time_to_shift)
 
     @kernel
-    def drop(self, evaporation_active, odt_active) -> None:
+    def drop(self, evaporation_active, odt_active, cmot_active, pgc_active) -> None:
         """
         Drop the MOT immediately
         Turn off all beams and coils
@@ -676,13 +676,18 @@ class MOT(Fragment):
 
         # Turn off the coils
         self.coils.turn_off()
-   
+
         if evaporation_active or odt_active:
             self.mot_beam.turn_beams_off()
         else:
             self.all_beams.turn_beams_off()
-        # For imaging we need to be back on resonance
-        self.relock_mot()
+        
+        # For imaging we need to be back on resonance, only relock if we did cmot or pgc
+        if cmot_active or pgc_active:
+            self.relock_mot()
+        else:
+            pass
+        
 
     @kernel
     def pump_intoF2(self) -> None:
