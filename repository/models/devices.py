@@ -107,6 +107,11 @@ SHUTTERS = [
         ttl="shutter_3DMOT",
         delay=THORLABS_SHUTTER_DELAY,
     ),
+    Shutter(
+        name="CPT",
+        ttl="shutter_LATTICE",
+        delay=THORLABS_SHUTTER_DELAY,
+    ),
 ]
 # Convert to dict for ease of use
 SHUTTERS = {beam.name: beam for beam in SHUTTERS}
