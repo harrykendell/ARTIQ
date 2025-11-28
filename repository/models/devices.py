@@ -1,4 +1,4 @@
-from artiq.language.units import A, MHz, V, dB, ms, mV
+from artiq.language.units import A, MHz, V, dB, ms
 from ndscan.experiment import FloatParam, Fragment
 from repository.models import Eom, Shutter, SUServoedBeam, VDrivenSupply
 from repository.models.Device import device_arrays
@@ -175,8 +175,8 @@ SUSERVOED_BEAMS = [
         servo_enabled=True,
         calib_gain=14696.973513,
         calib_offset=-443.552294,
-        setpoint= 3.0 * V         #0.324 * V,
-        #shutter_device="dummy_shutter",  # we don't have a shutter for this beam but need something to avoid errors
+        setpoint=3.0 * V,  # 0.324 * V,
+        # shutter_device="dummy_shutter",  # we don't have a shutter for this beam but need something to avoid errors
     ),
     SUServoedBeam(
         name="CDT2",

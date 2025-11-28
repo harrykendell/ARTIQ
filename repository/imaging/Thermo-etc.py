@@ -1,10 +1,9 @@
 from time import time
-from token import NAME
 
 from artiq.coredevice.core import Core
 from artiq.coredevice.dma import CoreDMA
 from artiq.experiment import kernel, rpc
-from artiq.language import delay, ms, now_mu, parallel, s, us
+from artiq.language import delay, ms, s, us
 
 # from repository.models.device_db import server_addr
 from ndscan.experiment import (
@@ -16,16 +15,13 @@ from ndscan.experiment import (
     make_fragment_scan_exp,
 )
 
-from artiq.coredevice.ttl import TTLInOut, TTLOut
-from ndscan.experiment.default_analysis import DefaultAnalysis
-from ndscan.experiment.default_analysis import CustomAnalysis
-from ndscan.experiment.parameters import BoolParamHandle, FloatParamHandle, ParamHandle
+from artiq.coredevice.ttl import TTLInOut
+from ndscan.experiment.parameters import BoolParamHandle, FloatParamHandle
 from repository.fragments.beam_setter import ControlBeamsWithoutCoolingAOM
 from repository.fragments.mot import MOT
 from repository.imaging.PCO_Camera import PcoCamera
 from repository.imaging.processor import AbsImage  # noqa: E402
 from repository.models.devices import SUServoedBeam
-from repository.Dipole_trap.moving_stage import MovingStage
 
 MAGNIFICATION = 1  # Default magnification for absorption imaging
 
@@ -59,7 +55,6 @@ class AbsorptionImageExpFrag(ExpFragment):
 
         self.setattr_device("moving_stage_ttl")
         self.moving_stage_trigger: TTLInOut = self.moving_stage_ttl
-
 
         self.setattr_param(
             "expansion_time",
@@ -126,7 +121,7 @@ class AbsorptionImageExpFrag(ExpFragment):
             min=0.0 * ms,
             unit="ms",
         )
-        
+
         self.atom_number: FloatChannel = self.setattr_result("atom_number")
         self.info: OpaqueChannel = self.setattr_result("info", OpaqueChannel)
 
@@ -138,21 +133,21 @@ class AbsorptionImageExpFrag(ExpFragment):
     @kernel
     def run_once(self):
         self.core.break_realtime()
-        
+
         self.mot.calculate_dma_handles()
         self.core.break_realtime()
         self.mot.set_dimple_trap_power(self.mot.power_dimple.get())
         self.mot.set_reservoir_trap_power(self.mot.power_reservoir.get())
-        
+
         # self.mot.odt_reservoir.turn_beams_on()
         # self.mot.odt_dimple.turn_beams_on()
         # kdc_main()  # move stage to imaging position
         # delay(4 * s)  # wait for power to stabilize
         # self.mot.cpt_shutter.off()
-        #self.absolute_moving_stage.set_stage_absolute(self.moving_absolute_distance.get(), 1.0)  # move stage to imaging position
-        #delay(1 * s)  # wait for power to stabilize
-        #self.moving_stage_trigger.pulse(10 * us)  # trigger moving stage
-        
+        # self.absolute_moving_stage.set_stage_absolute(self.moving_absolute_distance.get(), 1.0)  # move stage to imaging position
+        # delay(1 * s)  # wait for power to stabilize
+        # self.moving_stage_trigger.pulse(10 * us)  # trigger moving stage
+
         self.mot.load()
         if self.do_cmot.get():
             # self.kdc101()
@@ -163,13 +158,13 @@ class AbsorptionImageExpFrag(ExpFragment):
             )
             if self.do_pgc.get():
                 self.mot.pgc()
-        
+
         # dropping and locking mot again to resonance for imaging
         self.mot.drop(
             evaporation_active=self.do_evaporation1.get() or self.do_evaporation2.get(),
             odt_active=self.odt_active.get(),
         )
-        
+
         # if odt is active turn on odt beams
         if self.odt_active.get():
             delay(self.odt_hold_time.get())  # hold time in odt before imaging
@@ -202,33 +197,33 @@ class AbsorptionImageExpFrag(ExpFragment):
         # self.mot.cpt_shutter.off()
 
         # image cloud
-        #with parallel:
-         #   self.img_beam.turn_beams_on()
-          #  self.pco_camera.capture_image()
-        #delay(self.exposure_time.get())
+        # with parallel:
+        #   self.img_beam.turn_beams_on()
+        #  self.pco_camera.capture_image()
+        # delay(self.exposure_time.get())
 
-        #self.img_beam.turn_beams_off()
-        #delay(self.pco_camera.BUSY_TIME - self.exposure_time.get())
-        #self.mot.clear_atoms()
+        # self.img_beam.turn_beams_off()
+        # delay(self.pco_camera.BUSY_TIME - self.exposure_time.get())
+        # self.mot.clear_atoms()
 
         # reference image
-        #with parallel:
+        # with parallel:
         #    self.img_beam.turn_beams_on()
         #    self.pco_camera.capture_image()
-        #delay(self.exposure_time.get())
-        #self.img_beam.turn_beams_off()
-        #delay(self.pco_camera.BUSY_TIME - self.exposure_time.get())
+        # delay(self.exposure_time.get())
+        # self.img_beam.turn_beams_off()
+        # delay(self.pco_camera.BUSY_TIME - self.exposure_time.get())
 
         # background image
-        #self.pco_camera.capture_image()
-        #delay(self.pco_camera.BUSY_TIME)
+        # self.pco_camera.capture_image()
+        # delay(self.pco_camera.BUSY_TIME)
 
         # leave the MOT to reload
         self.mot.init()
         self.mot.load(wait_for_load=False)
 
-        #self.core.wait_until_mu(now_mu())
-        #self.update_images()
+        # self.core.wait_until_mu(now_mu())
+        # self.update_images()
 
     @rpc(flags={"async"})
     def update_images(self):

@@ -1,5 +1,4 @@
 from time import time
-from token import NAME
 
 from artiq.coredevice.core import Core
 from artiq.coredevice.dma import CoreDMA
@@ -16,10 +15,8 @@ from ndscan.experiment import (
     make_fragment_scan_exp,
 )
 
-from artiq.coredevice.ttl import TTLInOut, TTLOut
-from ndscan.experiment.default_analysis import DefaultAnalysis
-from ndscan.experiment.default_analysis import CustomAnalysis
-from ndscan.experiment.parameters import BoolParamHandle, FloatParamHandle, ParamHandle
+from artiq.coredevice.ttl import TTLInOut
+from ndscan.experiment.parameters import BoolParamHandle, FloatParamHandle
 from repository.fragments.beam_setter import ControlBeamsWithoutCoolingAOM
 from repository.fragments.mot import MOT
 from repository.imaging.PCO_Camera import PcoCamera
@@ -154,8 +151,8 @@ class AbsorptionImageExpFrag(ExpFragment):
         self.mot.set_dimple_trap_power(self.mot.power_dimple.get())
         self.mot.set_reservoir_trap_power(self.mot.power_reservoir.get())
 
-        #self.mot.odt_reservoir.turn_beams_on()
-        #self.mot.odt_dimple.turn_beams_on()
+        # self.mot.odt_reservoir.turn_beams_on()
+        # self.mot.odt_dimple.turn_beams_on()
         # self.mot.cpt_shutter.off()
         self.absolute_moving_stage.set_stage_absolute(20.455, 0)
         self.absolute_moving_stage.move_stage_absolute()
@@ -173,12 +170,13 @@ class AbsorptionImageExpFrag(ExpFragment):
             )
             if self.do_pgc.get():
                 self.mot.pgc()
-        
+
         # dropping and locking mot again to resonance for imaging
         self.mot.drop(
             evaporation_active=self.do_evaporation1.get() or self.do_evaporation2.get(),
             odt_active=self.odt_active.get(),
-            cmot_active=self.do_cmot.get(), pgc_active=self.do_pgc.get(),
+            cmot_active=self.do_cmot.get(),
+            pgc_active=self.do_pgc.get(),
         )
 
         # if odt is active turn on odt beams
@@ -207,9 +205,9 @@ class AbsorptionImageExpFrag(ExpFragment):
         # delay(35 * ms)  # wait for the shutter to open properly
 
         delay(self.expansion_time.get())
-        #self.moving_stage_trigger.on()
-        #delay(10 * us)  # wait for the stage to move
-        #self.moving_stage_trigger.off()
+        # self.moving_stage_trigger.on()
+        # delay(10 * us)  # wait for the stage to move
+        # self.moving_stage_trigger.off()
         # self.mot.cpt_shutter.off()
 
         # image cloud

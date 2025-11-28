@@ -1,26 +1,15 @@
 import logging
-from typing import List, Tuple
+from typing import List
 
-from numpy import int32, int64
 
 from artiq.coredevice.core import Core
 from artiq.coredevice.dma import CoreDMA
 from artiq.coredevice.suservo import Channel as SUServoChannel
-from artiq.experiment import TFloat, TInt32, kernel, portable
-from artiq.language.core import at_mu, delay, delay_mu, now_mu
-from artiq.language.units import MHz, ms, us
+from artiq.experiment import kernel
 from ndscan.experiment import Fragment
-from ndscan.experiment.parameters import FloatParam, FloatParamHandle, ParamHandle
-from repository.fragments.eom_setter import EomFrag
-from repository.fragments.supply_setter import SetSupplies
-from repository.models import DEVICE, Eom, SUServoedBeam, VDrivenSupply
+from repository.models import SUServoedBeam
 from repository.utils.dummy_devices import (
-    DummyEom,
-    DummyEomFrag,
-    DummySetSupplies,
-    DummySUServoChannel,
     DummySUServoedBeam,
-    DummyVDrivenSupply,
 )
 
 logger = logging.getLogger(__name__)
@@ -28,8 +17,9 @@ logger = logging.getLogger(__name__)
 
 class RampEvaporation(Fragment):
     """This class is specifically for the ramping the AOMs and Moving stages for lensing effect during evaporation."""
-    
-    def build_fragment(self,
+
+    def build_fragment(
+        self,
         evaporation_aom_beams: List[SUServoedBeam],
         evaporation_stage_ttl: List[float],
         use_dummy_devices: bool = False,
@@ -84,14 +74,14 @@ class RampEvaporation(Fragment):
                 logger.error(f"Invalid AOM channel: {channel}")
                 return False
         return True
-    
+
     def validate_stage_ttls(self, ttls: List[float]) -> bool:
         for ttl in ttls:
             if not isinstance(ttl, (float, int)):
                 logger.error(f"Invalid TTL value: {ttl}")
                 return False
         return True
-    
+
     @kernel
     def device_setup(self) -> None:
         self.core.reset()

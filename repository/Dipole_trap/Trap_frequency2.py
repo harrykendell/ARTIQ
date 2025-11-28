@@ -16,9 +16,7 @@ from ndscan.experiment import (
 )
 
 
-from ndscan.experiment.default_analysis import DefaultAnalysis
-from ndscan.experiment.default_analysis import CustomAnalysis
-from ndscan.experiment.parameters import BoolParamHandle, FloatParamHandle, ParamHandle
+from ndscan.experiment.parameters import BoolParamHandle, FloatParamHandle
 from repository.fragments.beam_setter import ControlBeamsWithoutCoolingAOM
 from repository.fragments.mot import MOT
 from repository.imaging.PCO_Camera import PcoCamera
@@ -90,7 +88,7 @@ class TrapFrequencyExpFrag(ExpFragment):
             min=0.0 * ms,
             unit="ms",
         )
-        
+
         self.wait_after_perturbation: FloatParamHandle = self.setattr_param(
             "wait_after_perturbation",
             FloatParam,
@@ -114,7 +112,7 @@ class TrapFrequencyExpFrag(ExpFragment):
 
         self.mot.calculate_dma_handles()
         self.core.break_realtime()
-        
+
         self.mot.odt_reservoir.turn_beams_on()
         self.mot.load()
         if self.do_cmot.get():
@@ -124,20 +122,20 @@ class TrapFrequencyExpFrag(ExpFragment):
 
         self.mot.drop(False, True)
         delay(self.odt_hold_time.get())
-        #perturbation to excite COM motion
-        self.mot.dipole_trap_com_shift() # apply perturbation to excite COM motion
-        #delay(0.5*ms)  # wait for perturbation to finish
+        # perturbation to excite COM motion
+        self.mot.dipole_trap_com_shift()  # apply perturbation to excite COM motion
+        # delay(0.5*ms)  # wait for perturbation to finish
         delay(self.wait_after_perturbation.get())
         self.mot.odt_reservoir.turn_beams_off()  # turn off reservoir beam for imaging
         delay(self.expansion_time.get())
-        
+
         # image cloud
         with parallel:
             self.img_beam.turn_beams_on()
             self.pco_camera.capture_image()
         delay(self.exposure_time.get())
         self.img_beam.turn_beams_off()
-        #self.mot.drop_reservoir()  # turn off reservoir beam for imaging
+        # self.mot.drop_reservoir()  # turn off reservoir beam for imaging
         delay(self.pco_camera.BUSY_TIME - self.exposure_time.get())
         self.mot.clear_atoms()
 
@@ -201,7 +199,9 @@ class TrapFrequencyExpFrag(ExpFragment):
         #     f"${{python}} -m repository.imaging.applet --server {server_addr}",  # noqa: E501,
         # )
 
-class fit():
+
+class fit:
     pass
+
 
 TrapFrequency = make_fragment_scan_exp(TrapFrequencyExpFrag)

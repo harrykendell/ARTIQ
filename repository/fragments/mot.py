@@ -3,7 +3,7 @@ import logging
 from artiq.coredevice.core import Core
 from artiq.coredevice.ttl import TTLOut
 from artiq.language import delay, kernel, parallel
-from artiq.language.units import A, MHz, V, W, dB, ms, s, us, mW
+from artiq.language.units import A, MHz, V, dB, ms, s, us
 from ndscan.experiment import Fragment
 from ndscan.experiment.parameters import FloatParam, FloatParamHandle
 from repository.fragments.beam_setter import ControlBeamsWithoutCoolingAOM
@@ -16,7 +16,6 @@ from repository.fragments.ramp import Ramp, default
 from repository.fragments.supply_setter import SetSupplies
 from repository.models.devices import Eom, SUServoedBeam, VDrivenSupply
 from repository.gui.managers import SUServoManager
-from artiq.coredevice.suservo import Channel as SUServoChannel
 
 
 logger = logging.getLogger(__name__)
@@ -76,7 +75,7 @@ class MOT(Fragment):
                 suservo_beam_infos=SUServoedBeam[
                     "MOT",
                     "IMG",
-                    #"PUMP",
+                    # "PUMP",
                     "LATX",
                     "LATY",
                     "CDT1",
@@ -431,7 +430,7 @@ class MOT(Fragment):
         # MOT locked and unpushed
         self.relock_mot()
         self.core.break_realtime()
-        #set ddipole and reservoir off
+        # set ddipole and reservoir off
         self.odt_dimple.turn_beams_off()
         self.odt_reservoir.turn_beams_off()
 
@@ -499,7 +498,7 @@ class MOT(Fragment):
         """
         delay(clearout_time)
         self.odt_dimple.turn_beams_off()
-    
+
     @kernel
     def on_dimple(self, clearout_time=0 * ms) -> None:
         """
@@ -509,7 +508,6 @@ class MOT(Fragment):
         """
         delay(clearout_time)
         self.odt_dimple.turn_beams_on()
-
 
     @kernel
     def drop_reservoir(self, clearout_time=0 * ms) -> None:
@@ -540,15 +538,15 @@ class MOT(Fragment):
 
         **Timeline:** advances by approx `loading_time` seconds
         """
-        #self.all_beams.turn_beams_off()
+        # self.all_beams.turn_beams_off()
         self.shutter_2d.on()
 
         if clearout:
             self.clear_atoms(clearout_time=clearout_time)
 
         self.mot_beam.turn_beams_on()
-        #self.odt_reservoir.turn_beams_on()
-        
+        # self.odt_reservoir.turn_beams_on()
+
         # We will check the MOT beam power after 10% of the loading time
         # so that it has settled in
         if wait_for_load:
@@ -574,7 +572,7 @@ class MOT(Fragment):
 
         if evaporation_active or odt_active:
             self.odt_dimple.turn_beams_on()
-            #self.odt_reservoir.turn_beams_on()
+            # self.odt_reservoir.turn_beams_on()
             pass
 
         # if we are doing evaporation then only turn on the dimple and reservoir in cmot step
@@ -681,13 +679,12 @@ class MOT(Fragment):
             self.mot_beam.turn_beams_off()
         else:
             self.all_beams.turn_beams_off()
-        
+
         # For imaging we need to be back on resonance, only relock if we did cmot or pgc
         if cmot_active or pgc_active:
             self.relock_mot()
         else:
             pass
-        
 
     @kernel
     def pump_intoF2(self) -> None:
@@ -703,14 +700,15 @@ class MOT(Fragment):
         Turn on the MOT beam only
         """
         self.mot_beam.turn_beams_on()
+
     @kernel
     def dipole_trap_com_shift(self) -> None:
         """
         Shift the dipole trap beams to a new position
         """
         self.evaporation_ramp1.do()
-        #set odt reserviour to defalut setpoint
-        #self.odt_reservoir.turn_beams_on()
+        # set odt reserviour to defalut setpoint
+        # self.odt_reservoir.turn_beams_on()
 
     @kernel
     def set_dimple_trap_power(self, power_dimple=0.5) -> None:
@@ -721,14 +719,14 @@ class MOT(Fragment):
     def set_reservoir_trap_power(self, power_reservoir=0.5) -> None:
         self.odt_reservoir.set_setpoint_volts("CDT1", power_reservoir)
 
-    #get the setpoint of the dimple
+    # get the setpoint of the dimple
     @kernel
-    def get_dimple_trap_power(self,ch=6):
+    def get_dimple_trap_power(self, ch=6):
         print("Dimple trap power:", SUServoManager.SUServoManager.get_adc(ch))
         return SUServoManager.SUServoManager.get_adc(ch)
 
-    #get the setpoint of the reservoir
+    # get the setpoint of the reservoir
     @kernel
-    def get_reservoir_trap_power(self,ch=7):
+    def get_reservoir_trap_power(self, ch=7):
         print("Reservoir trap power:", SUServoManager.SUServoManager.get_adc(ch))
         return SUServoManager.SUServoManager.get_adc(ch)

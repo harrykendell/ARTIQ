@@ -574,7 +574,6 @@ class Ramp(Fragment):
                             [supply_values[i]]
                         )
                         supply_values[i] += supply_steps[i]
-                       
 
                 delay_mu(14 * 7 * 4)  # Frame time for the fastino
 

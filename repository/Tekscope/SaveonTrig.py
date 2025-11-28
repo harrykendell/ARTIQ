@@ -7,6 +7,7 @@ about how to use the program.  Built using
 python 2.7 (http://www.python.org/)
 pyvisa 1.3 (http://pypi.python.org/pypi/PyVISA/1.3)
 """
+
 import sys
 import SoTmain
 
@@ -21,12 +22,11 @@ print("or USB connection. NI-VISA or TekVISA must be installed. \n")
 while True:
     try:
         SoTmain.main()
-    except Exception as ex:
+    except Exception:
         print("An unexpected error occured")
-    print("\n\nWould you like to start another capture" \
-          + " session? (Y/N)")
+    print("\n\nWould you like to start another capture" + " session? (Y/N)")
     Doagain = str(raw_input(""))
-    if ('Y' not in Doagain) and ('y' not in Doagain):
+    if ("Y" not in Doagain) and ("y" not in Doagain):
         print("Good Bye!")
         break
 a = raw_input("Press ENTER to exit")

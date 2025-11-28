@@ -3,7 +3,6 @@ import warnings
 import numpy as np
 import scipy.constants as const
 import matplotlib.pyplot as plt
-import numpy as np
 from lmfit import Model
 from matplotlib.gridspec import GridSpec
 from matplotlib.ticker import FuncFormatter

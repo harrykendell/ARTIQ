@@ -12,7 +12,6 @@ Tested with KDC101 and Z812
 
 import serial
 import time
-import numpy as np
 import logging
 
 
@@ -22,6 +21,7 @@ logger.info("Starting KDC101 serial communication")
 
 # total time program takes to run
 start_time = time.time()
+
 
 class KDC101:
     """
@@ -197,16 +197,15 @@ class KDC101:
         """
         Set the absolute move parameters of the stage.
         """
-        #debugging for position limits
+        # debugging for position limits
         if not (0 <= position <= 25.0):
             raise ValueError(
                 "Position must be between 0 and 25.0mm, please check the stage limits MTS25/M-Z8"
             )
         position_apt = self.get_position_apt(position)
         position_bytes = position_apt.to_bytes(4, byteorder="little", signed=True)
-        #check for valid position
+        # check for valid position
 
-        
         command = bytearray(
             [
                 0x50,
@@ -300,7 +299,9 @@ class KDC101:
         self.ser.flushOutput()
         time.sleep(sleep_time)
 
-    def set_velocity_profile(self, min_velocity, acceleration, max_velocity, sleep_time=1):
+    def set_velocity_profile(
+        self, min_velocity, acceleration, max_velocity, sleep_time=1
+    ):
         """
         Set the velocity profile of the stage.
         MAX velocity = 2.4 mm/s
@@ -368,40 +369,34 @@ class KDC101:
         """
         mode = 0x01 | 0x00 | 0x00 | 0x00 | 0x00 | 0x20 | 0x00 | 0x00 | 0x00
         # mode = 0x40  # set to trigger in enable only
-        command = bytearray(
-            [
-                0x00,
-                0x05,
-                0x01, mode
-            ]
-        )
-        
+        command = bytearray([0x00, 0x05, 0x01, mode])
+
         command.extend([0x50, 0x01])
         self.ser.write(command)
         time.sleep(1)
 
 
-#KDC101_device = KDC101(port="/dev/ttyUSB5", baudrate=115200, timeout=1)
+# KDC101_device = KDC101(port="/dev/ttyUSB5", baudrate=115200, timeout=1)
 
 
-#mode identify
-#KDC101_device.mod_identify(sleep_time=0)
-#trigger mode set
-#KDC101_device.set_velocity_profile(min_velocity=0.0, acceleration=4.5, max_velocity=2.4, sleep_time=0)
-#initialize_position = 20.0000
-#KDC101_device.set_abs_move_params(initialize_position, sleep_time=1)
-#KDC101_device.set_trigger_mode()
+# mode identify
+# KDC101_device.mod_identify(sleep_time=0)
+# trigger mode set
+# KDC101_device.set_velocity_profile(min_velocity=0.0, acceleration=4.5, max_velocity=2.4, sleep_time=0)
+# initialize_position = 20.0000
+# KDC101_device.set_abs_move_params(initialize_position, sleep_time=1)
+# KDC101_device.set_trigger_mode()
 
-#for i in range(300):
+# for i in range(300):
 #    KDC101_device.set_abs_move_params(initialize_position+0.001*i, sleep_time=0)
 #    KDC101_device.move_stage_absolute(sleep_time=0)
-    #logger.info(f"Moving to position: {initialize_position+0.001*i} mm")
+# logger.info(f"Moving to position: {initialize_position+0.001*i} mm")
 
-#KDC101_device.set_home_params(
+# KDC101_device.set_home_params(
 #   home_dir=0, limit_switch=0, offset_distance=0, home_velocity=0.5
 ##)
-#KDC101_device.home_move_stage()
-#time.sleep(1)  # wait for homing to complete
+# KDC101_device.home_move_stage()
+# time.sleep(1)  # wait for homing to complete
 # print("Homing complete.")
 
 # KDC101_device.set_rel_move_params(-5.0)
@@ -413,9 +408,6 @@ class KDC101:
 
 
 # wait for trigger input
-
-
-
 
 
 print("KDC101 example complete.")

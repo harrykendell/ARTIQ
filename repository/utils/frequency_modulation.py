@@ -6,16 +6,15 @@ import numpy as np
 import logging
 from artiq.coredevice.core import Core
 from artiq.coredevice.ttl import TTLInOut
-from artiq.experiment import EnumerationValue, delay, kernel
-from artiq.language.units import ms, us, MHz, kHz, V
+from artiq.experiment import EnumerationValue, kernel
+from artiq.language.units import MHz, kHz, V
 from ndscan.experiment import ExpFragment, FloatParam, IntParam
 from ndscan.experiment.entry_point import make_fragment_scan_exp
 from ndscan.experiment.parameters import FloatParamHandle, IntParamHandle
 from repository.fragments.supply_setter import SetSupplies
 from repository.models.devices import VDrivenSupply
 from repository.utils.get_local_devices import get_local_devices
-from artiq.language.core import kernel, now_mu, at_mu, delay_mu
-from artiq.coredevice.core import Core
+from artiq.language.core import kernel, delay_mu
 from artiq.coredevice.fastino import Fastino
 
 logger = logging.getLogger(__name__)
@@ -159,8 +158,7 @@ class SinusoidalFrequencyModulation(ExpFragment):
         # step_mu = max(
         #     self.core.seconds_to_mu(dt), t_frame_mu
         # )  # "Sample rate exceeds Fastino capability" - but check you cant go faster or anything
-        
-        
+
         step_mu = self.core.seconds_to_mu(dt)
         assert step_mu > self.fastino.t_frame
 

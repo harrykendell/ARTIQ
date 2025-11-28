@@ -28,7 +28,6 @@ class PcoCamera(Fragment):
     MOT_ROI = (MOT_X - MOT_SIZE, MOT_Y - MOT_SIZE, MOT_X + MOT_SIZE, MOT_Y + MOT_SIZE)
     WHOLE_CELL_ROI = (
         MOT_X - 100,
-
         MOT_Y - 150,
         MOT_X + 100,
         MOT_Y + 150,

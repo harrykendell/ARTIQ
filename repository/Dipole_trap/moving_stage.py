@@ -1,14 +1,10 @@
 import logging
-import time
 
-from ndscan.experiment.result_channels import ResultChannel
-import numpy as np
 from repository.Thorlabs.KDC101_serial import KDC101
 
 from artiq.coredevice.core import Core
 from artiq.coredevice.ttl import TTLInOut
-from artiq.experiment import delay, delay_mu, host_only, kernel, rpc
-from artiq.language.units import ms, s, us
+from artiq.experiment import kernel, rpc
 from ndscan.experiment import ExpFragment, FloatParam, Fragment, make_fragment_scan_exp
 from ndscan.experiment.parameters import FloatParamHandle
 
@@ -64,7 +60,7 @@ class MovingStage(Fragment):
         if self.KDC101 is None:
             raise RuntimeError("KDC101 not initialized. Call host_setup first.")
         self.KDC101.set_abs_move_params(position_mm, sleep_time=sleep_time)
-    
+
     @rpc
     def move_stage_absolute(self):
         """
@@ -77,6 +73,7 @@ class MovingStage(Fragment):
             f"Moving stage to absolute position {self.moving_absolute_distance.get()} mm."
         )
 
+
 class MovingStage_exp(ExpFragment):
     """
     move the stage to an absolute position
@@ -85,10 +82,8 @@ class MovingStage_exp(ExpFragment):
     def build_fragment(self):
         self.setattr_device("core")
         self.core: Core
-        
-        self.setattr_fragment(
-            "absolute_moving_stage", MovingStage
-        )
+
+        self.setattr_fragment("absolute_moving_stage", MovingStage)
         self.absolute_moving_stage: MovingStage
 
         self.setattr_param_rebind(
@@ -101,7 +96,9 @@ class MovingStage_exp(ExpFragment):
 
     @kernel
     def run_once(self) -> None:
-        self.absolute_moving_stage.set_stage_absolute(self.moving_absolute_distance.get())
+        self.absolute_moving_stage.set_stage_absolute(
+            self.moving_absolute_distance.get()
+        )
         self.absolute_moving_stage.move_stage_absolute()
         return super().run_once()
 
