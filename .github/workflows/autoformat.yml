@@ -3,7 +3,6 @@ on:
   push:
     paths:
       - '**/*.py'
-      - '**/*.ipynb'
 permissions:
   contents: write            # allows the workflow to push
 
