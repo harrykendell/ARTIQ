@@ -374,6 +374,20 @@ class KDC101:
         command.extend([0x50, 0x01])
         self.ser.write(command)
         time.sleep(1)
+      
+    def get_encoder_position(self, sleep_time=1):
+        """
+        Get the encoder position.
+        """
+        command = bytearray([0x11, 0x04, 0x01, 0x00, 0x50, 0x01])
+        self.ser.write(command)
+        time.sleep(sleep_time)
+        response = self.ser.read_all()
+        return response
+
+
+     
+     
 
 
 # KDC101_device = KDC101(port="/dev/ttyUSB5", baudrate=115200, timeout=1)
