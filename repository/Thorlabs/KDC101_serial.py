@@ -374,7 +374,7 @@ class KDC101:
         command.extend([0x50, 0x01])
         self.ser.write(command)
         time.sleep(1)
-      
+
     def get_encoder_position(self, sleep_time=1):
         """
         Get the encoder position.
@@ -384,10 +384,6 @@ class KDC101:
         time.sleep(sleep_time)
         response = self.ser.read_all()
         return response
-
-
-     
-     
 
 
 # KDC101_device = KDC101(port="/dev/ttyUSB5", baudrate=115200, timeout=1)
