@@ -73,7 +73,9 @@ These are augmented by higher level `Fragments` exposing experimental concepts:
 - [MOT](repository/fragments/mot.py): This represents the whole MOT
   - Loading
   - Cooling
- 
+-[KDC101_serial](\repository\Thorlabs\KDC101_serial.py) is used to control the moving stage with full passive control. Active control is currently under development. A high-level API, [moving_stage.py], is available at (repository\Dipole_trap\moving_stage.py) for direct integration with ARTIQ.
+
+
 Many of these `Fragments` also define `ExpFragments` in their own file to support being run on their own.
 
 ### Ramps
