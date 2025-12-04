@@ -388,6 +388,18 @@ class SUServoFrag(Fragment):
             frequency=frequency,
             phase=phase,
         )
+    
+    @kernal
+    def get_profile(self) -> TInt32:
+        """
+        Get the current profile number for this channel.
+
+        This method does not advance the timeline.
+
+        Returns:
+            TInt32: Current profile number
+        """
+        return self.suservo_channel.get_current_profile()
 
     @kernel
     def set_pgia_gain_mu(self, gain_mu):
