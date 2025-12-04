@@ -388,7 +388,7 @@ class SUServoFrag(Fragment):
             frequency=frequency,
             phase=phase,
         )
-    
+
     @kernal
     def get_profile(self) -> TInt32:
         """
