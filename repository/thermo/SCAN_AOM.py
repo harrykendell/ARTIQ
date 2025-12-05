@@ -159,6 +159,16 @@ class SetSUServoExpFrag(ExpFragment):
                 self.enable_iir.get(),
             )
             delay(self.step_duration.get())
+
+        # back to start frequency
+        self.SUServoFrag.set_suservo(
+            self.start_freq.get(),
+            self.amplitude.get(),
+            self.attenuation.get(),
+            self.rf_switch.get(),
+            self.setpoint_v.get(),
+            self.enable_iir.get(),
+        )
  
  
 scanSUServoExp = make_fragment_scan_exp(SetSUServoExpFrag)
