@@ -610,12 +610,12 @@ KDC101_device = KDC101(port="/dev/ttyUSB5", baudrate=115200, timeout=1)
 # print(f"velocity profile: {get_velocity_profile_response}")
 # print(f"home params: {get_home_params_response}")
 
-KDC101_device.plot_trapezoid_profile_v_vs_t(
-    max_velocity=1.0,
-    acceleration=1.0,
-    deceleration=1.0,
-    abs_distance=1.0,
-)
+#KDC101_device.plot_trapezoid_profile_v_vs_t(
+ #   max_velocity=1.0,
+ #   acceleration=1.0,
+  #  deceleration=1.0,
+   # abs_distance=1.0,
+#)
 
 
 print("KDC101 example complete.")
