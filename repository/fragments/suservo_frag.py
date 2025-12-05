@@ -389,7 +389,7 @@ class SUServoFrag(Fragment):
             phase=phase,
         )
     
-    @kernal
+    @kernel
     def get_profile(self) -> TInt32:
         """
         Get the current profile number for this channel.
