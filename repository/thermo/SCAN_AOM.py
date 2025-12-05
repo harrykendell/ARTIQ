@@ -1,124 +1,164 @@
-from time import time
+import logging
  
 from artiq.coredevice.core import Core
-from artiq.coredevice.dma import CoreDMA
-from artiq.experiment import kernel, rpc
-from artiq.language import delay, ms, now_mu, parallel, s, us, MHz
- 
-# from repository.models.device_db import server_addr
-from ndscan.experiment import (
-    BoolParam,
-    ExpFragment,
-    FloatChannel,
-    FloatParam,
-    OpaqueChannel,
-    make_fragment_scan_exp,
-)
- 
-from artiq.coredevice.ttl import TTLInOut
+from artiq.experiment import kernel
+from ndscan.experiment import BoolParam, EnumerationValue, ExpFragment, FloatParam
+from ndscan.experiment.entry_point import make_fragment_scan_exp
 from ndscan.experiment.parameters import BoolParamHandle, FloatParamHandle
-from repository.fragments.mot import MOT
-from repository.imaging.PCO_Camera import PcoCamera
-from repository.imaging.processor import AbsImage  # noqa: E402
-from repository.models.devices import SUServoedBeam
-from repository.Dipole_trap.moving_stage import MovingStage
- 
 from repository.fragments.suservo_frag import SUServoFrag
+from repository.models.devices import SUServoedBeam
+from artiq.language import delay, ms, now_mu, parallel, s, us
  
-from repository.fragments.mot import FloatParamHandle
  
- 
-class SCAN_AOM(ExpFragment):
+class SetSUServoExpFrag(ExpFragment):
     """
-    Scan AOM frequency and record response
+    Scan SUServo output frequency
+ 
+    This ExpFragment just breaks out the functionality of
+    :class:`.SUServoFrag`.
     """
  
     def build_fragment(self):
         self.setattr_device("core")
         self.core: Core
  
+        suservo_channels = list(SUServoedBeam.keys())
+        default: SUServoedBeam = SUServoedBeam[suservo_channels[0]]
+ 
+        if not suservo_channels:
+            raise ValueError("No suservo channels found in device_db")
+        self.setattr_argument(
+            "channel",
+            EnumerationValue(suservo_channels, default=default.name),
+        )
+        self.channel: str
+        if self.channel is None:
+            self.channel = default.name
+ 
+ 
+        self.setattr_param(
+            "amplitude",
+            FloatParam,
+            description="Amplitude of AD9910 output, from 0 to 1",
+            default=default.initial_amplitude,
+            min=0,
+            max=1,
+        )
+        self.setattr_param(
+            "attenuation",
+            FloatParam,
+            description="Attenuation on Urukul's variable attenuator",
+            default=default.attenuation,
+            unit="dB",
+            min=0,
+            max=31.5,
+        )
+        self.setattr_param(
+            "setpoint_v",
+            FloatParam,
+            description="Setpoint",
+            default=default.setpoint,
+            unit="V",
+            min=0,
+            max=10.0,
+        )
+ 
+        self.setattr_param(
+            "rf_switch",
+            BoolParam,
+            description="State of the RF switch",
+            default=True,
+        )
+        self.setattr_param(
+            "enable_iir",
+            BoolParam,
+            description="Enable the servo",
+            default=default.servo_enabled,
+        )
+ 
+        self.amplitude: FloatParamHandle
+        self.frequency: FloatParamHandle
+        self.attenuation: FloatParamHandle
+        self.setpoint_v: FloatParamHandle
+        self.rf_switch: BoolParamHandle
+        self.enable_iir: BoolParamHandle
+ 
         self.setattr_fragment(
             "SUServoFrag",
             SUServoFrag,
-            SUServoedBeam["LATX"].suservo_device,
+            SUServoedBeam[self.channel].suservo_device,
         )
         self.SUServoFrag: SUServoFrag
- 
-        self.start_freq: FloatParamHandle = self.setattr_param(
-            "start_frequency",
+        
+        self.setattr_param(
+            "start_freq",
             FloatParam,
-            default=190.0 * MHz,
+            description="Start frequency of the SUServo channel",
+            default=200.00 * 1e6,
+            min=0,
+            max=400e6,  # from AD9910 specs
             unit="MHz",
-            description="Start frequency of AOM scan",
+            step=1,
+        )
+        self.start_freq: FloatParamHandle
+ 
+        self.setattr_param(
+            "end_freq",
+            FloatParam,
+            description="End frequency of the SUServo channel",
+            default=220.00 * 1e6,
+            min=0,
+            max=400e6,  # from AD9910 specs
+            unit="MHz",
+            step=1,
+        )
+        self.end_freq: FloatParamHandle
+ 
+        self.setattr_param(
+            "step",
+            FloatParam,
+            description="Frequency step size",
+            default=1 * 1e6,
+            min=1,
+            max=100e6,  # from AD9910 specs
+            unit="MHz",
         )
  
-        self.stop_freq: FloatParamHandle = self.setattr_param(
-            "stop_frequency",
+        self.setattr_param(
+            "step_duration",
             FloatParam,
-            default=210.0 * MHz,
-            unit="MHz",
-            description="Stop frequency of AOM scan",
- 
-        )
-        self.step_size: FloatParamHandle = self.setattr_param(
-            "step_size",
-            FloatParam,
-            default=0.5 * MHz,
-            unit="MHz",
-            description="Step size of AOM scan",
-        )
- 
-        self.integration_time: FloatParamHandle = self.setattr_param(
-            "integration_time",
-            FloatParam,
-            default=20 * us,
+            description="step duration",
+            default=1000 * ms,
+            min=5 * us,
+            max=1e6 * us,  # from AD9910 specs
             unit="us",
-            description="Integration time for AOM scan",
         )
  
-        self.amplitude_dds: FloatParamHandle = self.setattr_param(
-            "amplitude_dds",
-            FloatParam,
-            default=0.5,
-            unit="",
-            description="Amplitude of DDS during scan, min=0 max=1",
-        )
+        self.step_duration: FloatParamHandle
  
- 
-        manual_init= False
-        self.manual_init: bool = manual_init
-    def device_setup(self):
-        self.device_setup_subfragments()
- 
-        if not self.manual_init:
-            self.core.break_realtime()
-            self.init()
+        self.step: FloatParamHandle
+        self.Range_size: FloatParamHandle
  
     @kernel
-    def init(self) -> None:
-        """
-        Initialize devices.
-        **Timeline:** we break_realtime() after setting the devices
-        """
-        self.reset()
+    def run_once(self):
+        logging.warning("clobbering attenuations")
+        range_size = int(
+            (self.end_freq.get() - self.start_freq.get()) / self.step.get()
+        )
         self.core.break_realtime()
  
-    @kernel
-    def run_once(self) -> None:
-        """
-        Scan AOM frequency and record response
-        """
-        start_freq = self.start_freq.get()
-        stop_freq = self.stop_freq.get()
-        step_size = self.step_size.get()
-        integration_time = self.integration_time.get()
+        self.SUServoFrag.set_attenuation(self.attenuation.get())
  
-        freq = start_freq
-        while freq <= stop_freq:
-            self.SUServoFrag.set_dds(profile=self.SUServoFrag.get_profile(), frequency=freq, offset=)
-            delay(integration_time)
-            # Here you would add code to record the response at this frequency
-            freq += step_size
+        for i in range(range_size):
+            self.SUServoFrag.set_suservo(
+                self.start_freq.get() + i * self.step.get(),
+                self.amplitude.get(),
+                self.attenuation.get(),
+                self.rf_switch.get(),
+                self.setpoint_v.get(),
+                self.enable_iir.get(),
+            )
+            delay(self.step_duration.get())
  
  
-SCAN_AOM_experiment = make_fragment_scan_exp(SCAN_AOM)
+scanSUServoExp = make_fragment_scan_exp(SetSUServoExpFrag)
