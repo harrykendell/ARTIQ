@@ -168,6 +168,6 @@ class SetSUServoExpFrag(ExpFragment):
             self.setpoint_v.get(),
             self.enable_iir.get(),
         )
- 
- 
+
+
 scanSUServoExp = make_fragment_scan_exp(SetSUServoExpFrag)
