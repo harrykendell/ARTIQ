@@ -60,7 +60,7 @@ class AbsImage:
         wavelength=780.24602089 * nm,
         detuning=0 * MHz,
         linewidth=6.065 * MHz,
-        pixel_size=25.52 * um, #1.55 * um,  # 
+        pixel_size=25.52 * um,  # 1.55 * um,  #
         magnification=None,
         fit_downsample=5,
     ):
