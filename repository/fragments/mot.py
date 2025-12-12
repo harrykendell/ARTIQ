@@ -538,8 +538,8 @@ class MOT(Fragment):
 
         **Timeline:** advances by approx `loading_time` seconds
         """
-        # self.all_beams.turn_beams_off()
-        self.shutter_2d.on()
+        self.all_beams.turn_beams_off()
+        #self.shutter_2d.on()
 
         if clearout:
             self.clear_atoms(clearout_time=clearout_time)
@@ -576,7 +576,7 @@ class MOT(Fragment):
             pass
 
         # if we are doing evaporation then only turn on the dimple and reservoir in cmot step
-        self.shutter_2d.off()
+        #self.shutter_2d.off()
         with parallel:
             # Fix EOM frequency
             self.eom.set_freq(self.eom.config.frequency + self.CMOT_detuning.get())

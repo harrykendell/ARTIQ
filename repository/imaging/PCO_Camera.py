@@ -21,9 +21,9 @@ class PcoCamera(Fragment):
     dimple_pixel_scan = -50
     ODT_Dimple_ROI = (1, 480 - dimple_pixel_scan, 1260, 600 - dimple_pixel_scan)
     FULL_ROI = (1, 1, 1392, 1040)
-    MOT_SIZE = 300
-    MOT_X = 580
-    MOT_Y = 600
+    MOT_SIZE = 200
+    MOT_X = 830
+    MOT_Y = 500
 
     MOT_ROI = (MOT_X - MOT_SIZE, MOT_Y - MOT_SIZE, MOT_X + MOT_SIZE, MOT_Y + MOT_SIZE)
     WHOLE_CELL_ROI = (
