@@ -2,7 +2,7 @@ from artiq.language.units import A, MHz, V, dB, ms
 from ndscan.experiment import FloatParam, Fragment
 from repository.models import Eom, Shutter, SUServoedBeam, VDrivenSupply
 from repository.models.Device import device_arrays
- 
+
 EOMS = [
     Eom(
         name="repump",
@@ -15,7 +15,7 @@ EOMS = [
 ]
 # Convert to dict for ease of use
 EOMS = {eom.name: eom for eom in EOMS}
- 
+
 VDRIVEN_SUPPLIES = [
     VDrivenSupply(
         name="X1",
@@ -92,7 +92,7 @@ VDRIVEN_SUPPLIES = [
 ]
 # Convert to dict for ease of use
 VDRIVEN_SUPPLIES = {supply.name: supply for supply in VDRIVEN_SUPPLIES}
- 
+
 THORLABS_SHUTTER_DELAY = 35.0 * ms
 EBAY_SHUTTER_DELAY = 25.0 * ms
 # the switch on time is actually quick fast. The limit is the dislike of short pulses
@@ -115,7 +115,7 @@ SHUTTERS = [
 ]
 # Convert to dict for ease of use
 SHUTTERS = {beam.name: beam for beam in SHUTTERS}
- 
+
 SUSERVOED_BEAMS = [
     SUServoedBeam(
         name="Locking",
@@ -193,7 +193,7 @@ SUSERVOED_BEAMS = [
 ]
 # Convert to dict for ease of use
 SUSERVOED_BEAMS = {beam.name: beam for beam in SUSERVOED_BEAMS}
- 
+
 # map from class to dict for initializing devices
 device_arrays.update(
     {
@@ -204,19 +204,19 @@ device_arrays.update(
         # Add other classes as needed
     }
 )
- 
- 
+
+
 class DefaultValues(Fragment):
     """
     This Fragment provides the global store for default values for all devices.
     This then allows them to be set in the GUI and scanned with a global source of truth.
- 
+
     It must be added to the experiment's Fragment tree to be used:
     ```python
         DEVICE.fragment = frag.setattr_fragment("DefaultValues", DefaultValues)
     ```
     """
- 
+
     def build_fragment(self):
         for eom in Eom.values():
             eom: Eom
@@ -273,4 +273,3 @@ class DefaultValues(Fragment):
                 default=vds.default_output,
                 unit=vds.unit,
             )
- 

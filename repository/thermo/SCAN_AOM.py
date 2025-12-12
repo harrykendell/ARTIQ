@@ -1,5 +1,5 @@
 import logging
- 
+
 from artiq.coredevice.core import Core
 from artiq.experiment import kernel
 from ndscan.experiment import BoolParam, EnumerationValue, ExpFragment, FloatParam
@@ -9,26 +9,26 @@ from repository.fragments.suservo_frag import SUServoFrag
 from repository.models.devices import SUServoedBeam
 from artiq.language import delay, ms, us
 from artiq.coredevice.ttl import TTLInOut
- 
- 
+
+
 class SetSUServoExpFrag(ExpFragment):
     """
     Scan SUServo output frequency
- 
+
     This ExpFragment just breaks out the functionality of
     :class:`.SUServoFrag`.
     """
- 
+
     def build_fragment(self):
         self.setattr_device("core")
         self.core: Core
- 
+
         suservo_channels = list(SUServoedBeam.keys())
         default: SUServoedBeam = SUServoedBeam[suservo_channels[0]]
- 
+
         self.setattr_device("moving_stage_ttl")
         self.moving_stage_trigger: TTLInOut = self.moving_stage_ttl
- 
+
         if not suservo_channels:
             raise ValueError("No suservo channels found in device_db")
         self.setattr_argument(
@@ -38,7 +38,7 @@ class SetSUServoExpFrag(ExpFragment):
         self.channel: str
         if self.channel is None:
             self.channel = default.name
- 
+
         self.setattr_param(
             "amplitude",
             FloatParam,
@@ -65,7 +65,7 @@ class SetSUServoExpFrag(ExpFragment):
             min=0,
             max=10.0,
         )
- 
+
         self.setattr_param(
             "rf_switch",
             BoolParam,
@@ -78,21 +78,21 @@ class SetSUServoExpFrag(ExpFragment):
             description="Enable the servo",
             default=default.servo_enabled,
         )
- 
+
         self.amplitude: FloatParamHandle
         self.frequency: FloatParamHandle
         self.attenuation: FloatParamHandle
         self.setpoint_v: FloatParamHandle
         self.rf_switch: BoolParamHandle
         self.enable_iir: BoolParamHandle
- 
+
         self.setattr_fragment(
             "SUServoFrag",
             SUServoFrag,
             SUServoedBeam[self.channel].suservo_device,
         )
         self.SUServoFrag: SUServoFrag
- 
+
         self.setattr_param(
             "start_freq",
             FloatParam,
@@ -104,7 +104,7 @@ class SetSUServoExpFrag(ExpFragment):
             step=1,
         )
         self.start_freq: FloatParamHandle
- 
+
         self.setattr_param(
             "end_freq",
             FloatParam,
@@ -116,7 +116,7 @@ class SetSUServoExpFrag(ExpFragment):
             step=1,
         )
         self.end_freq: FloatParamHandle
- 
+
         self.setattr_param(
             "step",
             FloatParam,
@@ -126,7 +126,7 @@ class SetSUServoExpFrag(ExpFragment):
             max=100e6,  # from AD9910 specs
             unit="MHz",
         )
- 
+
         self.setattr_param(
             "step_duration",
             FloatParam,
@@ -136,12 +136,12 @@ class SetSUServoExpFrag(ExpFragment):
             max=1e6 * us,  # from AD9910 specs
             unit="us",
         )
- 
+
         self.step_duration: FloatParamHandle
- 
+
         self.step: FloatParamHandle
         self.Range_size: FloatParamHandle
- 
+
     @kernel
     def run_once(self):
         logging.warning("clobbering attenuations")
@@ -149,7 +149,7 @@ class SetSUServoExpFrag(ExpFragment):
             (self.end_freq.get() - self.start_freq.get()) / self.step.get()
         )
         self.core.break_realtime()
-        
+
         # continoulsy scan the frequency until stopped
         while True:
             self.moving_stage_trigger.pulse(10 * us)  # trigger moving stage
@@ -163,7 +163,7 @@ class SetSUServoExpFrag(ExpFragment):
                     self.enable_iir.get(),
                 )
                 delay(self.step_duration.get())
- 
+
             for i in range(range_size):
                 self.SUServoFrag.set_suservo(
                     self.end_freq.get() - i * self.step.get(),
@@ -174,6 +174,6 @@ class SetSUServoExpFrag(ExpFragment):
                     self.enable_iir.get(),
                 )
                 delay(self.step_duration.get())
- 
- 
+
+
 scanSUServoExp = make_fragment_scan_exp(SetSUServoExpFrag)
