@@ -40,7 +40,7 @@ class KDC101:
     home_position = 10  # in mm # home position in counts
     chan_ident = 1  # channel ID for KDC101
 
-    def __init__(self, port="/dev/ttyUSB5", baudrate=115200, timeout=1):
+    def __init__(self, port="/dev/ttyUSB8", baudrate=115200, timeout=1):
         self.ser = serial.Serial(
             port=port,
             baudrate=baudrate,
@@ -355,6 +355,7 @@ class KDC101:
         min_velocity = self.get_velocity_apt(min_velocity)
         acceleration = self.get_acceleration_apt(acceleration)
         max_velocity = self.get_velocity_apt(max_velocity)
+        print(f"Min Velocity (APT counts): {min_velocity}, Acceleration (APT counts): {acceleration}, Max Velocity (APT counts): {max_velocity}")
         command.extend(min_velocity.to_bytes(4, byteorder="little", signed=True))
         command.extend(acceleration.to_bytes(4, byteorder="little", signed=True))
         command.extend(max_velocity.to_bytes(4, byteorder="little", signed=True))
@@ -368,7 +369,8 @@ class KDC101:
         command = bytearray([0x14, 0x04, 0x01, 0x00, 0x50, 0x01])
         self.ser.write(command)
         time.sleep(1)
-        response = self.ser.read_all()
+        response = self.ser.read_all()[0:20]
+        print(response)
         channel = int.from_bytes(response[6:8], byteorder="little", signed=True)
         min_velocity_apt = int.from_bytes(
             response[8:12], byteorder="little", signed=True
@@ -578,13 +580,16 @@ class KDC101:
         time.sleep(sleep_time)
 
 
-KDC101_device = KDC101(port="/dev/ttyUSB5", baudrate=115200, timeout=1)
+KDC101_device = KDC101(port="/dev/ttyUSB8", baudrate=115200, timeout=1)
 
 
 # mode identify
 # KDC101_device.mod_identify(sleep_time=0)
 # trigger mode set
-# KDC101_device.set_velocity_profile(min_velocity=0.0, acceleration=4.5, max_velocity=2.4, sleep_time=0)
+#KDC101_device.set_velocity_profile(
+ # min_velocity=0.0, acceleration=4.2, max_velocity=1.5, sleep_time=0
+#)
+#KDC101_device.set_bow_index(sleep_time=0, index=8)
 # initialize_position = 20.0099
 # KDC101_device.set_abs_move_params(initialize_position, sleep_time=1)
 # KDC101_device.set_trigger_mode()
@@ -594,8 +599,8 @@ KDC101_device = KDC101(port="/dev/ttyUSB5", baudrate=115200, timeout=1)
 #    KDC101_device.move_stage_absolute(sleep_time=0)
 # logger.info(f"Moving to position: {initialize_position+0.001*i} mm")
 
-# KDC101_device.set_home_params(home_dir=0, limit_switch=0, offset_distance=0, home_velocity=1.0)
-# KDC101_device.home_move_stage()
+#KDC101_device.set_home_params(home_dir=0, limit_switch=0, offset_distance=0, home_velocity=2.4)
+#KDC101_device.home_move_stage()
 # time.sleep(1)  # wait for homing to complete
 # print("Homing complete.")
 
@@ -610,8 +615,9 @@ KDC101_device = KDC101(port="/dev/ttyUSB5", baudrate=115200, timeout=1)
 # wait for trigger input
 
 # move stage absolutely to 1.0 mm
-# KDC101_device.set_abs_move_params(0.0, sleep_time=1)
-# KDC101_device.move_stage_absolute(sleep_time=1)
+#KDC101_device.set_abs_move_params(10.0, sleep_time=1)
+#KDC101_device.move_stage_absolute(sleep_time=5)
+#KDC101_device.get_velocity_profile()
 # print("Stage moved to 1.0 mm.")
 
 # get encoder counts at current position
