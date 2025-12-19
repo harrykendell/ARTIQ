@@ -22,7 +22,7 @@ from repository.fragments.mot import MOT
 from repository.imaging.PCO_Camera import PcoCamera
 from repository.imaging.processor import AbsImage  # noqa: E402
 from repository.models.devices import SUServoedBeam
-from repository.Dipole_trap.moving_stage import MovingStage
+#from repository.Dipole_trap.moving_stage import MovingStage
 
 MAGNIFICATION = 1  # Default magnification for absorption imaging
 
@@ -57,15 +57,15 @@ class AbsorptionImageExpFrag(ExpFragment):
         self.setattr_device("moving_stage_ttl")
         self.moving_stage_trigger: TTLInOut = self.moving_stage_ttl
 
-        self.setattr_fragment("absolute_moving_stage", MovingStage)
-        self.absolute_moving_stage: MovingStage
+        #self.setattr_fragment("absolute_moving_stage", MovingStage)
+        #self.absolute_moving_stage: MovingStage
 
-        self.setattr_param_rebind(
-            "moving_absolute_distance",
-            self.absolute_moving_stage,
-            "moving_absolute_distance",
-            default=1.0,
-        )
+        #self.setattr_param_rebind(
+        #    "moving_absolute_distance",
+         #   self.absolute_moving_stage,
+        #    "moving_absolute_distance",
+         #   default=1.0,
+        #)
         self.moving_absolute_distance: FloatParamHandle
 
         self.setattr_param(
@@ -159,11 +159,13 @@ class AbsorptionImageExpFrag(ExpFragment):
         # self.mot.odt_reservoir.turn_beams_on()
         # self.mot.odt_dimple.turn_beams_on()
         # self.mot.cpt_shutter.off()
-        # self.absolute_moving_stage.set_stage_absolute(20.455, 0)
-        # self.absolute_moving_stage.move_stage_absolute()
+        #self.absolute_moving_stage.set_stage_absolute(10.00, 0)
+        #self.absolute_moving_stage.move_stage_absolute()
+        
+        
         # delay(1 * s)
         # move stage to imaging position
-        # self.moving_stage_trigger.pulse(10 * us)  # trigger moving stage
+        #self.moving_stage_trigger.pulse(10 * ms)  # trigger moving stage
 
         self.mot.load()
         if self.do_cmot.get():
@@ -247,7 +249,7 @@ class AbsorptionImageExpFrag(ExpFragment):
     @rpc(flags={"async"})
     def update_images(self):
         images = self.pco_camera.retrieve_images(
-            roi=self.pco_camera.MOT_ROI, timeout=1 * s
+            roi=self.pco_camera.FULL_ROI, timeout=1 * s
         )
         if images is None:
             raise RuntimeError("Failed to retrieve images from camera")
