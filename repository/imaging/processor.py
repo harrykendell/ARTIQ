@@ -57,10 +57,11 @@ class AbsImage:
         data,
         ref,
         bg,
+        imaging_mode="ODT",
         wavelength=780.24602089 * nm,
         detuning=0 * MHz,
         linewidth=6.065 * MHz,
-        pixel_size=25.52 * um,  # 1.55 * um,  #
+        pixel_size=1.55 * um,  # 25.52 * um,
         magnification=None,
         fit_downsample=5,
     ):
@@ -80,6 +81,7 @@ class AbsImage:
         self.data_image = np.rot90(data)
         self.ref_image = np.rot90(ref)
         self.bg_image = np.rot90(bg)
+        self.imaging_mode = imaging_mode
 
         self.height = self.data_image.shape[0]
         self.width = self.data_image.shape[1]
@@ -602,31 +604,54 @@ class AbsImage:
 
         # For Qt integration, draw once to calculate sizes
         fig.canvas.draw_idle()
+        # print imaging mode
+        print(f"Imaging mode: {self.imaging_mode}")
 
-        # add seperate table with fit parameters left side of the od plot, use greek letters for sigma
-        textstr = "\n".join(
-            (
-                rf"Atom number: $\mathbf{{{self.atom_number:.2e}}}$",
-                rf"Peak OD: $\mathbf{{{self.optical_density[self.peak[0], self.peak[1]]:.2f}}}$",
-                rf"Centroid (mm): ($\mathbf{{{centroid_mm[0]:.2f}}}$, $\mathbf{{{centroid_mm[1]:.2f}}}$)",
-                rf"Peak center (mm): ($\mathbf{{{peak_mm[0]:.2f}}}$, $\mathbf{{{peak_mm[1]:.2f}}}$)",
-                rf"$\sigma_x$ (mm): $\mathbf{{{self.best_values['sx'] * scale_mm:.2f}}}$",
-                rf"$\sigma_y$ (mm): $\mathbf{{{self.best_values['sy'] * scale_mm:.2f}}}$",
-                rf"Phase-space density: $\mathbf{{{self.phase_space_density[2]:.2e}}}$",
-                rf"$\lambda_{{\mathrm{{dB}}}}$ (m): $\mathbf{{{self.phase_space_density[1]:.2e}}}$",
-                rf"Peak density (atoms/cm$^3$): $\mathbf{{{self.phase_space_density[0] * 1e-6:.2e}}}$",
+        if self.imaging_mode == "ODT":
+            # add seperate table with fit parameters left side of the od plot, use greek letters for sigma
+            textstr = "\n".join(
+                (
+                    rf"Atom number: $\mathbf{{{self.atom_number:.2e}}}$",
+                    rf"Peak OD: $\mathbf{{{self.optical_density[self.peak[0], self.peak[1]]:.2f}}}$",
+                    rf"Centroid (mm): ($\mathbf{{{centroid_mm[0]:.2f}}}$, $\mathbf{{{centroid_mm[1]:.2f}}}$)",
+                    rf"Peak center (mm): ($\mathbf{{{peak_mm[0]:.2f}}}$, $\mathbf{{{peak_mm[1]:.2f}}}$)",
+                    rf"$\sigma_x$ (mm): $\mathbf{{{self.best_values['sx'] * scale_mm:.2f}}}$",
+                    rf"$\sigma_y$ (mm): $\mathbf{{{self.best_values['sy'] * scale_mm:.2f}}}$",
+                    rf"Phase-space density: $\mathbf{{{self.phase_space_density[2]:.2e}}}$",
+                    rf"$\lambda_{{\mathrm{{dB}}}}$ (m): $\mathbf{{{self.phase_space_density[1]:.2e}}}$",
+                    rf"Peak density (atoms/cm$^3$): $\mathbf{{{self.phase_space_density[0] * 1e-6:.2e}}}$",
+                )
             )
-        )
+            od_ax.text(
+                0.0,
+                -0.76,
+                textstr,
+                transform=od_ax.transAxes,
+                fontsize=9,
+                verticalalignment="center",
+                bbox=dict(boxstyle="round,pad=0.5", facecolor="wheat", alpha=0.5),
+            )
 
-        od_ax.text(
-            1.05,
-            0.5,
-            textstr,
-            transform=od_ax.transAxes,
-            fontsize=10,
-            verticalalignment="center",
-            bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.5),
-        )
+        else:
+            textstr = "\n".join(
+                (
+                    rf"Atom number: $\mathbf{{{self.atom_number:.2e}}}$",
+                    rf"Peak OD: $\mathbf{{{self.optical_density[self.peak[0], self.peak[1]]:.2f}}}$",
+                    rf"Centroid (mm): ($\mathbf{{{centroid_mm[0]:.2f}}}$, $\mathbf{{{centroid_mm[1]:.2f}}}$)",
+                    rf"Peak center (mm): ($\mathbf{{{peak_mm[0]:.2f}}}$, $\mathbf{{{peak_mm[1]:.2f}}}$)",
+                    rf"$\sigma_x$ (mm): $\mathbf{{{self.best_values['sx'] * scale_mm:.2f}}}$",
+                    rf"$\sigma_y$ (mm): $\mathbf{{{self.best_values['sy'] * scale_mm:.2f}}}$",
+                )
+            )
+            od_ax.text(
+                1.1,
+                0.5,
+                textstr,
+                transform=od_ax.transAxes,
+                fontsize=9,
+                verticalalignment="center",
+                bbox=dict(boxstyle="round,pad=0.5", facecolor="wheat", alpha=0.5),
+            )
         plt.tight_layout()
 
         return fig, axes + [cax_raw, cax_od]
