@@ -57,7 +57,7 @@ class UnlockAndPushExp(ExpFragment):
         )
         self.reset: BoolParamHandle
 
-        # NB this means TTLIn cant be used but due to type chekcing we have no option
+        # NB this means TTLIn cant be used but due to type checking we have no option
         unlocks = [dev for dev in get_local_devices(self, TTLInOut) if "unlock" in dev]
         self.setattr_argument(
             "ttl",

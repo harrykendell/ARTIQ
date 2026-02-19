@@ -4,76 +4,38 @@
 # Author : Yolan Ankaine
 # Date : Jan 2026
 
-
-
-from sipyco.pc_rpc import Client
-from driver_topticadlc_copy import TopticaDLCPro
+import logging
 
 from artiq.coredevice.core import Core
-from artiq.coredevice.ttl import TTLInOut, TTLOut
-from artiq.experiment import EnumerationValue, delay, kernel, ms, us, ns
-from ndscan.experiment import BoolParam, ExpFragment, FloatParam
+from artiq.coredevice.ttl import TTLInOut
+from artiq.language import delay, kernel, rpc, ms, s, Hz, parallel, TFloat
+from ndscan.experiment import ExpFragment, FloatParam
+from ndscan.experiment.parameters import FloatParamHandle
 from ndscan.experiment.entry_point import make_fragment_scan_exp
-from ndscan.experiment.parameters import BoolParamHandle, FloatParamHandle
-from repository.fragments.supply_setter import SetSupplies
-from repository.models.devices import VDrivenSupply
-from repository.utils.get_local_devices import get_local_devices
+from controllers.ms024 import MSO24
+from controllers.Agilent33600A import Agilent33600A
 
-remote = Client("137.222.69.28", 3272, "TopticaDLCPro", timeout=1)
+logger = logging.getLogger(__name__)
 
 
 class TriggerFuncGenFrag(ExpFragment):
     """
     Trigger a function generator via TTL
-    Unlock a laser while triggering
-    Disable the Relock scan on DLC Pro
+
+    we need the scope connected on 192.168.0.5 and the AFG on 192.168.0.7
     """
 
     def build_fragment(self):
-
         # Devices
         self.setattr_device("core")
         self.core: Core
 
-        # Retrieve the laser to be modulated (default = 852 nm ECDL)
-        lasers = [dev.name for dev in VDrivenSupply.values() if dev.unit == "MHz"]
-        default = lasers[1]
-        self.setattr_argument("laser", EnumerationValue(lasers, default=default))
-        self.laser: str
-        self.setattr_device("core")
-        self.core: Core
-
-        if self.laser is not None:
-            current_config = VDrivenSupply[self.laser]
-        else:
-            current_config = VDrivenSupply[default]
-
-        self.setattr_fragment("setter", SetSupplies, [current_config], init=False)
-        self.setter: SetSupplies
-
         # Define TTL channels
-
-        # Laser unlock TTL
-        unlocks = [dev for dev in get_local_devices(self, TTLInOut) if "unlock" in dev]
-        default = unlocks[0]
-        self.setattr_argument("ttl", EnumerationValue(unlocks))  # ttl 6
-        self.ttl: str
-
-        if self.ttl is not None:
-            self.unlock_ttl: TTLInOut = self.get_device(self.ttl)
-        else:
-            self.unlock_ttl: TTLInOut = self.get_device(default)
-
-        # Function Generator trigger TTL
-        self.setattr_device("ttl7")
-        self.ttl7: TTLOut
-
-        # UI parameter : Laser Lock/Unlock
-        self.setattr_param("reset", BoolParam, "Lock the laser?", default=False)
-        self.reset: BoolParamHandle
+        self.unlock_ttl: TTLInOut = self.get_device("852_unlock")
+        self.FG_ext_trigger: TTLInOut = self.get_device("FG_ext_trigger")
+        self.scope_ttl: TTLInOut = self.get_device("probe")
 
         # UI parameter : laser settling time
-
         self.setattr_param(
             "time_to_shift",
             FloatParam,
@@ -83,139 +45,85 @@ class TriggerFuncGenFrag(ExpFragment):
         )
         self.time_to_shift: FloatParamHandle
 
-        # UI parameter : Enable/Disable the relock scan
+        # UI parameter : modulation frequency
         self.setattr_param(
-            "scan_enable",
-            BoolParam,
-            "Enable relock scan?",
-            default=False,
+            "frequency",
+            FloatParam,
+            "Modulation Frequency",
+            default=100 * Hz,
+            unit="Hz",
         )
-        self.scan_enable: BoolParamHandle
+        self.frequency: FloatParamHandle
 
-        # UI parameter : Enable/Disable trigger
-        self.setattr_param(
-            "enable_trig",
-            BoolParam,
-            "Enable trigger?",
-            default=True,
-        )
-        self.enable: BoolParamHandle
+    @rpc
+    def setup_scope(self, timebase):
+        with MSO24(silent=True) as ms024:
+            ms024.set_timebase(timebase)
+            ms024.start_acquisition()
 
-    # ----- Experiment functions -----#
+    @rpc
+    def choose_timebase(self, freq) -> TFloat:
+        min_timebase = 2.0 / freq
+        timebases = []
+        for exp in range(-9, 2):
+            decade = 10.0**exp
+            timebases.extend([1.0 * decade, 2.0 * decade, 4.0 * decade])
+        for timebase in timebases:
+            if timebase >= min_timebase:
+                return timebase
+        return timebases[-1]
 
-    # -------------------- Version 1 --------------------------------
-    # # Lock or Unlock a TOPTICA ECDL
-    # def lock_unlock_laser(self):
-    #     if self.reset.get():
-    #         """
-    #         Relock an ECDL.
-    #         Then after `time_to_shift` seconds, turn the TTL off
-    #         """
-    #         self.setter.set_to_defaults()
-    #         delay(self.time_to_shift.get())
-    #         self.unlock_ttl.off()
-    #         logging.warning("Locking %s", self.laser)
+    @rpc(flags={"async"})
+    def acquire(self, freq):
+        filename = f"{freq}Hz_SINE_AFG"
+        with MSO24(silent=True) as ms024:
+            ts, vs = ms024.get_trace([2, 3, 4])
+        ms024.save_traces_to_file(ts, vs, filename=filename)
 
-    #     else:
-    #         """
-    #         Unlock an ECDL
-    #         """
-    #         self.unlock_ttl.on()
-    #         logging.warning("Unlocking %s", self.laser)
-
-    # # Disable the relock piezo scan on the Toptica DLC Pro
-    # def connect_to_DLC(self):
-    #     with TopticaDLCPro(ip="192.168.0.4") as dlc:
-    #         if dlc.laser1.scope.channel1.signal.get():
-    #             if self.scan_enable.get():
-    #                 """Enable scan"""
-    #                 dlc.laser1.scan.enabled.set(True)
-    #             else:
-    #                 """Disable scan"""
-    #                 dlc.laser1.scan.enabled.set(False)
-
-    # # Trigger the function generator
-    # def trigger_FG(self):
-    #     """Trigger the function generator via TTL"""
-
-    # if self.enable_trig.get():
-    #     self.ttl7.output()  # ensure ttl is output
-    #     self.ttl7.off()  # ensure ttl is low
-
-    #     delay(1 * us)  # wait for ttl to settle
-    #     self.ttl7.on()  # trigger FG
-    #     delay(10 * ns)  # minimum pulse width (e.g. 10 ns)
-
-    #     self.ttl7.off()  # turn off the ttl
-
-    # # Perform the experiment once
-    # @kernel
-    # def run_once(self):
-    #     """
-    #     - Unlock the laser
-    #     - Disable the relock piezo scan on the Toptica DLC Pro
-    #     - Trigger the Function Generator via TTL
-    #     """
-    #     # Reset the core  and break realtime to ensure clean timing boundary
-    #     self.core.reset()
-    #     self.core.break_realtime()
-
-    #     # Experiment sequence
-    #     #self.lock_unlock_laser()  # lock or unlock
-    #     self.connect_to_DLC()  # disable or enable scan on DLC Pro
-    #     self.trigger_FG()  # trigger the function generator
-
-    # -------------------- Version 2 --------------------------------
-    # Disable the relock piezo scan on the Toptica DLC Pro
-    def connect_to_DLC(self):
-        with TopticaDLCPro(ip="192.168.0.4") as dlc:
-            if dlc.laser1.scope.channel1.signal.get():
-                if self.scan_enable.get():
-                    """Enable scan"""
-                    dlc.laser1.scan.enabled.set(True)
-                else:
-                    """Disable scan"""
-                    dlc.laser1.scan.enabled.set(False)
-
-    # def run(self):
-    #     self.connect_to_DLC()
-    #     self.run_once()
+    @rpc
+    def setup_afg(self, freq):
+        with Agilent33600A(silent=True) as afg:
+            afg.sin_pulse(1, freq, 5, 15)
 
     @kernel
     def run_once(self):
         """
-        - Unlock the laser
-        - Disable the relock piezo scan on the Toptica DLC Pro
-        - Trigger the Function Generator via TTL
+        The experimental procedure is:
+
+        1. Unlock 852, allow time to unlock
+        2. Trigger AFG+Scope via TTL
+        3. Run sine wave through AFG for 20 periods
+        4. TTLs go low and Relock 852 after delay
         """
+        timebase = self.choose_timebase(self.frequency.get())
+        self.setup_scope(timebase)
+        self.setup_afg(self.frequency.get())
+
+        # we have 15 periods of the oscillation we need to fit in 3/4 of the display which has total width 10*timebase
+        # the timebase can be 1ns,2ns,4ns,10ns,20ns,40ns,100ns...
+        # how do we ensure the oscillation fits but is as big as possible
 
         # Reset the core  and break realtime to ensure clean timing boundary
         self.core.reset()
-        self.core.break_realtime()
+        delay(1 * s)
 
         # ----- Experiment sequence -----#
-        # # 1. Unlock the laser
-        # self.unlock_ttl.output()
+        # 1. Unlock 852, allow time to unlock
+        self.unlock_ttl.on()
+        delay(self.time_to_shift.get())
 
-        # # 2. Disable scan
-        self.connect_to_DLC()
+        # 2. + 3. Trigger AFG+Scope via TTL to do 20 periods of sine wave
+        with parallel:
+            self.FG_ext_trigger.on()  # ensure ttl is output
+            self.scope_ttl.on()  # trigger scope
 
-        # Reset the core  and break realtime to ensure clean timing boundary
-        self.core.reset()
-        self.core.break_realtime()
+        # 4. TTLs go low and relock 852 after delay
+        delay(1 * s)
+        self.FG_ext_trigger.off()
+        self.scope_ttl.off()
+        self.unlock_ttl.off()
 
-        # 3. Trigger the function generator
-        # self.trigger_FG()  # trigger the function generator
-
-        if self.enable_trig.get():
-            self.ttl7.output()  # ensure ttl is output
-            self.ttl7.off()  # ensure ttl is low
-
-            delay(1 * us)  # wait for ttl to settle
-            self.ttl7.on()  # trigger FG
-            delay(10 * ns)  # minimum pulse width (e.g. 10 ns)
-
-            self.ttl7.off()  # turn off the ttl
+        self.acquire(self.frequency.get())
 
 
 TriggerFuncGen = make_fragment_scan_exp(TriggerFuncGenFrag)

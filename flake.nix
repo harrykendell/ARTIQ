@@ -203,6 +203,7 @@
             ps.matplotlib
             ps.pyqt5
             ps.pydantic
+            ps.pyvisa-py
             ps.ifaddr
             ps.pint
             ps.lmfit

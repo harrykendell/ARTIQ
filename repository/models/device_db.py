@@ -319,21 +319,22 @@ aliases = {
     "shutter_3DMOT": "ttl1",
     "shutter_IMG": "ttl3",
     # 852 Lattice
-    "852_unlock": "ttl5",
+    "852_unlock": "ttl6",  # was previosuly ttl5 but this connection port was loose
     "suservo_aom_LATX": "suservo_ch4",
     "suservo_aom_LATY": "suservo_ch5",
     "shutter_LATTICE": "ttl2",
+    "FG_ext_trigger": "ttl7",  # external trigger to Function Generator
     # 1064 Cross Dipole Trap
     "suservo_aom_CDT1": "suservo_ch6",
     "suservo_aom_CDT2": "suservo_ch7",
     # PCO camera
     "pco_camera": "ttl8",
     # probe - generic use
-    "moving_stage_ttl": "ttl11",
+    "probe": "ttl11",
     # we need the dummy to also be a TTLOut not TTLInOut for typing reasons
     "dummy_shutter": "ttl0",
     # moving stage
-    # "moving_stage": "ttl11",
+    "moving_stage_ttl": "ttl11",
 }
 
 device_db |= aliases

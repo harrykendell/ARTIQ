@@ -54,8 +54,8 @@ VDRIVEN_SUPPLIES = [
         fastino="fastino",
         ch=4,
         gain=222 * MHz / V,
-        min_output=-200 * MHz,  # we are in 150Ω mode so max JP5 open -> +-5V
-        max_output=200 * MHz,  # we are in 150Ω mode so max JP5 open -> +-5V
+        min_output=-200 * MHz,  # we are in 150Ω mode so max JP5 open -> +-5V (7.5V is damage)
+        max_output=200 * MHz,  # we are in 150Ω mode so max JP5 open -> +-5V (7.5V is damage)
         default_output=0.0 * MHz,
         unit="MHz",
     ),
@@ -64,8 +64,8 @@ VDRIVEN_SUPPLIES = [
         fastino="fastino",
         ch=5,
         gain=83 * MHz / V,
-        min_output=-300 * MHz,  # we are in 150Ω mode so max JP5 open -> +-5V
-        max_output=300 * MHz,  # we are in 150Ω mode so max JP5 open -> +-5V
+        min_output=-300 * MHz,  # we are in 150Ω mode so max JP5 open -> +-5V (7.5V is damage)
+        max_output=300 * MHz,  # we are in 150Ω mode so max JP5 open -> +-5V (7.5V is damage)
         default_output=0.0 * MHz,
         unit="MHz",
     ),
@@ -172,7 +172,7 @@ SUSERVOED_BEAMS = [
         suservo_device="suservo_aom_CDT1",
         frequency=110.0 * MHz,
         attenuation=18.0 * dB,
-        servo_enabled=True,
+        servo_enabled=False,
         calib_gain=14696.973513,
         calib_offset=-443.552294,
         setpoint=3.0 * V,  # 0.324 * V,
@@ -183,11 +183,11 @@ SUSERVOED_BEAMS = [
         suservo_device="suservo_aom_CDT2",
         frequency=110.0 * MHz,
         attenuation=18.0 * dB,
-        servo_enabled=True,
+        servo_enabled=False,
         photodiode_offset=0.0115 * V,
-        calib_gain=4251,
+        calib_gain=12900.0,
         calib_offset=-38.0,
-        setpoint=3.4 * V,
+        setpoint=10.0 * V,
         # shutter_device="dummy_shutter",  # we don't have a shutter for this beam but need something to avoid errors
     ),
 ]

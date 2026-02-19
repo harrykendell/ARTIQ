@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -12,20 +13,25 @@ def assert_near(a, b, tol=1e-9):
 
 
 class MSO24:
-    def __init__(self, ip_address: str = "192.168.0.5", timeout: int = 10000):
+    def __init__(
+        self, ip_address: str = "192.168.0.5", timeout: int = 10000, silent=False
+    ):
         """
         Initialize connection to the MSO24 oscilloscope over LAN.
         :param ip_address: IP address of the oscilloscope.
         """
+        self.silent = silent
         self.rm = pyvisa.ResourceManager()
-        logging.info(f"Connecting to MSO24 at {ip_address}")
+        if not silent:
+            logging.info(f"Connecting to MSO24 at {ip_address}")
         self.instrument = self.rm.open_resource(f"TCPIP::{ip_address}::INSTR")
         self.instrument.timeout = timeout  # Set timeout to 10 seconds
         self.instrument.encoding = "latin_1"
         self.instrument.read_termination = "\n"
         self.instrument.write_termination = None
         # self.reset()
-        print(self.query("*IDN?"))
+        if not silent:
+            print(self.query("*IDN?"))
 
     def __enter__(self):
         return self
@@ -37,7 +43,8 @@ class MSO24:
     def write(self, command: str, *args):
         """Send a command to the oscilloscope."""
         full_command = command + " " + " ".join(map(str, args))
-        logging.info(f"Writing: {full_command}")
+        if not self.silent:
+            logging.info(f"Writing: {full_command}")
         self.instrument.write(full_command)
 
         if logging.getLogger().isEnabledFor(logging.ERROR):
@@ -47,13 +54,15 @@ class MSO24:
 
     def reset(self):
         """Reset the oscilloscope."""
-        logging.info("Resetting MSO24")
+        if not self.silent:
+            logging.info("Resetting MSO24")
         self.write("*RST")
         self.write("*CLS")
 
     def query(self, command: str):
         """Send a query to the oscilloscope and return the response."""
-        logging.info(f"Querying: {command}")
+        if not self.silent:
+            logging.info(f"Querying: {command}")
         ret = self.instrument.query(command)
         if logging.getLogger().isEnabledFor(logging.ERROR):
             error = self.instrument.query("*ESR?")
@@ -87,7 +96,8 @@ class MSO24:
         self.set_afg_output(self.AFGFunc.SINE, frequency, amplitude)
 
     def set_timebase(self, scale: float):
-        """Set the horizontal timebase scale."""
+        """Set the horizontal timebase scale.
+        The total acquisition time is 10x timebase"""
         self.write(f"HORizontal:MAIn:SCAle {scale}")
 
     def set_volt_scale(self, channel: int, scale: float):
@@ -105,15 +115,20 @@ class MSO24:
         self.write(f"ACQUIRE:NUMAVG {num_avg}")
         self.write("ACQUIRE:MODE AVERAGE")
 
-    def get_trace(self, channels: int | list[int]):
+    def start_acquisition(self):
+        self.write("ACQUIRE:STATE 0")  # Stop acquisition
+        self.write("ACQUIRE:STOPAFTER SEQUENCE")
+        self.write("ACQUIRE:STATE 1")  # Start acquisition
+
+    def get_trace(self, channels: int | list[int], already_acquiring=False):
         """Extract traces from the given channels."""
 
         if isinstance(channels, int):
             channels = [channels]
 
-        self.write("ACQUIRE:STATE 0")  # Stop acquisition
-        self.write("ACQUIRE:STOPAFTER SEQUENCE")
-        self.write("ACQUIRE:STATE 1")  # Start acquisition
+        if not already_acquiring:
+            self.start_acquisition()
+
         self.query("*OPC?")  # Wait for aquisition to complete
 
         # Configure data retrieval
@@ -172,11 +187,28 @@ class MSO24:
         plt.legend()
         plt.show()
 
+    def make_filename(self, filename):
+        filename = str(filename)
+        if ".csv" not in filename:
+            filename = filename + ".csv"
+
+        # if filename exists append higher integers until it doesnt ie filename+3.csv
+        path = Path(filename)
+        if path.exists():
+            stem = path.stem
+            suffix = path.suffix
+            counter = 1
+            while path.exists():
+                path = path.with_name(f"{stem}_v{counter}{suffix}")
+                counter += 1
+            filename = str(path)
+
+        return filename
+
     def save_trace_to_file(self, time_axis, voltage_trace, filename: str = "trace.csv"):
         """Save the trace to a file."""
         # if theres no filetype, add .csv
-        if "." not in filename:
-            filename = filename + ".csv"
+        filename = self.make_filename(filename)
 
         with open(filename, "w") as f:
             f.write("Time (s),Voltage (V)\n")
@@ -190,8 +222,7 @@ class MSO24:
         filename: str = "traces.csv",
     ):
         """Save multiple traces to a file."""
-        if "." not in filename:
-            filename = filename + ".csv"
+        filename = self.make_filename(filename)
 
         with open(filename, "w") as f:
             f.write("Time (s)")
@@ -207,7 +238,8 @@ class MSO24:
 
     def close(self):
         """Close the connection to the oscilloscope."""
-        logging.info("Closing connection to MSO24")
+        if not self.silent:
+            logging.info("Closing connection to MSO24")
         self.instrument.close()
         self.rm.close()
 
@@ -226,13 +258,13 @@ if __name__ == "__main__":
         help="IP address of the oscilloscope",
     )
 
-    parser.add_argument(
-        "-c",
-        "--channel",
-        type=int,
-        default=1,
-        help="Channel number to read from",
-    )
+    # parser.add_argument(
+    #     "-c",
+    #     "--channel",
+    #     type=int,
+    #     default=1,
+    #     help="Channel number to read from",
+    # )
 
     parser.add_argument(
         "-o",
@@ -251,7 +283,7 @@ if __name__ == "__main__":
         # ms024.set_volt_scale(1, 1)
         # ms024.set_trigger(1, 0)
 
-        ms024.set_averaging(10)
+        # ms024.set_averaging(10)
         ts, vs = ms024.get_trace([1, 2])
         ms024.plot_traces(ts, vs, names={1: "Photodiode signal", 2: "Shutter TTL"})
 
