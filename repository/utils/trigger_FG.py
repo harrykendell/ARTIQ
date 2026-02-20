@@ -1,5 +1,5 @@
-## This code is written to add the external trigger to the Keysight Function Generator.
-## It simulatenously unlocks the 852nm laser by turning off the servo while the FG is triggered.
+# This code is written to add the external trigger to the Keysight Function Generator.
+# It simulatenously unlocks the 852nm laser by turning off the servo while the FG is triggered.
 
 # Author : Yolan Ankaine
 # Date : Jan 2026
@@ -9,11 +9,12 @@ import logging
 from artiq.coredevice.core import Core
 from artiq.coredevice.ttl import TTLInOut
 from artiq.language import delay, kernel, rpc, ms, s, Hz, parallel, TFloat
-from ndscan.experiment import ExpFragment, FloatParam
-from ndscan.experiment.parameters import FloatParamHandle
+from ndscan.experiment import BoolParam, ExpFragment, FloatParam
+from ndscan.experiment.parameters import BoolParamHandle, FloatParamHandle
 from ndscan.experiment.entry_point import make_fragment_scan_exp
 from controllers.ms024 import MSO24
 from controllers.Agilent33600A import Agilent33600A
+from controllers.RedPitaya import RedPitaya
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +56,9 @@ class TriggerFuncGenFrag(ExpFragment):
         )
         self.frequency: FloatParamHandle
 
+        self.setattr_param("use_redpitaya", BoolParam, "Use Red Pitaya", default=False)
+        self.use_redpitaya: BoolParamHandle
+
     @rpc
     def setup_scope(self, timebase):
         with MSO24(silent=True) as ms024:
@@ -75,7 +79,8 @@ class TriggerFuncGenFrag(ExpFragment):
 
     @rpc(flags={"async"})
     def acquire(self, freq):
-        filename = f"{freq}Hz_SINE_AFG"
+        dev = "Red Pitaya" if self.use_redpitaya.get() else "AFG"
+        filename = f"{freq}Hz_SINE_{dev}"
         with MSO24(silent=True) as ms024:
             ts, vs = ms024.get_trace([2, 3, 4])
         ms024.save_traces_to_file(ts, vs, filename=filename)
@@ -84,6 +89,11 @@ class TriggerFuncGenFrag(ExpFragment):
     def setup_afg(self, freq):
         with Agilent33600A(silent=True) as afg:
             afg.sin_pulse(1, freq, 5, 15)
+
+    @rpc
+    def setup_redpitaya(self, freq):
+        with RedPitaya() as rp:
+            rp.sin_burst(chan=1, freq=freq, voltage=1.0, num_cycles=15)
 
     @kernel
     def run_once(self):
@@ -97,11 +107,11 @@ class TriggerFuncGenFrag(ExpFragment):
         """
         timebase = self.choose_timebase(self.frequency.get())
         self.setup_scope(timebase)
-        self.setup_afg(self.frequency.get())
 
-        # we have 15 periods of the oscillation we need to fit in 3/4 of the display which has total width 10*timebase
-        # the timebase can be 1ns,2ns,4ns,10ns,20ns,40ns,100ns...
-        # how do we ensure the oscillation fits but is as big as possible
+        if self.use_redpitaya.get():
+            self.setup_redpitaya(self.frequency.get())
+        else:
+            self.setup_afg(self.frequency.get())
 
         # Reset the core  and break realtime to ensure clean timing boundary
         self.core.reset()
