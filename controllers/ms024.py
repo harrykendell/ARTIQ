@@ -67,7 +67,10 @@ class MSO24:
         if logging.getLogger().isEnabledFor(logging.ERROR):
             error = self.instrument.query("*ESR?")
             if error != "0":
-                logging.error(f"Error: {error} for command: {command}")
+                self.instrument.write("SYST:ERR?")
+                logging.error(
+                    f"Error: {error} for command: {command}\n{self.instrument.read()}"
+                )
         return ret.strip()
 
     class AFGFunc:
@@ -108,6 +111,7 @@ class MSO24:
         """Set the trigger level for a given channel."""
         self.write(f"TRIGger:A:EDGE:SOUrce CH{channel}")
         self.write(f"TRIGger:A:LEVel:CH{channel} {level}")
+        self.write("TRIGger:MODE NORMal")
 
     def set_averaging(self, num_avg: int = 1):
         """Set the number of averages for the acquisition."""
