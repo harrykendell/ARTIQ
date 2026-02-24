@@ -63,9 +63,9 @@ class KIM101:
         position_counts = int.from_bytes(read_bytes[4:6], byteorder="little", signed=True)
         return position_counts
 
-KIM101 = KIM101()
+#KIM101 = KIM101()
 #identify the module
-KIM101.mod_identify()
+#KIM101.mod_identify()
 # Get current position
-current_pos = KIM101.current_position()
-logger.info(f"Current position: {current_pos} counts")
+#current_pos = KIM101.current_position()
+#logger.info(f"Current position: {current_pos} counts")

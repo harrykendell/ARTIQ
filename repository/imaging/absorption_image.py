@@ -22,7 +22,7 @@ from repository.fragments.mot import MOT
 from repository.imaging.PCO_Camera import PcoCamera
 from repository.imaging.processor import AbsImage  # noqa: E402
 from repository.models.devices import SUServoedBeam
-#from repository.Dipole_trap.moving_stage import MovingStage
+# from repository.Dipole_trap.moving_stage import MovingStage
 
 MAGNIFICATION = 1  # Default magnification for absorption imaging
 
@@ -57,15 +57,15 @@ class AbsorptionImageExpFrag(ExpFragment):
         self.setattr_device("moving_stage_ttl")
         self.moving_stage_trigger: TTLInOut = self.moving_stage_ttl
 
-        #self.setattr_fragment("absolute_moving_stage", MovingStage)
-        #self.absolute_moving_stage: MovingStage
+        # self.setattr_fragment("absolute_moving_stage", MovingStage)
+        # self.absolute_moving_stage: MovingStage
 
-        #self.setattr_param_rebind(
+        # self.setattr_param_rebind(
         #    "moving_absolute_distance",
-         #   self.absolute_moving_stage,
+        #   self.absolute_moving_stage,
         #    "moving_absolute_distance",
-         #   default=1.0,
-        #)
+        #   default=1.0,
+        # )
         self.moving_absolute_distance: FloatParamHandle
 
         self.setattr_param(
@@ -77,6 +77,14 @@ class AbsorptionImageExpFrag(ExpFragment):
             unit="ms",
         )
         self.expansion_time: FloatParamHandle
+
+        self.setattr_param(
+            "imaging_type",
+            BoolParam,
+            "Imaging type: ODT (True) or Full (False)",
+            default=False,
+        )
+        self.imaging_mode: FloatParamHandle
 
         self.do_cmot: BoolParamHandle = self.setattr_param(
             "do_cmot", BoolParam, "Do the CMOT step", default=False
@@ -148,24 +156,23 @@ class AbsorptionImageExpFrag(ExpFragment):
         self.mot.calculate_dma_handles()
         self.core.break_realtime()
 
-        if (
-            self.odt_active.get()
-            or self.do_evaporation1.get()
-            or self.do_evaporation2.get()
-        ):
-            self.mot.set_dimple_trap_power(self.mot.power_dimple.get())
-            self.mot.set_reservoir_trap_power(self.mot.power_reservoir.get())
+        # if (
+        #   self.odt_active.get()
+        #   or self.do_evaporation1.get()
+        #   or self.do_evaporation2.get()
+        # ):
+        self.mot.set_dimple_trap_power(self.mot.power_dimple.get())
+        #self.mot.set_reservoir_trap_power(self.mot.power_reservoir.get())
 
         # self.mot.odt_reservoir.turn_beams_on()
         # self.mot.odt_dimple.turn_beams_on()
         # self.mot.cpt_shutter.off()
-        #self.absolute_moving_stage.set_stage_absolute(10.00, 0)
-        #self.absolute_moving_stage.move_stage_absolute()
-        
-        
+        # self.absolute_moving_stage.set_stage_absolute(10.00, 0)
+        # self.absolute_moving_stage.move_stage_absolute()
+
         # delay(1 * s)
         # move stage to imaging position
-        #self.moving_stage_trigger.pulse(10 * ms)  # trigger moving stage
+        # self.moving_stage_trigger.pulse(10 * ms)  # trigger moving stage
 
         self.mot.load()
         if self.do_cmot.get():
@@ -248,8 +255,13 @@ class AbsorptionImageExpFrag(ExpFragment):
 
     @rpc(flags={"async"})
     def update_images(self):
+        if self.imaging_type.get():
+            roi=self.pco_camera.ODT_ROI
+        else:
+            roi=self.pco_camera.FULL_ROI
+   
         images = self.pco_camera.retrieve_images(
-            roi=self.pco_camera.FULL_ROI, timeout=1 * s
+            roi=roi, timeout=1 * s
         )
         if images is None:
             raise RuntimeError("Failed to retrieve images from camera")
@@ -275,6 +287,7 @@ class AbsorptionImageExpFrag(ExpFragment):
             data=images[0],
             ref=images[1],
             bg=images[2],
+            imaging_mode="ODT",
             magnification=MAGNIFICATION,  # Set default magnification
         )
 

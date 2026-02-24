@@ -580,7 +580,7 @@ class KDC101:
         time.sleep(sleep_time)
 
 
-KDC101_device = KDC101(port="/dev/ttyUSB8", baudrate=115200, timeout=1)
+#KDC101_device = KDC101(port="/dev/ttyUSB8", baudrate=115200, timeout=1)
 
 
 # mode identify
@@ -645,4 +645,4 @@ KDC101_device = KDC101(port="/dev/ttyUSB8", baudrate=115200, timeout=1)
 # )
 
 
-print("KDC101 example complete.")
+# print("KDC101 example complete.")

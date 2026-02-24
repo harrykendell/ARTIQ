@@ -2,7 +2,7 @@
 # Date : Jan 2026
 
 from sipyco.pc_rpc import Client
-from driver_topticadlc_copy import TopticaDLCPro
+from controllers.driver_topticadlc import TopticaDLCPro
 
 from artiq.coredevice.core import Core
 from artiq.experiment import EnumerationValue, kernel

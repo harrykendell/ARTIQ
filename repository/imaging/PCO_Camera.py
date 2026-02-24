@@ -18,8 +18,8 @@ logging.getLogger("pco").setLevel(logging.WARNING)
 
 class PcoCamera(Fragment):
     ODT_Reservoir_ROI = (1, 350, 1392, 600)
-    dimple_pixel_scan = -50
-    ODT_Dimple_ROI = (1, 480 - dimple_pixel_scan, 1260, 600 - dimple_pixel_scan)
+    dimple_pixel_scan = 10
+    ODT_Dimple_ROI = (1, 550 - dimple_pixel_scan, 1260, 650 - dimple_pixel_scan)
     FULL_ROI = (1, 1, 1392, 1040)
     MOT_SIZE = 200
     MOT_X = 850
@@ -36,7 +36,6 @@ class PcoCamera(Fragment):
 
     def build_fragment(self, num_images=1):
         self.num_images = num_images
-
         self.setattr_device("core")
         self.core: Core
 

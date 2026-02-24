@@ -513,40 +513,6 @@ class AbsImage:
             linewidths=1,
         )
 
-        # add text box with fit parameters
-
-        # show the fitted slices
-        # od_ax.plot(
-        #   x_contour,
-        #   self.best_fit[self.peak[0], :],
-        #  color="green",
-        #  linewidth=2,
-        # label="Horizontal fit",
-        # )
-        # od_ax.plot(
-        #    self.best_fit[:, self.peak[1]],
-        #    y_contour,
-        ##    color="green",
-        ##    linewidth=2,
-        #    label="Vertical fit",
-        # )
-
-        # show the od slices too
-        # od_ax.plot(
-        #    x_contour,
-        #   self.optical_density[self.peak[0], :],
-        #   color="white",
-        #   linewidth=2,
-        #   label="Horizontal OD",
-        # )
-        # od_ax.plot(
-        #    self.optical_density[:, self.peak[1]],
-        #    y_contour,
-        #    color="white",
-        #    linewidth=2,
-        #    label="Vertical OD",
-        # )
-
         # show the 1stdev fitted gaussian outline - contour of A/e
         od_ax.contour(
             x_contour,
@@ -604,8 +570,6 @@ class AbsImage:
 
         # For Qt integration, draw once to calculate sizes
         fig.canvas.draw_idle()
-        # print imaging mode
-        print(f"Imaging mode: {self.imaging_mode}")
 
         if self.imaging_mode == "ODT":
             # add seperate table with fit parameters left side of the od plot, use greek letters for sigma
@@ -624,7 +588,7 @@ class AbsImage:
             )
             od_ax.text(
                 0.0,
-                -0.76,
+                -1.3,
                 textstr,
                 transform=od_ax.transAxes,
                 fontsize=9,

@@ -35,6 +35,7 @@ class TriggerFuncGenFrag(ExpFragment):
         self.unlock_ttl: TTLInOut = self.get_device("852_unlock")
         self.FG_ext_trigger: TTLInOut = self.get_device("FG_ext_trigger")
         self.scope_ttl: TTLInOut = self.get_device("probe")
+        self.RP_ext_trigger: TTLInOut = self.get_device("ttl10")
 
         # UI parameter : laser settling time
         self.setattr_param(
@@ -125,11 +126,13 @@ class TriggerFuncGenFrag(ExpFragment):
         # 2. + 3. Trigger AFG+Scope via TTL to do 20 periods of sine wave
         with parallel:
             self.FG_ext_trigger.on()  # ensure ttl is output
+            self.RP_ext_trigger.on()  # trigger RP if used
             self.scope_ttl.on()  # trigger scope
 
         # 4. TTLs go low and relock 852 after delay
         delay(1 * s)
         self.FG_ext_trigger.off()
+        self.RP_ext_trigger.off()
         self.scope_ttl.off()
         self.unlock_ttl.off()
 
