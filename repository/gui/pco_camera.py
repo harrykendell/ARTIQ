@@ -30,7 +30,7 @@ import pyqtgraph as pg
 import sys
 
 sys.path.append(__file__.split("artiq")[0] + "artiq")
-from repository.imaging.PCO_Camera import PcoCamera  # noqa
+from repository.imaging.PCO_Camera import PcoCamera, ROI  # noqa
 
 
 # logger.addHandler(pco.stream_handler)
@@ -114,9 +114,9 @@ class CameraWidget(QWidget):
 
         # combo box for selecting the ROI
         self.roi_combo = pg.ComboBox()
-        self.roi_combo.addItem("MOT", PcoCamera.MOT_ROI)
-        self.roi_combo.addItem("Whole Cell", PcoCamera.WHOLE_CELL_ROI)
-        self.roi_combo.addItem("Full Image", PcoCamera.FULL_ROI)
+        for roi in ROI:
+            self.roi_combo.addItem(roi.name.replace("_", " ").title(), roi.value)
+
         self.roi_combo.setCurrentIndex(2)
         self.roi_combo.currentIndexChanged.connect(self.reset_zoom)
         self.roi_combo.setToolTip("whole cell")

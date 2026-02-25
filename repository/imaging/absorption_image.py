@@ -8,6 +8,7 @@ from artiq.language import delay, ms, now_mu, parallel, s, us
 # from repository.models.device_db import server_addr
 from ndscan.experiment import (
     BoolParam,
+    EnumParam,
     ExpFragment,
     FloatChannel,
     FloatParam,
@@ -16,16 +17,13 @@ from ndscan.experiment import (
 )
 
 from artiq.coredevice.ttl import TTLInOut
-from ndscan.experiment.parameters import BoolParamHandle, FloatParamHandle
+from ndscan.experiment.parameters import BoolParamHandle, FloatParamHandle, ParamHandle
 from repository.fragments.beam_setter import ControlBeamsWithoutCoolingAOM
 from repository.fragments.mot import MOT
-from repository.imaging.PCO_Camera import PcoCamera
+from repository.imaging.PCO_Camera import PcoCamera, ROI
 from repository.imaging.processor import AbsImage, AbsImageSettings  # noqa: E402
 from repository.models.devices import SUServoedBeam
 # from repository.Dipole_trap.moving_stage import MovingStage
-
-MAGNIFICATION = 1  # Default magnification for absorption imaging
-
 
 class AbsorptionImageExpFrag(ExpFragment):
     """
@@ -69,6 +67,14 @@ class AbsorptionImageExpFrag(ExpFragment):
         self.moving_absolute_distance: FloatParamHandle
 
         self.setattr_param(
+            "magnification",
+            FloatParam,
+            "Magnification for imaging",
+            default=1.0,
+        )
+        self.magnification: FloatParamHandle
+
+        self.setattr_param(
             "expansion_time",
             FloatParam,
             "Expansion time before imaging",
@@ -78,13 +84,15 @@ class AbsorptionImageExpFrag(ExpFragment):
         )
         self.expansion_time: FloatParamHandle
 
+        # enum selection of ROI for retrieving images
         self.setattr_param(
-            "imaging_type",
-            BoolParam,
-            "Imaging type: ODT (True) or Full (False)",
-            default=False,
+            "imaging_roi",
+            EnumParam,
+            "Select imaging ROI",
+            default=ROI.FULL,
+            enum_class=ROI,
         )
-        self.imaging_mode: FloatParamHandle
+        self.imaging_roi: ParamHandle
 
         self.do_cmot: BoolParamHandle = self.setattr_param(
             "do_cmot", BoolParam, "Do the CMOT step", default=False
@@ -255,13 +263,8 @@ class AbsorptionImageExpFrag(ExpFragment):
 
     @rpc(flags={"async"})
     def update_images(self):
-        if self.imaging_type.get():
-            roi=self.pco_camera.ODT_ROI
-        else:
-            roi=self.pco_camera.FULL_ROI
-   
         images = self.pco_camera.retrieve_images(
-            roi=roi, timeout=1 * s
+            roi=self.imaging_roi.get(), timeout=1 * s
         )
         if images is None:
             raise RuntimeError("Failed to retrieve images from camera")
@@ -283,7 +286,7 @@ class AbsorptionImageExpFrag(ExpFragment):
             broadcast=True,
         )
 
-        settings = AbsImageSettings(magnification=MAGNIFICATION)  # Set default magnification
+        settings = AbsImageSettings(magnification=self.magnification.get())  # Set default magnification
 
         self.set_dataset(
             "Images.absorption.settings",

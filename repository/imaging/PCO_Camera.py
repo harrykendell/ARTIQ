@@ -1,3 +1,4 @@
+from enum import Enum
 import logging
 import time
 
@@ -15,23 +16,17 @@ from repository.models.device_db import server_addr
 logger = logging.getLogger(__name__)
 logging.getLogger("pco").setLevel(logging.WARNING)
 
+dimple_pixel_scan = 10
+MOT_SIZE = 200
+MOT_X = 850
+MOT_Y = 550
+class ROI(Enum):
+    FULL = (1, 1, 1392, 1040)
+    MOT = (MOT_X - MOT_SIZE, MOT_Y - MOT_SIZE, MOT_X + MOT_SIZE, MOT_Y + MOT_SIZE)
+    ODT_Reservoir = (1, 350, 1392, 600)
+    ODT_Dimple = (1, 550 - dimple_pixel_scan, 1260, 650 - dimple_pixel_scan)
 
 class PcoCamera(Fragment):
-    ODT_Reservoir_ROI = (1, 350, 1392, 600)
-    dimple_pixel_scan = 10
-    ODT_Dimple_ROI = (1, 550 - dimple_pixel_scan, 1260, 650 - dimple_pixel_scan)
-    FULL_ROI = (1, 1, 1392, 1040)
-    MOT_SIZE = 200
-    MOT_X = 850
-    MOT_Y = 550
-
-    MOT_ROI = (MOT_X - MOT_SIZE, MOT_Y - MOT_SIZE, MOT_X + MOT_SIZE, MOT_Y + MOT_SIZE)
-    WHOLE_CELL_ROI = (
-        MOT_X - 100,
-        MOT_Y - 150,
-        MOT_X + 100,
-        MOT_Y + 150,
-    )
     BUSY_TIME = 150 * ms
 
     def build_fragment(self, num_images=1):
@@ -125,7 +120,7 @@ class PcoCamera(Fragment):
         self.trigger.off()
 
     @host_only
-    def retrieve_images(self, timeout=5.0 * s, roi=WHOLE_CELL_ROI):
+    def retrieve_images(self, timeout=5.0 * s, roi: ROI=ROI.FULL):
         """
         Pulls all stored images off the camera and stores the first
         into the diagnostic dataset
@@ -147,7 +142,7 @@ class PcoCamera(Fragment):
         else:
             return None
         logger.info("All images counted")
-        self.images, _ = self.cam.images(roi=roi)
+        self.images, _ = self.cam.images(roi=roi.value)
         logger.info("Images retrieved")
         self.images = self.rotate_and_flip(self.images).astype(np.float64)
         self.set_dataset("Images.Latest_image", self.images[-1], broadcast=True)
