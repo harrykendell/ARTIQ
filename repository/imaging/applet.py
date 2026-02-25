@@ -9,8 +9,7 @@ from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as Navigation
 from matplotlib.figure import Figure
 
 from artiq.applets.simple import TitleApplet  # noqa: E402
-from repository.imaging.absorption_image import MAGNIFICATION  # noqa: E402
-from repository.imaging.processor import AbsImage  # noqa: E402
+from repository.imaging.processor import AbsImage, AbsImageSettings  # noqa: E402
 
 
 class AbsorptionView(QtWidgets.QWidget):
@@ -125,19 +124,20 @@ class AbsorptionView(QtWidgets.QWidget):
             # Check if all required datasets are available
             if all(
                 value.get(getattr(self.args, key)) is not None
-                for key in ["TOF", "REF", "BG", "expansion_time"]
+                for key in ["TOF", "REF", "BG", "expansion_time", "settings"]
             ):
                 # Get the image data
                 tof_data = value[self.args.TOF]
                 ref_data = value[self.args.REF]
                 bg_data = value[self.args.BG]
+                settings = value[self.args.settings]
 
                 # Create AbsImage object
                 self.absimg = AbsImage(
                     data=tof_data,
                     ref=ref_data,
                     bg=bg_data,
-                    magnification=MAGNIFICATION,  # Set default magnification
+                    settings=AbsImageSettings.from_dataset(settings),
                 )
 
                 # Enable save button now that we have data
@@ -224,6 +224,11 @@ def main():
         "--BG", default="Images.absorption.BG", help="Background Image"
     )
     applet.dataset_args.add("BG")
+
+    applet._arggroup_datasets.add_argument(
+        "--settings", default="Images.absorption.settings", help="Settings"
+    )
+    applet.dataset_args.add("settings")
 
     applet._arggroup_datasets.add_argument(
         "--expansion_time",

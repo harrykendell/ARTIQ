@@ -20,7 +20,7 @@ from ndscan.experiment.parameters import BoolParamHandle, FloatParamHandle
 from repository.fragments.beam_setter import ControlBeamsWithoutCoolingAOM
 from repository.fragments.mot import MOT
 from repository.imaging.PCO_Camera import PcoCamera
-from repository.imaging.processor import AbsImage  # noqa: E402
+from repository.imaging.processor import AbsImage, AbsImageSettings  # noqa: E402
 from repository.models.devices import SUServoedBeam
 # from repository.Dipole_trap.moving_stage import MovingStage
 
@@ -283,12 +283,19 @@ class AbsorptionImageExpFrag(ExpFragment):
             broadcast=True,
         )
 
+        settings = AbsImageSettings(magnification=MAGNIFICATION)  # Set default magnification
+
+        self.set_dataset(
+            "Images.absorption.settings",
+            settings.to_dataset(),
+            broadcast=True,
+        )
+
         self.absimg = AbsImage(
             data=images[0],
             ref=images[1],
             bg=images[2],
-            imaging_mode="ODT",
-            magnification=MAGNIFICATION,  # Set default magnification
+            settings=settings,
         )
 
         self.atom_number.push(self.absimg.atom_number)

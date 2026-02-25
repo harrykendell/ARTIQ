@@ -1,3 +1,4 @@
+import dataclasses
 import functools
 import warnings
 import numpy as np
@@ -7,7 +8,7 @@ from lmfit import Model
 from matplotlib.gridspec import GridSpec
 from matplotlib.ticker import FuncFormatter
 from scipy.ndimage import gaussian_filter
-
+from dataclasses import dataclass
 from artiq.language.units import MHz
 
 warnings.filterwarnings("ignore", message="Using UFloat objects with std_dev==0")
@@ -46,6 +47,26 @@ def ravel(func):
 
     return wrapper
 
+@dataclass(frozen=True)
+class AbsImageSettings:
+    wavelength: float = 780.24602089 * 1e-9  # m
+    detuning: float = 0 * MHz
+    linewidth: float = 6.065 * MHz
+    atom_mass: float = 1.443e-25  # kg, mass of Rb87
+    temperature: float = 10e-6  # K
+    pixel_size: float = 1.55 * 1e-6  # m
+    fit_downsample: int = 5
+    magnification: float = None  # Set to None to force user to specify
+
+    # need this to be pyon serializable for dataset storage
+    def to_dataset(self):
+        return str(str(dataclasses.asdict(self)))
+
+    @staticmethod
+    def from_dataset(d: str):
+        return AbsImageSettings(
+            **eval(d)
+        )
 
 class AbsImage:
     nm = 1e-9
@@ -57,13 +78,7 @@ class AbsImage:
         data,
         ref,
         bg,
-        imaging_mode="ODT",
-        wavelength=780.24602089 * nm,
-        detuning=0 * MHz,
-        linewidth=6.065 * MHz,
-        pixel_size=1.55 * um,  # 25.52 * um,
-        magnification=None,
-        fit_downsample=5,
+        settings: AbsImageSettings = AbsImageSettings(),
     ):
         """AbsImage class for processing absorption images.
 
@@ -81,35 +96,29 @@ class AbsImage:
         self.data_image = np.rot90(data)
         self.ref_image = np.rot90(ref)
         self.bg_image = np.rot90(bg)
-        self.imaging_mode = imaging_mode
 
         self.height = self.data_image.shape[0]
         self.width = self.data_image.shape[1]
         # numpy images are y, x
         self.xy = np.mgrid[0 : self.height, 0 : self.width]
-        self.fit_downsample = fit_downsample
+        self.settings = settings
 
-        self.wavelength = wavelength
-        self.detuning = detuning
-        self.linewidth = linewidth
-        self.pixel_size = pixel_size
-
-        if magnification is None:
+        if self.settings.magnification is None:
             # NB for now 50mm lens at 150mm distance focuses to 75mm away
             # self.magnification = 75 / 150 = 0.5
             raise ValueError(
                 "Please set magnification for the PCO camera\nNB: For nowa 50mm lens at"
                 " 150mm focuses to 75mm away, so set to 0.5"
             )
-        self.magnification = magnification
+        self.magnification = self.settings.magnification
 
     def all_info(self):
         """Returns a string of a dict with all the information about the image."""
         return f"""
-            "wavelength": {self.wavelength},
-            "detuning": {self.detuning},
-            "linewidth": {self.linewidth},
-            "pixel_size": {self.pixel_size},
+            "wavelength": {self.settings.wavelength},
+            "detuning": {self.settings.detuning},
+            "linewidth": {self.settings.linewidth},
+            "pixel_size": {self.settings.pixel_size},
             "magnification": {self.magnification},
             "atom_number": {self.atom_number},
             "peak_pixel": {self.peak},
@@ -120,13 +129,12 @@ class AbsImage:
             "phase_space_density": {self.phase_space_density},
             "peak_optical_density": {self.peak[2]},
             "Peak density (atoms/cm^3): {self.phase_space_density[0] * 1e-6:.2e}
-
         """
 
     @functools.cached_property
     def physical_scale(self):
         """Pixel to real-space size in m."""
-        scale = self.pixel_size * (1 / self.magnification)
+        scale = self.settings.pixel_size * (1 / self.settings.magnification)
         return scale
 
     @functools.cached_property
@@ -165,9 +173,9 @@ class AbsImage:
     def atom_number(self):
         """Calculates the total atom number from the transmission ROI values."""
         # light and camera parameters
-        sigma_0 = (3 / (2 * np.pi)) * np.square(self.wavelength)  # cross-section
+        sigma_0 = (3 / (2 * np.pi)) * np.square(self.settings.wavelength)  # cross-section
         sigma = sigma_0 * np.reciprocal(
-            1 + np.square(4 * np.square(self.detuning / self.linewidth))
+            1 + np.square(4 * np.square(self.settings.detuning / self.settings.linewidth))
         )  # off resonance
         area = np.square(self.physical_scale)  # pixel area in SI units
 
@@ -253,9 +261,9 @@ class AbsImage:
         model.set_param_hint("z0", value=0, vary=False)
 
         result = model.fit(
-            np.ravel(self.optical_density[:: self.fit_downsample]),
-            x=x_mg[:: self.fit_downsample],
-            y=y_mg[:: self.fit_downsample],
+            np.ravel(self.optical_density[:: self.settings.fit_downsample]),
+            x=x_mg[:: self.settings.fit_downsample],
+            y=y_mg[:: self.settings.fit_downsample],
             max_nfev=1000,
             fit_kws={"xtol": 1e-7},
         )
@@ -283,10 +291,6 @@ class AbsImage:
             Total number of atoms in the cloud.
         sigma_x, sigma_y, sigma_z : floats
             Position-space 1/e standard deviations (meters) along x, y, z.
-        T : float
-            Temperature in Kelvin.
-        m : float
-            Mass of one atom in kilograms.
 
         Returns
         -------
@@ -297,8 +301,6 @@ class AbsImage:
         PSD : float
             Phase-space density (dimensionless, N λ³ / V).
         """
-        m = 1.443e-25  # mass of Rb87 in kg
-        T = 10e-6  # temperature in K
 
         sigma_x = self.fit.best_values["sx"] * self.physical_scale
         sigma_y = self.fit.best_values["sy"] * self.physical_scale
@@ -313,7 +315,7 @@ class AbsImage:
 
         # Thermal de Broglie wavelength
         # λ_dB = h / sqrt(2 π m k_B T)
-        lambda_db = const.h / np.sqrt(2 * np.pi * m * const.k * T)
+        lambda_db = const.h / np.sqrt(2 * np.pi * self.settings.atom_mass * const.k * self.settings.temperature)
 
         # Phase-space density: n * λ_dB^3
         PSD = n * lambda_db**3
@@ -571,51 +573,29 @@ class AbsImage:
         # For Qt integration, draw once to calculate sizes
         fig.canvas.draw_idle()
 
-        if self.imaging_mode == "ODT":
-            # add seperate table with fit parameters left side of the od plot, use greek letters for sigma
-            textstr = "\n".join(
-                (
-                    rf"Atom number: $\mathbf{{{self.atom_number:.2e}}}$",
-                    rf"Peak OD: $\mathbf{{{self.optical_density[self.peak[0], self.peak[1]]:.2f}}}$",
-                    rf"Centroid (mm): ($\mathbf{{{centroid_mm[0]:.2f}}}$, $\mathbf{{{centroid_mm[1]:.2f}}}$)",
-                    rf"Peak center (mm): ($\mathbf{{{peak_mm[0]:.2f}}}$, $\mathbf{{{peak_mm[1]:.2f}}}$)",
-                    rf"$\sigma_x$ (mm): $\mathbf{{{self.best_values['sx'] * scale_mm:.2f}}}$",
-                    rf"$\sigma_y$ (mm): $\mathbf{{{self.best_values['sy'] * scale_mm:.2f}}}$",
-                    rf"Phase-space density: $\mathbf{{{self.phase_space_density[2]:.2e}}}$",
-                    rf"$\lambda_{{\mathrm{{dB}}}}$ (m): $\mathbf{{{self.phase_space_density[1]:.2e}}}$",
-                    rf"Peak density (atoms/cm$^3$): $\mathbf{{{self.phase_space_density[0] * 1e-6:.2e}}}$",
-                )
+        textstr = "\n".join(
+            (
+                rf"Atom number: $\mathbf{{{self.atom_number:.2e}}}$",
+                rf"Peak OD: $\mathbf{{{self.optical_density[self.peak[0], self.peak[1]]:.2f}}}$",
+                rf"Centroid (mm): ($\mathbf{{{centroid_mm[0]:.2f}}}$, $\mathbf{{{centroid_mm[1]:.2f}}}$)",
+                rf"Peak center (mm): ($\mathbf{{{peak_mm[0]:.2f}}}$, $\mathbf{{{peak_mm[1]:.2f}}}$)",
+                rf"$\sigma_x$ (mm): $\mathbf{{{self.best_values['sx'] * scale_mm:.2f}}}$",
+                rf"$\sigma_y$ (mm): $\mathbf{{{self.best_values['sy'] * scale_mm:.2f}}}$",
+                rf"Phase-space density: $\mathbf{{{self.phase_space_density[2]:.2e}}}$",
+                rf"$\lambda_{{\mathrm{{dB}}}}$ (m): $\mathbf{{{self.phase_space_density[1]:.2e}}}$",
+                rf"Peak density (atoms/cm$^3$): $\mathbf{{{self.phase_space_density[0] * 1e-6:.2e}}}$",
             )
-            od_ax.text(
-                0.0,
-                -1.3,
-                textstr,
-                transform=od_ax.transAxes,
-                fontsize=9,
-                verticalalignment="center",
-                bbox=dict(boxstyle="round,pad=0.5", facecolor="wheat", alpha=0.5),
-            )
+        )
+        od_ax.text(
+            1.1,
+            0.5,
+            textstr,
+            transform=od_ax.transAxes,
+            fontsize=9,
+            verticalalignment="center",
+            bbox=dict(boxstyle="round,pad=0.5", facecolor="wheat", alpha=0.5),
+        )
 
-        else:
-            textstr = "\n".join(
-                (
-                    rf"Atom number: $\mathbf{{{self.atom_number:.2e}}}$",
-                    rf"Peak OD: $\mathbf{{{self.optical_density[self.peak[0], self.peak[1]]:.2f}}}$",
-                    rf"Centroid (mm): ($\mathbf{{{centroid_mm[0]:.2f}}}$, $\mathbf{{{centroid_mm[1]:.2f}}}$)",
-                    rf"Peak center (mm): ($\mathbf{{{peak_mm[0]:.2f}}}$, $\mathbf{{{peak_mm[1]:.2f}}}$)",
-                    rf"$\sigma_x$ (mm): $\mathbf{{{self.best_values['sx'] * scale_mm:.2f}}}$",
-                    rf"$\sigma_y$ (mm): $\mathbf{{{self.best_values['sy'] * scale_mm:.2f}}}$",
-                )
-            )
-            od_ax.text(
-                1.1,
-                0.5,
-                textstr,
-                transform=od_ax.transAxes,
-                fontsize=9,
-                verticalalignment="center",
-                bbox=dict(boxstyle="round,pad=0.5", facecolor="wheat", alpha=0.5),
-            )
         plt.tight_layout()
 
         return fig, axes + [cax_raw, cax_od]
