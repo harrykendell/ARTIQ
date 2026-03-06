@@ -323,7 +323,6 @@ aliases = {
     "suservo_aom_LATX": "suservo_ch4",
     "suservo_aom_LATY": "suservo_ch5",
     "shutter_LATTICE": "ttl2",
-    "FG_ext_trigger": "ttl7",  # external trigger to Function Generator
     # 1064 Cross Dipole Trap
     "suservo_aom_CDT1": "suservo_ch6",
     "suservo_aom_CDT2": "suservo_ch7",
@@ -335,6 +334,10 @@ aliases = {
     "dummy_shutter": "ttl0",
     # moving stage
     "moving_stage_ttl": "ttl11",
+    # Shaking the Red Pitaya for the 852nm laser unlock
+    "AFG_ext_trigger": "ttl7",  # external trigger to Function Generator
+    "RedPitaya_trigger": "ttl10",
+    "scope_trigger": "ttl11",
 }
 
 device_db |= aliases

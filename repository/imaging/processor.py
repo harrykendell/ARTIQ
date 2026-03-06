@@ -54,7 +54,7 @@ class AbsImageSettings:
     linewidth: float = 6.065 * MHz
     atom_mass: float = 1.443e-25  # kg, mass of Rb87
     temperature: float = 10e-6  # K
-    pixel_size: float = 1.55 * 1e-6  # m
+    pixel_size: float = 6.45 * 1e-6  # m
     fit_downsample: int = 5
     magnification: float = None  # Set to None to force user to specify
 
