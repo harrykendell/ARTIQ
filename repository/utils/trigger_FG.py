@@ -57,22 +57,64 @@ class TriggerFuncGenFrag(ExpFragment):
         )
         self.frequency: FloatParamHandle
 
+        self.voltage: FloatParamHandle = self.setattr_param(
+            "voltage",
+            FloatParam,
+            "Modulation Voltage (Max voltage)",
+            default=4.0,
+            unit="V",
+        )
+
         self.setattr_param("use_redpitaya", BoolParam, "Use Red Pitaya", default=False)
         self.use_redpitaya: BoolParamHandle
 
     @rpc
-    def setup_scope(self, timebase):
+    def setup_scope(self, timebase) -> TFloat:
         with MSO24(silent=True) as ms024:
+            ms024.cancel_acquisition()
+            ms024.set_trigger(channel= 4, level=1.0)
             ms024.set_timebase(timebase)
             ms024.start_acquisition()
+            return ms024.wait_for_ready()
 
     @rpc
     def choose_timebase(self, freq) -> TFloat:
         min_timebase = 2.0 / freq
-        timebases = []
-        for exp in range(-9, 2):
-            decade = 10.0**exp
-            timebases.extend([1.0 * decade, 2.0 * decade, 4.0 * decade])
+        timebases = [
+            1e-09,
+            2e-09,
+            4e-09,
+            1e-08,
+            2e-08,
+            4e-08,
+            1e-07,
+            2e-07,
+            4e-07,
+            1e-06,
+            2e-06,
+            4e-06,
+            1e-05,
+            2e-05,
+            4e-05,
+            0.0001,
+            0.0002,
+            0.0004,
+            0.001,
+            0.002,
+            0.004,
+            0.01,
+            0.02,
+            0.04,
+            0.1,
+            0.2,
+            0.4,
+            1.0,
+            2.0,
+            4.0,
+            10.0,
+            20.0,
+            40.0,
+        ]
         for timebase in timebases:
             if timebase >= min_timebase:
                 return timebase
@@ -83,18 +125,18 @@ class TriggerFuncGenFrag(ExpFragment):
         dev = "Red Pitaya" if self.use_redpitaya.get() else "AFG"
         filename = f"{freq}Hz_SINE_{dev}"
         with MSO24(silent=True) as ms024:
-            ts, vs = ms024.get_trace([2, 3, 4])
+            ts, vs = ms024.get_trace([2, 3, 4], already_acquiring=True)
         ms024.save_traces_to_file(ts, vs, filename=filename)
 
     @rpc
     def setup_afg(self, freq):
         with Agilent33600A(silent=True) as afg:
-            afg.sin_pulse(1, freq, 5, 15)
+            afg.sin_pulse(1, freq, self.voltage.get(), 15)
 
     @rpc
     def setup_redpitaya(self, freq):
         with RedPitaya() as rp:
-            rp.sin_burst(chan=1, freq=freq, voltage=1.0, num_cycles=15)
+            rp.sin_burst(chan=1, freq=freq, voltage=self.voltage.get(), num_cycles=15, usingAMP=True)
 
     @kernel
     def run_once(self):
@@ -106,6 +148,8 @@ class TriggerFuncGenFrag(ExpFragment):
         3. Run sine wave through AFG for 20 periods
         4. TTLs go low and Relock 852 after delay
         """
+        self.core.reset()  # Ensure clean state
+
         timebase = self.choose_timebase(self.frequency.get())
         self.setup_scope(timebase)
 
@@ -115,27 +159,29 @@ class TriggerFuncGenFrag(ExpFragment):
             self.setup_afg(self.frequency.get())
 
         # Reset the core  and break realtime to ensure clean timing boundary
-        self.core.reset()
-        delay(1 * s)
+        self.core.break_realtime()
 
         # ----- Experiment sequence -----#
         # 1. Unlock 852, allow time to unlock
         self.unlock_ttl.on()
         delay(self.time_to_shift.get())
 
-        # 2. + 3. Trigger AFG+Scope via TTL to do 20 periods of sine wave
+        # 2. + 3. Trigger AFG+Scope via TTL
         with parallel:
             self.AFG_ext_trigger.on()  # ensure ttl is output
             self.RP_ext_trigger.on()  # trigger RP if used
             self.scope_ttl.on()  # trigger scope
 
         # 4. TTLs go low and relock 852 after delay
-        delay(1 * s)
+        # delay for 15 pulses at the given freq
+        todelay = 15.0 / self.frequency.get()
+        delay(todelay)
         self.AFG_ext_trigger.off()
         self.RP_ext_trigger.off()
         self.scope_ttl.off()
         self.unlock_ttl.off()
 
+        delay(0.2 * s)
         self.acquire(self.frequency.get())
 
 

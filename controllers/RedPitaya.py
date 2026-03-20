@@ -2167,10 +2167,15 @@ class RedPitaya(object):
         return self.txrx_txt("SYST:ERR:NEXT?")
 
     # Convenience methods
-    def sin_burst(self, chan: int, freq: float, voltage: float, num_cycles: int) -> None:
+    def sin_burst(self, chan: int, freq: float, voltage: float, num_cycles: int, usingAMP= False) -> None:
         """
         Convenience method to generate a burst of sine wave on a specific channel.
+
+        The amplifier gives a gain of 5.3x, so the voltage is multiplied by 5.3 if usingAMP is True. The burst is triggered by an external positive edge signal.
         """
+        AMP_GAIN = 5.3
+        if usingAMP:
+            voltage = voltage / AMP_GAIN
         self.gen_set(chan=chan, func=Waveform.SINE, freq=freq, volt=voltage, trig_sour=TriggerSource.EXT_PE)
         self.gen_burst_set(chan=chan, ncyc=num_cycles)
 

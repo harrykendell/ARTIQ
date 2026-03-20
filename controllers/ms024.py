@@ -1,5 +1,6 @@
 import logging
 from pathlib import Path
+from time import sleep
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -47,7 +48,7 @@ class MSO24:
             logging.info(f"Writing: {full_command}")
         self.instrument.write(full_command)
 
-        if logging.getLogger().isEnabledFor(logging.ERROR):
+        if True or logging.getLogger().isEnabledFor(logging.INFO):
             error = self.instrument.query("*ESR?")
             if error != "0":
                 logging.error(f"Error: {error} for command: {full_command}")
@@ -64,11 +65,11 @@ class MSO24:
         if not self.silent:
             logging.info(f"Querying: {command}")
         ret = self.instrument.query(command)
-        if logging.getLogger().isEnabledFor(logging.ERROR):
+        if logging.getLogger().isEnabledFor(logging.INFO):
             error = self.instrument.query("*ESR?")
             if error != "0":
                 self.instrument.write("SYST:ERR?")
-                logging.error(
+                logging.info(
                     f"Error: {error} for command: {command}\n{self.instrument.read()}"
                 )
         return ret.strip()
@@ -109,9 +110,9 @@ class MSO24:
 
     def set_trigger(self, channel: int, level: float):
         """Set the trigger level for a given channel."""
+        self.write("TRIGger:A:MODE NORMal")
         self.write(f"TRIGger:A:EDGE:SOUrce CH{channel}")
         self.write(f"TRIGger:A:LEVel:CH{channel} {level}")
-        self.write("TRIGger:MODE NORMal")
 
     def set_averaging(self, num_avg: int = 1):
         """Set the number of averages for the acquisition."""
@@ -119,10 +120,25 @@ class MSO24:
         self.write(f"ACQUIRE:NUMAVG {num_avg}")
         self.write("ACQUIRE:MODE AVERAGE")
 
+    def cancel_acquisition(self):
+        """Cancel the current acquisition."""
+        self.write("ACQUIRE:STATE 0")
+
     def start_acquisition(self):
-        self.write("ACQUIRE:STATE 0")  # Stop acquisition
+        self.cancel_acquisition()
         self.write("ACQUIRE:STOPAFTER SEQUENCE")
         self.write("ACQUIRE:STATE 1")  # Start acquisition
+
+    def wait_for_ready(self):
+        """
+        Wait for the trigger to be ready.
+        """
+        while True:
+            state= self.query("TRIGger:STATE?")
+            if state.strip() == "READY":
+                break
+            sleep(0.1)
+        return 0.0
 
     def get_trace(self, channels: int | list[int], already_acquiring=False):
         """Extract traces from the given channels."""
