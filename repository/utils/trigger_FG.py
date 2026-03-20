@@ -5,6 +5,7 @@
 # Date : Jan 2026
 
 import logging
+import numpy as np
 
 from artiq.coredevice.core import Core
 from artiq.coredevice.ttl import TTLInOut
@@ -79,46 +80,28 @@ class TriggerFuncGenFrag(ExpFragment):
 
     @rpc
     def choose_timebase(self, freq) -> TFloat:
-        min_timebase = 2.0 / freq
-        timebases = [
-            1e-09,
-            2e-09,
-            4e-09,
-            1e-08,
-            2e-08,
-            4e-08,
-            1e-07,
-            2e-07,
-            4e-07,
-            1e-06,
-            2e-06,
-            4e-06,
-            1e-05,
-            2e-05,
-            4e-05,
-            0.0001,
-            0.0002,
-            0.0004,
-            0.001,
-            0.002,
-            0.004,
-            0.01,
-            0.02,
-            0.04,
-            0.1,
-            0.2,
-            0.4,
-            1.0,
-            2.0,
-            4.0,
-            10.0,
-            20.0,
-            40.0,
-        ]
-        for timebase in timebases:
-            if timebase >= min_timebase:
-                return timebase
-        return timebases[-1]
+        """
+        We need to fit 15 periods inside 8 timebases at maximum
+
+        Timebases can only be 1,2,4 * 10^n seconds, so we need to find the smallest timebase that can fit 15 periods in 8 timebases
+        """
+        time_for_15_periods = 15.0 / freq
+        max_timebase = time_for_15_periods / 8.0
+
+        # Find our power and multiplier
+        power = int(np.floor(np.log10(max_timebase)))
+        multiplier = max_timebase / (10 ** power)
+
+        if multiplier <= 1:
+            chosen_multiplier = 1
+        elif multiplier <= 2:
+            chosen_multiplier = 2
+        elif multiplier <= 4:
+            chosen_multiplier = 4
+        else:
+            chosen_multiplier = 10
+        chosen_timebase = chosen_multiplier * (10 ** power)
+        return chosen_timebase
 
     @rpc(flags={"async"})
     def acquire(self, freq):
@@ -186,3 +169,8 @@ class TriggerFuncGenFrag(ExpFragment):
 
 
 TriggerFuncGen = make_fragment_scan_exp(TriggerFuncGenFrag)
+
+
+# To generate the frequencies for the scan, we can use the following code in a notebook:
+# freqs = np.logspace(1, 6, 100, endpoint=True)
+# print(f"{', '.join([f'{f:.2e}' for f in freqs])}")
