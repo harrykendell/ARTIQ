@@ -69,11 +69,6 @@ fi
 
 # Running locally on a different machine - we run everything locally
 echo -e "${GREEN}Not running on the ARTIQ server${NC}"
-(python repository/gui/ArtiqMonitor.py) &
+# (python repository/gui/ArtiqMonitor.py) &
 
-# who knows if they have nix installed
-if command -v nix 2>&1 >/dev/null; then
-    nix shell --command bash -c "artiq_dashboard -v --server=\"$SERVER_ADDRESS\" -p=\"ndscan.dashboard_plugin\""
-else
-    artiq_dashboard -v --server="$SERVER_ADDRESS" -p="ndscan.dashboard_plugin"
-fi
+nix shell --command bash -c "artiq_dashboard -v --server=\"$SERVER_ADDRESS\" -p=\"ndscan.dashboard_plugin\""
