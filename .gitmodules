@@ -24,7 +24,7 @@
 	url = https://github.com/OxfordIonTrapGroup/oxart-devices
 [submodule "submodules/ndscan"]
 	path = submodules/ndscan
-	url = https://github.com/OxfordIonTrapGroup/ndscan
+	url = https://github.com/harrykendell/ndscan
 [submodule "submodules/dax"]
 	path = submodules/dax
 	url = https://gitlab.com/duke-artiq/dax.git
