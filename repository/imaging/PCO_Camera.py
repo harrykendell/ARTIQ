@@ -17,8 +17,8 @@ logger = logging.getLogger(__name__)
 logging.getLogger("pco").setLevel(logging.WARNING)
 
 dimple_pixel_scan = 10
-MOT_SIZE = 200
-MOT_X = 850
+MOT_SIZE = 300
+MOT_X = 800
 MOT_Y = 550
 class ROI(Enum):
     FULL = (1, 1, 1392, 1040)

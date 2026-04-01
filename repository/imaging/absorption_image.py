@@ -1,9 +1,12 @@
+from collections.abc import Iterable
 from time import time
 
 from artiq.coredevice.core import Core
 from artiq.coredevice.dma import CoreDMA
 from artiq.experiment import kernel, rpc
 from artiq.language import delay, ms, now_mu, parallel, s, us
+import numpy as np
+from scipy.optimize import curve_fit
 
 # from repository.models.device_db import server_addr
 from ndscan.experiment import (
@@ -17,6 +20,7 @@ from ndscan.experiment import (
 )
 
 from artiq.coredevice.ttl import TTLInOut
+from ndscan.experiment.default_analysis import DefaultAnalysis, OnlineFit, CustomAnalysis
 from ndscan.experiment.parameters import BoolParamHandle, FloatParamHandle, ParamHandle
 from repository.fragments.beam_setter import ControlBeamsWithoutCoolingAOM
 from repository.fragments.mot import MOT
@@ -24,6 +28,7 @@ from repository.imaging.PCO_Camera import PcoCamera, ROI
 from repository.imaging.processor import AbsImage, AbsImageSettings  # noqa: E402
 from repository.models.devices import SUServoedBeam
 # from repository.Dipole_trap.moving_stage import MovingStage
+
 
 class AbsorptionImageExpFrag(ExpFragment):
     """
@@ -151,7 +156,12 @@ class AbsorptionImageExpFrag(ExpFragment):
         )
 
         self.atom_number: FloatChannel = self.setattr_result("atom_number")
+        self.sigmax_mm: FloatChannel = self.setattr_result("sigmax_mm")
+        self.sigmay_mm: FloatChannel = self.setattr_result("sigmay_mm")
+        self.phase_space_density: FloatChannel = self.setattr_result("phase_space_density")
         self.info: OpaqueChannel = self.setattr_result("info", OpaqueChannel)
+        self.gaussian_fit_centre_x: FloatChannel = self.setattr_result("gaussian_fit_centre_x")
+        self.gaussian_fit_centre_y: FloatChannel = self.setattr_result("gaussian_fit_centre_y")
 
     @kernel
     def device_setup(self) -> None:
@@ -163,14 +173,14 @@ class AbsorptionImageExpFrag(ExpFragment):
         self.core.break_realtime()
         self.mot.calculate_dma_handles()
         self.core.break_realtime()
-
+    
         # if (
         #   self.odt_active.get()
         #   or self.do_evaporation1.get()
         #   or self.do_evaporation2.get()
         # ):
         self.mot.set_dimple_trap_power(self.mot.power_dimple.get())
-        #self.mot.set_reservoir_trap_power(self.mot.power_reservoir.get())
+        # self.mot.set_reservoir_trap_power(self.mot.power_reservoir.get())
 
         # self.mot.odt_reservoir.turn_beams_on()
         # self.mot.odt_dimple.turn_beams_on()
@@ -286,7 +296,9 @@ class AbsorptionImageExpFrag(ExpFragment):
             broadcast=True,
         )
 
-        settings = AbsImageSettings(magnification=self.magnification.get())  # Set default magnification
+        settings = AbsImageSettings(
+            magnification=self.magnification.get()
+        )  # Set default magnification
 
         self.set_dataset(
             "Images.absorption.settings",
@@ -303,12 +315,74 @@ class AbsorptionImageExpFrag(ExpFragment):
 
         self.atom_number.push(self.absimg.atom_number)
         self.info.push(self.absimg.all_info())
+        self.sigmax_mm.push(self.absimg.sigmax)
+        self.sigmay_mm.push(self.absimg.sigmay)
+        self.phase_space_density.push(self.absimg.phase_space_density_1)
+        self.gaussian_fit_centre_x.push(self.absimg.x0)
+        self.gaussian_fit_centre_y.push(self.absimg.y0)
+    
+    #def get_default_analyses(self):
+       # return [OnlineFit("line", data={"x": self.expansion_time, "y": self.sigmax_mm})]
+    def get_default_analyses(self):
+        return [
+            CustomAnalysis(
+                [self.expansion_time],
+                self.Temperature,
+                [FloatChannel("fit_t"), FloatChannel("fit_d")],
+            )
+        ]
+
+    def Temperature(self, axis_values, result_values, analysis_result):
+        # --- Constants ---
+        kB = 1.380649e-23  # Boltzmann constant (J/K)
+        m = 1.45e-25  # Mass (kg)
+        # s = 1.62  # Pixel size in µm/pixel
+        # delta_s = 0.18  # Uncertainty in pixel size
+
+        t_data_sorted = axis_values[self.expansion_time]
+          # Get expansion time data
+        d_data_sorted = result_values[self.sigmax_mm] # Get atom number data
+
+        # --- Model function ---
+        def model(t, d0, T):
+            return np.sqrt(d0**2 + (kB * T * t**2) / m)
+
+        # --- Fit the data ---
+        # NOTE: Replace or define your t_data_sorted and d_data_sorted arrays before fitting.
+        # Example:
+        # t_data_sorted = np.array([...])
+        # d_data_sorted = np.array([...])
+
+        bounds = ([0, 0], [np.inf, np.inf])
+        p0 = [500e-6, 100e-6]  # Initial guess
+
+        popt, pcov = curve_fit(
+            model, t_data_sorted, d_data_sorted, p0=p0, bounds=bounds
+        )
+        d0_fit, T_fit = popt
+        d0_err, T_err = np.sqrt(np.diag(pcov))
+
+        t_fit = np.linspace(min(t_data_sorted), max(t_data_sorted), 300)
+        d_fit = model(t_fit, *popt)
+        print(f"Fitted parameters: d0 = {d0_fit:.2e} m, T = {T_fit:.2e} K")
+        print(f"Expansion time: {t_fit}")
+        print(f"Fitted size: {d_fit}")
+        #print types 
+        print(f"t_fit type: {type(t_fit)}, d_fit type: {type(d_fit)}")
+        #size of the object
+        t_fit=np.reshape(t_fit, (1,...))
+        d_fit=np.reshape(d_fit, (1,...))
+        analysis_result["fit_t"].push(t_fit)
+        analysis_result["fit_d"].push(d_fit)
+        # perr = np.sqrt(np.diag(pcov))
+        # d_fit_upper = model(t_fit, *(popt + perr))
+        # d_fit_lower = model(t_fit, *(popt - perr))
+
+        return None
 
         # self.ccb.issue(
         #     "create_applet",
         #     "AbsorptionImage",
         #     f"${{python}} -m repository.imaging.applet --server {server_addr}",  # noqa: E501,
         # )
-
-
 AbsorptionImage = make_fragment_scan_exp(AbsorptionImageExpFrag)

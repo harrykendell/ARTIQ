@@ -53,10 +53,10 @@ class AbsImageSettings:
     detuning: float = 0 * MHz
     linewidth: float = 6.065 * MHz
     atom_mass: float = 1.443e-25  # kg, mass of Rb87
-    temperature: float = 10e-6  # K
-    pixel_size: float = 6.45 * 1e-6  # m
+    temperature: float = 40e-6  # K
+    pixel_size: float = 6.45e-6  # m
     fit_downsample: int = 5
-    magnification: float = None  # Set to None to force user to specify
+    magnification: float = 0.19  # Set to None to force user to specify
 
     # need this to be pyon serializable for dataset storage
     def to_dataset(self):
@@ -128,7 +128,9 @@ class AbsImage:
             "physical_scale": {self.physical_scale},
             "phase_space_density": {self.phase_space_density},
             "peak_optical_density": {self.peak[2]},
-            "Peak density (atoms/cm^3): {self.phase_space_density[0] * 1e-6:.2e}
+            "Peak density (atoms/cm^3)": {self.phase_space_density[0] * 1e-6:.2e},
+            "sigmax_mm": {self.best_values['sx'] * self.physical_scale * 1e3},
+            "sigmay_mm": {self.best_values['sy'] * self.physical_scale * 1e3},
         """
 
     @functools.cached_property
@@ -163,6 +165,15 @@ class AbsImage:
         np.clip(transmission, a_min=0, a_max=1, out=transmission)
 
         return transmission
+    @functools.cached_property
+    def sigmax(self):
+        """Returns the fitted sigma_x in mm."""
+        return self.best_values["sx"] * self.physical_scale* 1e3
+    
+    @functools.cached_property
+    def sigmay(self):
+        """Returns the fitted sigma_y in mm."""
+        return self.best_values["sy"] * self.physical_scale* 1e3
 
     @functools.cached_property
     def absorption(self):
@@ -235,6 +246,15 @@ class AbsImage:
         array = np.zeros(self.data_image.shape, dtype="bool")
         array[maj_axis / np.square(b) + min_axis / np.square(a) <= bound] = True
         return array
+    @functools.cached_property
+    def x0(self):
+        """Returns the x0 of the fitted gaussian in mm."""
+        return self.best_values["x0"]
+
+    @functools.cached_property
+    def y0(self):
+        """Returns the y0 of the fitted gaussian in mm."""
+        return self.best_values["y0"]
 
     @functools.cached_property
     def fit(self):
@@ -321,6 +341,14 @@ class AbsImage:
         PSD = n * lambda_db**3
 
         return n, lambda_db, PSD
+    
+    @functools.cached_property
+    def phase_space_density_1(self):
+        """Returns the phase-space density of the cloud."""
+        n, lambda_db, PSD = self.phase_space_density
+        return PSD
+    
+
 
     @property
     def best_fit(self):
