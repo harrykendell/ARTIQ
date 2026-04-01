@@ -78,7 +78,8 @@ class SetSupplies(Fragment):
     def _single_output_to_volts(self, output: TFloat, supply_idx: TInt32):
         gain = self.configs[supply_idx].gain
         minlim = self.configs[supply_idx].min_output
-        if output < minlim:
+        eps = 1e-10
+        if output < minlim - eps:
             logger.warning(
                 "Output %s below min output %s for supply %s",
                 output,
@@ -87,7 +88,7 @@ class SetSupplies(Fragment):
             )
             return minlim / gain
         lim = self.configs[supply_idx].max_output
-        if output > lim:
+        if output > lim + eps:
             logger.warning(
                 "Output %s exceeds max output %s for supply %s",
                 output,
