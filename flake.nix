@@ -147,6 +147,11 @@
         '';
       };
 
+      qtPluginPath = pkgs.lib.concatStringsSep ":" [
+        "${pkgs.qt5.qtbase}/${pkgs.qt5.qtbase.qtPluginPrefix}"
+        "${pkgs.qt6.qtbase}/${pkgs.qt6.qtbase.qtPluginPrefix}"
+      ];
+
       pythonEnv = pkgs.python3.withPackages (ps: [
         aqmain.artiq
         ps.sip
@@ -172,13 +177,29 @@
         artiq-comtools
       ]);
 
-    in {
-      defaultPackage.x86_64-linux = pkgs.buildEnv {
-        name = "artiq-env";
+      artiqBaseEnv = pkgs.buildEnv {
+        name = "artiq-base-env";
         paths = [
           pythonEnv
           aqmain.openocd-bscanspi  # needed if and only if flashing boards
         ];
+      };
+
+    in {
+      defaultPackage.x86_64-linux = pkgs.symlinkJoin {
+        name = "artiq-env";
+        paths = [
+          artiqBaseEnv
+        ];
+        nativeBuildInputs = [pkgs.makeWrapper];
+        postBuild = ''
+          for program in "$out"/bin/*; do
+            if [ -f "$program" ] && [ -x "$program" ]; then
+              wrapProgram "$program" \
+                --prefix QT_PLUGIN_PATH : "${qtPluginPath}"
+            fi
+          done
+        '';
       };
 
     };
