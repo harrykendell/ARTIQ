@@ -5,7 +5,7 @@
   inputs.extrapkg.inputs.artiqpkgs.follows = "artiq";
   # We pull Github packages in as flake inputs so we can conveniently update them
   # using `nix lock`, etc., rather than manually having to track hashes.
-  inputs.src-ndscan = {url = "github:harrykendell/ndscan?ref=master"; flake = false;};
+  inputs.src-ndscan = {url = "github:harrykendell/ndscan?ref=optimise"; flake = false;};
   inputs.src-oitg = {url = "github:OxfordIonTrapGroup/oitg"; flake= false;};
   inputs.src-oxart-devices = {url = "github:OxfordIonTrapGroup/oxart-devices"; flake= false;};
   inputs.src-miniconf-mqtt = {url = "github:quartiq/miniconf/6b0173ea5e540e1b3c3916bb6c7701cc06db47f0"; flake= false;};
