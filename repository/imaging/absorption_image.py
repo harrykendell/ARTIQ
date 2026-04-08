@@ -1,13 +1,9 @@
-from collections.abc import Iterable
 from time import time
  
 from artiq.coredevice.core import Core
 from artiq.coredevice.dma import CoreDMA
 from artiq.experiment import kernel, rpc
 from artiq.language import delay, ms, now_mu, parallel, s, us
-import numpy as np
-from scipy.optimize import curve_fit
-from matplotlib import pyplot as plt
  
 # from repository.models.device_db import server_addr
 from ndscan.experiment import (
@@ -21,7 +17,6 @@ from ndscan.experiment import (
 )
  
 from artiq.coredevice.ttl import TTLInOut
-from ndscan.experiment.default_analysis import DefaultAnalysis, OnlineFit, CustomAnalysis
 from ndscan.experiment.parameters import BoolParamHandle, FloatParamHandle, ParamHandle
 from repository.fragments.beam_setter import ControlBeamsWithoutCoolingAOM
 from repository.fragments.mot import MOT
