@@ -181,6 +181,8 @@
         name = "artiq-base-env";
         paths = [
           pythonEnv
+          pkgs.libusb1
+          pkgs.stdenv.cc.cc.lib
           aqmain.openocd-bscanspi  # needed if and only if flashing boards
         ];
       };
@@ -196,7 +198,8 @@
           for program in "$out"/bin/*; do
             if [ -f "$program" ] && [ -x "$program" ]; then
               wrapProgram "$program" \
-                --prefix QT_PLUGIN_PATH : "${qtPluginPath}"
+                --prefix QT_PLUGIN_PATH : "${qtPluginPath}" \
+                --prefix LD_LIBRARY_PATH : "$out/lib"
             fi
           done
         '';

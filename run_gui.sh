@@ -61,9 +61,7 @@ if on_server; then
         echo -e "${RED}WARNING: /etc/hosts has localhost set to 127.0.1.1.\nThis will prevent X-forwarding.\nPlease set it to 127.0.0.1${NC}"
         exit 1
     fi
-    #  SO fix
-    FIX="export LD_LIBRARY_PATH=$(find /nix/store -type d -wholename '/nix/store/*artiq-env/lib')"
-    nix shell --command bash -c "$FIX ; artiq_dashboard -v --server=\"$SERVER_ADDRESS\" -p=\"ndscan.dashboard_plugin\""
+    nix shell --command bash -c "artiq_dashboard -v --server=\"$SERVER_ADDRESS\" -p=\"ndscan.dashboard_plugin\""
     exit 0
 fi
 

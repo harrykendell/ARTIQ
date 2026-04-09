@@ -13,9 +13,6 @@ clean_up() {
 }
 
 artiq_stack() {
-    # .so fix
-    FIX="export LD_LIBRARY_PATH=$(find /nix/store -type d -wholename '/nix/store/*artiq-env/lib')"
-
     # ARTIQ
     SERVER_ADDRESS=137.222.69.28
     MASTER="\"artiq_master -v --repository ${SCRIPT_DIR} --device-db ${SCRIPT_DIR}/repository/models/device_db.py --experiment-subdir repository --log-file ${SCRIPT_DIR}/artiq.log --bind=$SERVER_ADDRESS --name 'GECKO ARTIQ'\""
@@ -24,7 +21,7 @@ artiq_stack() {
 
     NAMES="master,ctlmgr,janitor"
     CMDS="${MASTER} ${CTLMGR} ${JANITOR}"
-    nix shell --command bash -c "${FIX} ; concurrently -c=auto --kill-others --prefix='{name} {time}' --timestamp-format='yyyy-MM-dd HH:mm:ss' -n ${NAMES} ${CMDS}"
+    nix shell --command bash -c "concurrently -c=auto --kill-others --prefix='{name} {time}' --timestamp-format='yyyy-MM-dd HH:mm:ss' -n ${NAMES} ${CMDS}"
 }
 
 check_tmux() {
