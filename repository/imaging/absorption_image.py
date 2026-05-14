@@ -1,9 +1,13 @@
+from collections.abc import Iterable
 from time import time
  
 from artiq.coredevice.core import Core
 from artiq.coredevice.dma import CoreDMA
 from artiq.experiment import kernel, rpc
 from artiq.language import delay, ms, now_mu, parallel, s, us
+import numpy as np
+from scipy.optimize import curve_fit
+from matplotlib import pyplot as plt
  
 # from repository.models.device_db import server_addr
 from ndscan.experiment import (
@@ -17,10 +21,15 @@ from ndscan.experiment import (
 )
  
 from artiq.coredevice.ttl import TTLInOut
+from ndscan.experiment.default_analysis import (
+    DefaultAnalysis,
+    OnlineFit,
+    CustomAnalysis,
+)
 from ndscan.experiment.parameters import BoolParamHandle, FloatParamHandle, ParamHandle
 from repository.fragments.beam_setter import ControlBeamsWithoutCoolingAOM
 from repository.fragments.mot import MOT
-from repository.imaging.PCO_Camera import PcoCamera, ROI
+from repository.imaging.PCO_Camera import PcoCamera, ROI_1, ROI_2, camera_name
 from repository.imaging.processor import AbsImage, AbsImageSettings  # noqa: E402
 from repository.models.devices import SUServoedBeam
 # from repository.Dipole_trap.moving_stage import MovingStage
@@ -40,12 +49,19 @@ class AbsorptionImageExpFrag(ExpFragment):
  
         self.setattr_device("ccb")
  
-        self.setattr_fragment("pco_camera", PcoCamera, num_images=3)
+        self.setattr_fragment(
+            "pco_camera", PcoCamera, num_images=3
+        )
         self.pco_camera: PcoCamera
         self.setattr_param_rebind(
             "exposure_time", self.pco_camera, "exposure_time", default=0.11 * ms
         )
         self.exposure_time: FloatParamHandle
+ 
+        self.setattr_param_rebind(
+            "camera_used", self.pco_camera, "camera_used", default=camera_name.FIRST
+        )
+        self.camera_used: ParamHandle
  
         self.mot: MOT = self.setattr_fragment("MOT", MOT, manual_init=False)
  
@@ -86,13 +102,14 @@ class AbsorptionImageExpFrag(ExpFragment):
         self.expansion_time: FloatParamHandle
  
         # enum selection of ROI for retrieving images
+        #get the correct enum class based on the camera used
         self.setattr_param(
-            "imaging_roi",
-            EnumParam,
-            "Select imaging ROI",
-            default=ROI.FULL,
-            enum_class=ROI,
-        )
+                "imaging_roi",
+                EnumParam,
+                "Select imaging ROI",
+                default=ROI_1.FULL,
+                enum_class=ROI_1,
+            )
         self.imaging_roi: ParamHandle
  
         self.do_cmot: BoolParamHandle = self.setattr_param(
@@ -154,10 +171,16 @@ class AbsorptionImageExpFrag(ExpFragment):
         self.atom_number: FloatChannel = self.setattr_result("atom_number")
         self.sigmax_mm: FloatChannel = self.setattr_result("sigmax_mm")
         self.sigmay_mm: FloatChannel = self.setattr_result("sigmay_mm")
-        self.phase_space_density: FloatChannel = self.setattr_result("phase_space_density")
+        self.phase_space_density: FloatChannel = self.setattr_result(
+            "phase_space_density"
+        )
         self.info: OpaqueChannel = self.setattr_result("info", OpaqueChannel)
-        self.gaussian_fit_centre_x: FloatChannel = self.setattr_result("gaussian_fit_centre_x")
-        self.gaussian_fit_centre_y: FloatChannel = self.setattr_result("gaussian_fit_centre_y")
+        self.gaussian_fit_centre_x: FloatChannel = self.setattr_result(
+            "gaussian_fit_centre_x"
+        )
+        self.gaussian_fit_centre_y: FloatChannel = self.setattr_result(
+            "gaussian_fit_centre_y"
+        )
  
     @kernel
     def device_setup(self) -> None:
@@ -169,7 +192,7 @@ class AbsorptionImageExpFrag(ExpFragment):
         self.core.break_realtime()
         self.mot.calculate_dma_handles()
         self.core.break_realtime()
-    
+ 
         # if (
         #   self.odt_active.get()
         #   or self.do_evaporation1.get()
@@ -198,6 +221,10 @@ class AbsorptionImageExpFrag(ExpFragment):
             )
             if self.do_pgc.get():
                 self.mot.pgc()
+ 
+        # pumping to F=1
+        # self.mot.set_repump_attenuation(31.0)
+        # delay(0.5 * ms)
  
         # dropping and locking mot again to resonance for imaging
         self.mot.drop(
@@ -261,6 +288,7 @@ class AbsorptionImageExpFrag(ExpFragment):
         delay(self.pco_camera.BUSY_TIME)
  
         # leave the MOT to reload
+        # self.mot.set_repump_attenuation(17.0)
         self.mot.init()
         self.mot.load(wait_for_load=False)
  
@@ -316,14 +344,17 @@ class AbsorptionImageExpFrag(ExpFragment):
         self.phase_space_density.push(self.absimg.phase_space_density_1)
         self.gaussian_fit_centre_x.push(self.absimg.x0)
         self.gaussian_fit_centre_y.push(self.absimg.y0)
-    
-    #def get_default_analyses(self):
-       # return [OnlineFit("line", data={"x": self.expansion_time, "y": self.sigmax_mm})]
+ 
+    # def get_default_analyses(self):
+    # return [OnlineFit("line", data={"x": self.expansion_time, "y": self.sigmax_mm})]
+ 
+    # self.ccb.issue(
+    #     "create_applet",
+    #     "AbsorptionImage",
+    #     f"${{python}} -m repository.imaging.applet --server {server_addr}",  # noqa: E501,
+    # )
  
  
-        # self.ccb.issue(
-        #     "create_applet",
-        #     "AbsorptionImage",
-        #     f"${{python}} -m repository.imaging.applet --server {server_addr}",  # noqa: E501,
-        # )
 AbsorptionImage = make_fragment_scan_exp(AbsorptionImageExpFrag)
+ 
+ 
