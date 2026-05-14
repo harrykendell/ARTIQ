@@ -2,7 +2,7 @@
 core_addr = "192.168.0.2"
 server_addr = "137.222.69.28"
 # default_core_addr = "192.168.1.75"
-
+ 
 # standard core components
 device_db = {
     "core": {
@@ -59,7 +59,7 @@ device_db = {
         "arguments": {"address": 0xE2},
     },
 }
-
+ 
 # DAC = Digital to Analog Converter
 # 32 channels 16bit DAC
 device_db["fastino"] = {
@@ -68,7 +68,7 @@ device_db["fastino"] = {
     "class": "Fastino",
     "arguments": {"channel": 0, "log2_width": 0},
 }
-
+ 
 # freq synthesiser 50MHz - 4GHz (6.8GHz-ish if pushed)
 # boosted to 5GHz - 12GHz by the almazny
 # SPI = Serial Peripheral Interface
@@ -84,30 +84,28 @@ device_db["mirny_cpld"] = {
     "class": "Mirny",
     "arguments": {"spi_device": "spi_mirny", "refclk": 125000000.0, "clk_sel": "mmcx"},
 }
-
-
+ 
+ 
 for i in range(4):
-    device_db.update(
-        {
-            "ttl_mirny_sw" + str(i): {
-                "type": "local",
-                "module": "artiq.coredevice.ttl",
-                "class": "TTLOut",
-                "arguments": {"channel": 2 + i},
+    device_db.update({
+        "ttl_mirny_sw" + str(i): {
+            "type": "local",
+            "module": "artiq.coredevice.ttl",
+            "class": "TTLOut",
+            "arguments": {"channel": 2 + i},
+        },
+        "mirny_ch" + str(i): {
+            "type": "local",
+            "module": "artiq.coredevice.adf5356",
+            "class": "ADF5356",
+            "arguments": {
+                "channel": i,
+                "sw_device": "ttl_mirny_sw" + str(i),
+                "cpld_device": "mirny_cpld",
             },
-            "mirny_ch" + str(i): {
-                "type": "local",
-                "module": "artiq.coredevice.adf5356",
-                "class": "ADF5356",
-                "arguments": {
-                    "channel": i,
-                    "sw_device": "ttl_mirny_sw" + str(i),
-                    "cpld_device": "mirny_cpld",
-                },
-            },
-        }
-    )
-
+        },
+    })
+ 
 # device_db.update(
 #     {
 #         "mirny_almazny": {
@@ -121,75 +119,67 @@ for i in range(4):
 #     }
 # )
 for i in range(4):
-    device_db.update(
-        {
-            "almazny_ch" + str(i): {
-                "type": "local",
-                "module": "artiq.coredevice.almazny",
-                "class": "AlmaznyChannel",
-                "arguments": {
-                    "host_mirny": "mirny_cpld",
-                    "channel": i,
-                },
-            }
+    device_db.update({
+        "almazny_ch" + str(i): {
+            "type": "local",
+            "module": "artiq.coredevice.almazny",
+            "class": "AlmaznyChannel",
+            "arguments": {
+                "host_mirny": "mirny_cpld",
+                "channel": i,
+            },
         }
-    )
-
+    })
+ 
 # 4x4 TTL IOs - switched by sets of 4
 # NB ttl0-ttl3 are OUT only
 for i in range(4):
-    device_db.update(
-        {
-            "ttl" + str(i): {
-                "type": "local",
-                "module": "artiq.coredevice.ttl",
-                "class": "TTLOut",
-                "arguments": {"channel": 6 + i},
-            }
+    device_db.update({
+        "ttl" + str(i): {
+            "type": "local",
+            "module": "artiq.coredevice.ttl",
+            "class": "TTLOut",
+            "arguments": {"channel": 6 + i},
         }
-    )
+    })
 # next set of 4 are in/out and can be used as counters
 for i in range(4):
-    device_db.update(
-        {
-            "ttl" + str(i + 4): {
-                "type": "local",
-                "module": "artiq.coredevice.ttl",
-                "class": "TTLInOut",
-                "arguments": {"channel": 10 + i},
-            },
-            "ttl" + str(i + 4) + "_counter": {
-                "type": "local",
-                "module": "artiq.coredevice.edge_counter",
-                "class": "EdgeCounter",
-                "arguments": {"channel": 14 + i},
-            },
-        }
-    )
+    device_db.update({
+        "ttl" + str(i + 4): {
+            "type": "local",
+            "module": "artiq.coredevice.ttl",
+            "class": "TTLInOut",
+            "arguments": {"channel": 10 + i},
+        },
+        "ttl" + str(i + 4) + "_counter": {
+            "type": "local",
+            "module": "artiq.coredevice.edge_counter",
+            "class": "EdgeCounter",
+            "arguments": {"channel": 14 + i},
+        },
+    })
 # the last 8 are also in/out and can be used as counters
 for i in range(8):
-    device_db.update(
-        {
-            "ttl" + str(i + 8): {
-                "type": "local",
-                "module": "artiq.coredevice.ttl",
-                "class": "TTLInOut",
-                "arguments": {"channel": 18 + i},
-            },
-            "ttl" + str(i + 8) + "_counter": {
-                "type": "local",
-                "module": "artiq.coredevice.edge_counter",
-                "class": "EdgeCounter",
-                "arguments": {"channel": 26 + i},
-            },
-        }
-    )
-
+    device_db.update({
+        "ttl" + str(i + 8): {
+            "type": "local",
+            "module": "artiq.coredevice.ttl",
+            "class": "TTLInOut",
+            "arguments": {"channel": 18 + i},
+        },
+        "ttl" + str(i + 8) + "_counter": {
+            "type": "local",
+            "module": "artiq.coredevice.edge_counter",
+            "class": "EdgeCounter",
+            "arguments": {"channel": 26 + i},
+        },
+    })
+ 
 # SU Servo is an 8-channel ADC (Sampler) and two 4-channel DDS (Urukuls) with a DSP
 # engine connecting the ADC data and the DDS output amplitudes to enable feedback.
 # It can be used to implement intensity stabilization of laser beams
 # with an amplifier and AOM driven by Urukul and a photodetector connected to Sampler.
-
+ 
 # PGIA = Programmable Gain Instrumentation Amplifier
 # CPLD = Complex Programmable Logic Device
 # DDS = Direct Digital Synthesis
@@ -205,17 +195,15 @@ device_db["suservo"] = {
     },
 }
 for i in range(8):
-    device_db.update(
-        {
-            "suservo_ch" + str(i): {
-                "type": "local",
-                "module": "artiq.coredevice.suservo",
-                "class": "Channel",
-                "arguments": {"channel": 34 + i, "servo_device": "suservo"},
-            }
+    device_db.update({
+        "suservo_ch" + str(i): {
+            "type": "local",
+            "module": "artiq.coredevice.suservo",
+            "class": "Channel",
+            "arguments": {"channel": 34 + i, "servo_device": "suservo"},
         }
-    )
-
+    })
+ 
 # Sampler
 device_db["spi_sampler_pgia"] = {
     "type": "local",
@@ -223,86 +211,80 @@ device_db["spi_sampler_pgia"] = {
     "class": "SPIMaster",
     "arguments": {"channel": 43},
 }
-
+ 
 # Two Urukuls
 for i in range(2):
-    device_db.update(
-        {
-            "spi_urukul" + str(i): {
-                "type": "local",
-                "module": "artiq.coredevice.spi2",
-                "class": "SPIMaster",
-                "arguments": {"channel": 44 + i},
+    device_db.update({
+        "spi_urukul" + str(i): {
+            "type": "local",
+            "module": "artiq.coredevice.spi2",
+            "class": "SPIMaster",
+            "arguments": {"channel": 44 + i},
+        },
+        "urukul" + str(i) + "_cpld": {
+            "type": "local",
+            "module": "artiq.coredevice.urukul",
+            "class": "CPLD",
+            "arguments": {
+                "spi_device": "spi_urukul" + str(i),
+                "refclk": 125000000.0,
+                "clk_sel": 2,
             },
-            "urukul" + str(i) + "_cpld": {
-                "type": "local",
-                "module": "artiq.coredevice.urukul",
-                "class": "CPLD",
-                "arguments": {
-                    "spi_device": "spi_urukul" + str(i),
-                    "refclk": 125000000.0,
-                    "clk_sel": 2,
-                },
+        },
+        "urukul" + str(i) + "_dds": {
+            "type": "local",
+            "module": "artiq.coredevice.ad9910",
+            "class": "AD9910",
+            "arguments": {
+                "pll_n": 32,
+                "chip_select": 3,
+                "cpld_device": "urukul" + str(i) + "_cpld",
             },
-            "urukul" + str(i) + "_dds": {
-                "type": "local",
-                "module": "artiq.coredevice.ad9910",
-                "class": "AD9910",
-                "arguments": {
-                    "pll_n": 32,
-                    "chip_select": 3,
-                    "cpld_device": "urukul" + str(i) + "_cpld",
-                },
-            },
-        }
-    )
-
+        },
+    })
+ 
 # 2 front panel user controllable LEDs
 for i in range(3):
-    device_db.update(
-        {
-            "led" + str(i): {
-                "type": "local",
-                "module": "artiq.coredevice.ttl",
-                "class": "TTLOut",
-                "arguments": {"channel": 46 + i},
-            }
+    device_db.update({
+        "led" + str(i): {
+            "type": "local",
+            "module": "artiq.coredevice.ttl",
+            "class": "TTLOut",
+            "arguments": {"channel": 46 + i},
         }
-    )
-
+    })
+ 
 # Toptica Lasers
-device_db.update(
-    {
-        "toptica_780": {
-            "type": "local",
-            "module": "controllers.driver_topticadlc",
-            "class": "TopticaDLCPro",
-            "arguments": {
-                "ip": "192.168.0.4",
-                "laser": "laser2",
-                "simulation": False,
-            },
-        },
-        "toptica_852": {
-            "type": "local",
-            "module": "controllers.driver_topticadlc",
-            "class": "TopticaDLCPro",
-            "arguments": {
-                "ip": "192.168.0.4",
-                "laser": "laser1",
-                "simulation": False,
-            },
-        },
-        "topticaDLC": {
-            "type": "controller",
-            "host": server_addr,
-            "port": 3272,
+device_db.update({
+    "toptica_780": {
+        "type": "local",
+        "module": "controllers.driver_topticadlc",
+        "class": "TopticaDLCPro",
+        "arguments": {
             "ip": "192.168.0.4",
-            "command": "python controllers/aqctl_topticadlc.py -ip {ip} -p {port} --bind {bind}",
+            "laser": "laser2",
+            "simulation": False,
         },
-    }
-)
-
+    },
+    "toptica_852": {
+        "type": "local",
+        "module": "controllers.driver_topticadlc",
+        "class": "TopticaDLCPro",
+        "arguments": {
+            "ip": "192.168.0.4",
+            "laser": "laser1",
+            "simulation": False,
+        },
+    },
+    "topticaDLC": {
+        "type": "controller",
+        "host": server_addr,
+        "port": 3272,
+        "ip": "192.168.0.4",
+        "command": "python controllers/aqctl_topticadlc.py -ip {ip} -p {port} --bind {bind}",
+    },
+})
+ 
 # Aliases
 aliases = {
     # photodiode on 3DMOT - given we don't enable servoing for the locking arm
@@ -327,7 +309,8 @@ aliases = {
     "suservo_aom_CDT1": "suservo_ch6",
     "suservo_aom_CDT2": "suservo_ch7",
     # PCO camera
-    "pco_camera": "ttl8",
+    "pco_camera_pixelfly": "ttl8",
+    "pco_camera_edge": "ttl9",
     # probe - generic use
     "probe": "ttl11",
     # we need the dummy to also be a TTLOut not TTLInOut for typing reasons
@@ -339,5 +322,7 @@ aliases = {
     "RedPitaya_trigger": "ttl10",
     "scope_trigger": "ttl11",
 }
-
+ 
 device_db |= aliases
+ 
+ 
