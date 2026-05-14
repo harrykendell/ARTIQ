@@ -9,7 +9,14 @@ from artiq.coredevice.core import Core
 from artiq.coredevice.ttl import TTLInOut
 from artiq.experiment import delay, delay_mu, host_only, kernel, rpc
 from artiq.language.units import ms, s, us
-from ndscan.experiment import ExpFragment, FloatParam, Fragment, make_fragment_scan_exp
+from ndscan.experiment import (
+    ExpFragment,
+    FloatParam,
+    Fragment,
+    make_fragment_scan_exp,
+    EnumParam,
+    ParamHandle,
+)
 from ndscan.experiment.parameters import FloatParamHandle
 from repository.models.device_db import server_addr
  
@@ -18,13 +25,25 @@ logging.getLogger("pco").setLevel(logging.WARNING)
  
 dimple_pixel_scan = 10
 MOT_SIZE = 300
-MOT_X = 600
-MOT_Y = 450
-class ROI(Enum):
+MOT_X = 800
+MOT_Y = 600
+ 
+ 
+class ROI_1(Enum):
     FULL = (1, 1, 1392, 1040)
     MOT = (MOT_X - MOT_SIZE, MOT_Y - MOT_SIZE, MOT_X + MOT_SIZE, MOT_Y + MOT_SIZE)
-    ODT_Reservoir = (1, 350, 1392, 600)
+    ODT_Reservoir = (1, 450, 1392, 750)
     ODT_Dimple = (1, 550 - dimple_pixel_scan, 1260, 650 - dimple_pixel_scan)
+ 
+ 
+class ROI_2(Enum):
+    FULL = (1, 1, 2048, 2048)
+ 
+ 
+class camera_name(Enum):
+    FIRST = "pco.pixelfly usb"
+    SECOND = "pco.edge 4.2m LT rolling shutter"
+ 
  
 class PcoCamera(Fragment):
     BUSY_TIME = 150 * ms
@@ -45,8 +64,17 @@ class PcoCamera(Fragment):
         )
         self.exposure_time: FloatParamHandle
  
-        self.setattr_device("pco_camera")
-        self.trigger: TTLInOut = self.pco_camera
+        self.setattr_param(
+            "camera_used",
+            EnumParam,
+            "Select which camera to use",
+            default=camera_name.FIRST,
+            enum_class=camera_name,
+        )
+        self.camera_used: ParamHandle
+ 
+        self.setattr_device("pco_camera_pixelfly")
+        self.trigger: TTLInOut = self.pco_camera_pixelfly
  
         self.debug = logger.getEffectiveLevel() <= logging.WARNING
         self.counter = 0
@@ -55,8 +83,16 @@ class PcoCamera(Fragment):
         """
         Setup the host-side camera controls
         """
+ 
+        FIRST = 19701804
+        SECOND = 61011464
+        if self.camera_used.get() == camera_name.FIRST:
+            self.cam = pco.Camera(serial=FIRST)
+        elif self.camera_used.get() == camera_name.SECOND:
+            self.cam = pco.Camera(serial=SECOND)
+        else:
+            raise ValueError(f"Unknown camera selected: {self.camera_used.get()}")
         # don't specify an interface or unclosed cameras cause indefinite hangs
-        self.cam = pco.Camera()
         self.cam.default_configuration()
  
         self.cam.configuration = {
@@ -120,7 +156,7 @@ class PcoCamera(Fragment):
         self.trigger.off()
  
     @host_only
-    def retrieve_images(self, timeout=5.0 * s, roi: ROI=ROI.FULL):
+    def retrieve_images(self, timeout=5.0 * s, roi: ROI_1 = ROI_1.FULL):
         """
         Pulls all stored images off the camera and stores the first
         into the diagnostic dataset
@@ -210,3 +246,5 @@ class PcoCameraExpFrag(ExpFragment):
  
  
 SingleImage = make_fragment_scan_exp(PcoCameraExpFrag)
+ 
+ 
