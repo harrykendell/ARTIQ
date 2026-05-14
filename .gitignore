@@ -172,7 +172,7 @@ dataset_db.mdb
 results
 artiq.log.*
 flake.lock
-src/
+./src
 crate config/bu2402001_*
 *.npy
 absorption_images
