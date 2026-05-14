@@ -18,7 +18,7 @@ from botorch.acquisition.analytic import LogExpectedImprovement
 from botorch.optim import optimize_acqf
 
 
-from utils.get_results import get_measurement
+from src.utils.get_results import get_measurement
 from src.globals import get_cooling_stages,  get_param_bounds
 from src.utils import make_tensors
 from src.utils.param_selection import select_active_bounds, select_active_params

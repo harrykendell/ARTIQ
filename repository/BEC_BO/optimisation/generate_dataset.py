@@ -1,14 +1,14 @@
 import numpy as np
 from pathlib import Path
 
-from utils.param_selection import select_active_params
+from src.utils.param_selection import select_active_params
 from optimisation.objective_funcs import objective_function
 from src.globals import get_cooling_stages,  get_param_bounds
-from utils.sampler import LHS_sampler
+from src.utils.sampler import LHS_sampler
 from src.utils.make_tensors import make_tensors
 from src.utils.normalization import normalize
 from src.utils.param_selection import make_param_dict
-from utils.get_results import get_measurement
+from src.utils.get_results import get_measurement
 
 
 # get the global variables
