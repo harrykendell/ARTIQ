@@ -21,7 +21,6 @@ from botorch.optim import optimize_acqf
 from src.utils.get_results import get_measurement
 from src.globals import get_cooling_stages,  get_param_bounds
 from src.utils import make_tensors
-from src.utils.param_selection import select_active_bounds, select_active_params
 from src.utils.normalization import denormalize
 from src.utils.param_selection import make_param_dict
 
@@ -146,7 +145,7 @@ def get_next_points(
 
     return candidates, model
 
-# Extract posterior mean and variance 
+
 def get_posterior(model, test_X): 
     """Finds the posterior distribution at the 
     test points.
@@ -302,8 +301,6 @@ def plot_performance(init_y, best_init_y):
 
     return perc_imp
 
-    
-
 
 def create_test_X( init_x, init_y, n_test, param_idx, fixed_values=None): 
     """Creates the (tensor) uniform grid across the parameter range 
@@ -329,7 +326,7 @@ def create_test_X( init_x, init_y, n_test, param_idx, fixed_values=None):
         fixed = fixed_values.to(torch.float64)
 
     # create normalized sweep
-    # Build test grid along the chosen parameter
+    # build test grid along the chosen parameter
     test_vals = torch.linspace(
         0, 1, n_test,
         dtype=torch.float64
@@ -367,25 +364,25 @@ def plot_gp_slice(model, init_x, init_y, init_y_var,
     # get slice through the parameter space
     test_X, test_vals = create_test_X( init_x, init_y, n_test, param_idx, fixed_values=None)
 
-    # Query posterior
+    # query posterior
     mean, variance, std = get_posterior(model, test_X)
 
-    # Extract output of interest
+    # extract output of interest
     mean_1d  = mean[:, output_idx].numpy()
     std_1d   = std[:, output_idx].numpy()
     lower_1d = mean_1d - z * std_1d
     upper_1d = mean_1d + z * std_1d
     x_1d     = test_vals.numpy()
 
-    # Extract training points projected onto this slice
+    # extract training points projected onto this slice
     train_x_proj = init_x[:, param_idx].numpy()
     train_y_proj = init_y[:, output_idx].numpy()
     train_e_proj = init_y_var[:, output_idx].sqrt().numpy()  # SEM
 
-    # ── Plot ──────────────────────────────────────────────────────────────────
+    #  plot
     fig, ax = plt.subplots(figsize=(9, 5))
 
-    # Confidence interval shading
+    # confidence interval shading
     ci_pct = int(round((1 - 2 * (1 - torch.distributions.Normal(0,1)
                                   .cdf(torch.tensor(z)).item())) * 100))
 
@@ -393,11 +390,11 @@ def plot_gp_slice(model, init_x, init_y, init_y_var,
                     alpha=0.25, color="#2f6bbf",
                     label=f"{ci_pct}% confidence interval")
 
-    # Posterior mean
+    # posterior mean
     ax.plot(x_1d, mean_1d, color="#2f6bbf", lw=2.0,
             label="Posterior mean")
 
-    # Training observations with error bars
+    # training observations with error bars
     ax.errorbar(train_x_proj, train_y_proj,
                 yerr=1.96 * train_e_proj,
                 fmt="o", color="#e05c2a", ms=5, lw=1.2,

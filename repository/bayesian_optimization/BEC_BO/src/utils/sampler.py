@@ -16,7 +16,7 @@ def LHS_sampler(n,active_param_indices, user_seed):
         - X_init : (n, d) array of initial parameter vectors
     """
 
-    # Define the parameter bounds ------------
+    # Define the parameter bounds 
     # create dictionary for parameter bounds where
     # each row is [lower_bound, upper_bound] for one parameter
    

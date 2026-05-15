@@ -22,7 +22,7 @@ from ndscan.experiment.parameters import (
 
 from artiq.coredevice.core import Core
 from src.globals import get_cooling_stages,  get_param_bounds
-from src.utils.param_selection import select_active_params, active_bounds_arrays
+from src.utils.param_selection import select_active_params, select_active_bounds, make_unit_bounds
 
 cooling_stages = get_cooling_stages()
 param_bounds = get_param_bounds()
@@ -42,7 +42,7 @@ class BOConfigFrag(ExpFragment):
         self.setattr_device("core")
         self.core: Core
 
-        # Select cooling stages to optimize : set by user 
+        # select cooling stages to optimize : set by user 
         self.opt_mot: BoolParamHandle = self.setattr_param(
             "opt_mot", BoolParam,
             "Optimise MOT parameters",
@@ -64,7 +64,7 @@ class BOConfigFrag(ExpFragment):
             default=False,
         )
 
-        # Define session metadata 
+        # define session metadata 
         self.bo_session_name: StringParamHandle = self.setattr_param(
             "bo_session_name", StringParam,
             "BO session name",
@@ -109,7 +109,7 @@ class BOConfigFrag(ExpFragment):
         write to Artiq datasets, and save the config.
         """
 
-        # Determine which stages are selected 
+        # determine which stages are selected 
         selected_stages = {}
         if self.opt_mot.get():
             selected_stages["mot"]  = cooling_stages["mot"]
@@ -126,11 +126,13 @@ class BOConfigFrag(ExpFragment):
                 "Enable at least one of: opt_mot, opt_cmot, opt_pgc, opt_cdt"
             )
 
-        # Create list of active parameters and bounds 
+        # create list of active parameters 
         _, active_params = select_active_params(selected_stages)
 
-        active_bounds_lower, active_bounds_upper = active_bounds_arrays(active_params, param_bounds)
-        
+        # select active (physical and unit) bounds
+        phys_bounds = select_active_bounds(active_params, param_bounds)
+        unit_bounds = make_unit_bounds(active_params)
+
         # Session metadata 
         session_name = self.bo_session_name.get()
         m_samples     = int(self.bo_m_samples.get())
@@ -139,11 +141,11 @@ class BOConfigFrag(ExpFragment):
         date          = datetime.now().strftime("%Y-%m-%d")
         timestamp     = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        # Log the session summary 
+        # log the session summary 
         print(f"\n{'='*55}")
         print("  BO Session Configuration")
         print(f"{'='*55}")
-        print(f"  Campaign     : {session_name}")
+        print(f"  Session     : {session_name}")
         print(f"  Date         : {date}")
         print(f"  Stages       : {list(selected_stages.keys())}")
         print(f"  Parameters   : {len(active_params)}")
@@ -156,7 +158,7 @@ class BOConfigFrag(ExpFragment):
             print(f"    {p:<25s}  [{lo}, {hi}]")
         print(f"{'='*55}\n")
 
-        # Save info to an Artiq dataset (to be accessed in BO)
+        # save info to an Artiq dataset (to be accessed in BO)
         self.set_dataset(
             "bo_config.session_name",
             session_name, broadcast=True, persist=True,
@@ -166,12 +168,12 @@ class BOConfigFrag(ExpFragment):
             json.dumps(active_params), broadcast=True, persist=True,
         )
         self.set_dataset(
-            "bo_config.bounds_lower",
-            active_bounds_lower, broadcast=True, persist=True,
+            "bo_config.phys_bounds",
+            phys_bounds, broadcast=True, persist=True,
         )
         self.set_dataset(
-            "bo_config.bounds_upper",
-            active_bounds_upper, broadcast=True, persist=True,
+            "bo_config.unit_bounds",
+            unit_bounds, broadcast=True, persist=True,
         )
         self.set_dataset(
             "bo_config.selected_stages",
@@ -192,7 +194,7 @@ class BOConfigFrag(ExpFragment):
         )
     
 
-        # Save config dictionary as a JSON file
+        # save config dictionary as a JSON file
         config = {
             "metadata": {
                 "session_name" : session_name,
@@ -208,9 +210,8 @@ class BOConfigFrag(ExpFragment):
                 "m_samples"       : m_samples,
             },
             "bounds": {
-                p: {"lower": param_bounds[p][0],
-                    "upper": param_bounds[p][1]}
-                for p in active_params
+                "phys_bounds"     : phys_bounds,
+                "unit_bounds"     : unit_bounds,
             },
         }
 
