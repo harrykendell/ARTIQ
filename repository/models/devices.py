@@ -2,7 +2,7 @@ from artiq.language.units import A, MHz, V, dB, ms
 from ndscan.experiment import FloatParam, Fragment
 from repository.models import Eom, Shutter, SUServoedBeam, VDrivenSupply
 from repository.models.Device import device_arrays
- 
+
 EOMS = [
     Eom(
         name="repump",
@@ -15,7 +15,7 @@ EOMS = [
 ]
 # Convert to dict for ease of use
 EOMS = {eom.name: eom for eom in EOMS}
- 
+
 VDRIVEN_SUPPLIES = [
     VDrivenSupply(
         name="X1",
@@ -54,8 +54,10 @@ VDRIVEN_SUPPLIES = [
         fastino="fastino",
         ch=4,
         gain=222 * MHz / V,
-        min_output=-200 * MHz,  # we are in 150Ω mode so max JP5 open -> +-5V (7.5V is damage)
-        max_output=200 * MHz,  # we are in 150Ω mode so max JP5 open -> +-5V (7.5V is damage)
+        min_output=-200
+        * MHz,  # we are in 150Ω mode so max JP5 open -> +-5V (7.5V is damage)
+        max_output=200
+        * MHz,  # we are in 150Ω mode so max JP5 open -> +-5V (7.5V is damage)
         default_output=0.0 * MHz,
         unit="MHz",
     ),
@@ -64,8 +66,10 @@ VDRIVEN_SUPPLIES = [
         fastino="fastino",
         ch=5,
         gain=83 * MHz / V,
-        min_output=-300 * MHz,  # we are in 150Ω mode so max JP5 open -> +-5V (7.5V is damage)
-        max_output=300 * MHz,  # we are in 150Ω mode so max JP5 open -> +-5V (7.5V is damage)
+        min_output=-300
+        * MHz,  # we are in 150Ω mode so max JP5 open -> +-5V (7.5V is damage)
+        max_output=300
+        * MHz,  # we are in 150Ω mode so max JP5 open -> +-5V (7.5V is damage)
         default_output=0.0 * MHz,
         unit="MHz",
     ),
@@ -92,7 +96,7 @@ VDRIVEN_SUPPLIES = [
 ]
 # Convert to dict for ease of use
 VDRIVEN_SUPPLIES = {supply.name: supply for supply in VDRIVEN_SUPPLIES}
- 
+
 THORLABS_SHUTTER_DELAY = 35.0 * ms
 EBAY_SHUTTER_DELAY = 25.0 * ms
 # the switch on time is actually quick fast. The limit is the dislike of short pulses
@@ -115,7 +119,7 @@ SHUTTERS = [
 ]
 # Convert to dict for ease of use
 SHUTTERS = {beam.name: beam for beam in SHUTTERS}
- 
+
 SUSERVOED_BEAMS = [
     SUServoedBeam(
         name="Locking",
@@ -128,7 +132,7 @@ SUSERVOED_BEAMS = [
         suservo_device="suservo_aom_MOT",
         frequency=192.0 * MHz,
         attenuation=17.0 * dB,
-        shutter_device="shutter_3DMOT",
+        shutter_device="shutter_3DMOT,shutter_2DMOT",
         shutter_delay=THORLABS_SHUTTER_DELAY,
         setpoint=3.5 * V,
         servo_enabled=True,
@@ -143,7 +147,7 @@ SUSERVOED_BEAMS = [
         # shutter_device="shutter_IMG",
         # shutter_delay=EBAY_SHUTTER_DELAY,
         setpoint=0.5 * V,
-        servo_enabled=True,
+        servo_enabled=False,
         calib_gain=36.64e-3,
         calib_offset=-0.87e-3,
     ),
@@ -193,30 +197,28 @@ SUSERVOED_BEAMS = [
 ]
 # Convert to dict for ease of use
 SUSERVOED_BEAMS = {beam.name: beam for beam in SUSERVOED_BEAMS}
- 
+
 # map from class to dict for initializing devices
-device_arrays.update(
-    {
-        Eom: EOMS,
-        VDrivenSupply: VDRIVEN_SUPPLIES,
-        Shutter: SHUTTERS,
-        SUServoedBeam: SUSERVOED_BEAMS,
-        # Add other classes as needed
-    }
-)
- 
- 
+device_arrays.update({
+    Eom: EOMS,
+    VDrivenSupply: VDRIVEN_SUPPLIES,
+    Shutter: SHUTTERS,
+    SUServoedBeam: SUSERVOED_BEAMS,
+    # Add other classes as needed
+})
+
+
 class DefaultValues(Fragment):
     """
     This Fragment provides the global store for default values for all devices.
     This then allows them to be set in the GUI and scanned with a global source of truth.
- 
+
     It must be added to the experiment's Fragment tree to be used:
     ```python
         DEVICE.fragment = frag.setattr_fragment("DefaultValues", DefaultValues)
     ```
     """
- 
+
     def build_fragment(self):
         for eom in Eom.values():
             eom: Eom
@@ -273,5 +275,3 @@ class DefaultValues(Fragment):
                 default=vds.default_output,
                 unit=vds.unit,
             )
- 
- 

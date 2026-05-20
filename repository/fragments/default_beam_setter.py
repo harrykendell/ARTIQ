@@ -142,15 +142,25 @@ class SetBeamsToDefaults(Fragment):
         # Loop over all the suservo beams, defining:
         #   * SUServoFrag fragments to control them
         #   * Devices for their shutters, if defined
+        @staticmethod
+        def _split_shutter_devices(shutter_device: str) -> List[str]:
+            if shutter_device == "None":
+                return []
+
+            return [name.strip() for name in shutter_device.split(",") if name.strip()]
+
         for beam_info in self.beam_infos:
+            beam_info.shutter_device = str(beam_info.shutter_device)
             setter = self.setattr_fragment(
                 beam_info.name, SUServoFrag, beam_info.suservo_device
             )
             self.suservo_setters.append(setter)
 
-            if beam_info.shutter_device:
-                self.shutter_ttls.append(self.get_device(beam_info.shutter_device))
-            beam_info.shutter_device = str(beam_info.shutter_device)
+            shutter_device_names = _split_shutter_devices(beam_info.shutter_device)
+
+            for shutter_device_name in shutter_device_names:
+                self.shutter_ttls.append(self.get_device(shutter_device_name))
+
 
         self.max_shutter_delay = max(
             [beam_info.shutter_delay for beam_info in (self.beam_infos)] + [0]

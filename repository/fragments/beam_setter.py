@@ -90,6 +90,13 @@ class ControlBeamsWithoutCoolingAOM(Fragment):
         MyBeamTurnerOnnerer = make_fragment_scan_exp(MyBeamTurnerOnnererFrag)
     """
 
+    @staticmethod
+    def _split_shutter_devices(shutter_device: str) -> List[str]:
+        if shutter_device == "None":
+            return []
+
+        return [name.strip() for name in shutter_device.split(",") if name.strip()]
+
     def build_fragment(self, beam_infos: List[SUServoedBeam]):
         self.setattr_device("core")
         self.core: Core
@@ -99,7 +106,7 @@ class ControlBeamsWithoutCoolingAOM(Fragment):
 
         self.beam_suservos: List[SUServoChannel] = []
         self.beam_shutters: List[TTLOut] = []
-        self.shutter_indexes: List[int] = []
+        self.shutter_indexes: List[List[int]] = []
 
         # Sort beams by order of delay - smallest delay first
         self.beam_infos = sorted(beam_infos, key=lambda v: v.shutter_delay)
@@ -117,20 +124,27 @@ class ControlBeamsWithoutCoolingAOM(Fragment):
         for beam_info in self.beam_infos:
             self.beam_suservos.append(self.get_device(beam_info.suservo_device))
 
-            if beam_info.shutter_device == "None":
+            shutter_device_names = self._split_shutter_devices(beam_info.shutter_device)
+            beam_shutter_indexes: List[int] = []
+
+            if len(shutter_device_names) == 0:
                 if self.debug_enabled and beam_info.name != "dummy":
                     logger.info("Beam [%s] has no shutter", beam_info.name)
-                self.shutter_indexes.append(-1)
+                beam_shutter_indexes.append(-1)
                 self.beam_shutters.append(self.get_device("dummy_shutter"))
             else:
-                self.beam_shutters.append(self.get_device(beam_info.shutter_device))
-                self.shutter_indexes.append(len(self.beam_shutters) - 1)
+                for shutter_device_name in shutter_device_names:
+                    self.beam_shutters.append(self.get_device(shutter_device_name))
+                    beam_shutter_indexes.append(len(self.beam_shutters) - 1)
+
                 if self.debug_enabled and beam_info.name != "dummy":
                     logger.info(
-                        "Beam [%s] has shutter [%s]",
+                        "Beam [%s] has shutters [%s]",
                         beam_info.name,
                         beam_info.shutter_device,
                     )
+
+            self.shutter_indexes.append(beam_shutter_indexes)
 
         self.num_beams = len(self.beam_infos)
         self.longest_beam_delay = max([info.shutter_delay for info in self.beam_infos])
@@ -173,17 +187,16 @@ class ControlBeamsWithoutCoolingAOM(Fragment):
         if not ignore_shutters:
             for i in range(self.num_beams - 1, -1, -1):
                 beam_info = self.beam_infos[i]
-                if beam_info.shutter_device == "None":
+                beam_shutter_indexes = self.shutter_indexes[i]
+                if len(beam_shutter_indexes) == 0 or beam_shutter_indexes[0] < 0:
                     continue
 
                 suservo = self.beam_suservos[i]
-                shutter = self.beam_shutters[self.shutter_indexes[i]]
 
                 if self.debug_enabled:
                     slack_mu = now_mu() - self.core.get_rtio_counter_mu()
                     logger.info(
-                        "Opening Shutter [%s] for beam [%s]",
-                        shutter.channel,
+                        "Opening shutters for beam [%s]",
                         beam_info.name,
                     )
                     at_mu(self.core.get_rtio_counter_mu() + slack_mu)
@@ -195,9 +208,15 @@ class ControlBeamsWithoutCoolingAOM(Fragment):
                         en_iir=0,
                         profile=suservo.channel,
                     )
+
                 delay_mu(self.t_rtio_cycle_mu)
-                shutter.on()
-                delay_mu(self.t_rtio_cycle_mu)
+
+                for shutter_index in beam_shutter_indexes:
+                    if shutter_index < 0:
+                        continue
+
+                    self.beam_shutters[shutter_index].on()
+                    delay_mu(self.t_rtio_cycle_mu)
 
                 delay(beam_info.shutter_delay)
 
@@ -274,25 +293,29 @@ class ControlBeamsWithoutCoolingAOM(Fragment):
             # I'm removing it here in case others have the same problem.
             # delay_mu(self.t_rtio_cycle_mu)
 
-            if not ignore_shutters and beam_info.shutter_device != "None":
-                shutter = self.beam_shutters[self.shutter_indexes[i]]
-                shutter.off()
-                delay_mu(self.t_rtio_cycle_mu)
+            if not ignore_shutters:
+                beam_shutter_indexes = self.shutter_indexes[i]
+                if len(beam_shutter_indexes) > 0 and beam_shutter_indexes[0] >= 0:
+                    for shutter_index in beam_shutter_indexes:
+                        if shutter_index < 0:
+                            continue
+
+                        self.beam_shutters[shutter_index].off()
+                        delay_mu(self.t_rtio_cycle_mu)
 
         if not ignore_shutters:
             for i in range(self.num_beams):
                 beam_info = self.beam_infos[i]
-                if beam_info.shutter_device == "None":
+                beam_shutter_indexes = self.shutter_indexes[i]
+                if len(beam_shutter_indexes) == 0 or beam_shutter_indexes[0] < 0:
                     continue
 
                 suservo = self.beam_suservos[i]
-                shutter = self.beam_shutters[self.shutter_indexes[i]]
 
                 if self.debug_enabled:
                     slack_mu = now_mu() - self.core.get_rtio_counter_mu()
                     logger.info(
-                        "Closing shutter [%s] for beam [%s]",
-                        shutter.channel,
+                        "Closing shutters for beam [%s]",
                         beam_info.name,
                     )
                     at_mu(self.core.get_rtio_counter_mu() + slack_mu)
@@ -314,28 +337,33 @@ class ControlBeamsWithoutCoolingAOM(Fragment):
     def _set_shutters(self, state=True, ignore_delay=False):
         for i in range(self.num_beams - 1, -1, -1):
             beam_info = self.beam_infos[i]
-            if beam_info.shutter_device == "None":
+            beam_shutter_indexes = self.shutter_indexes[i]
+            if len(beam_shutter_indexes) == 0 or beam_shutter_indexes[0] < 0:
                 continue
-
-            shutter = self.beam_shutters[self.shutter_indexes[i]]
 
             if self.debug_enabled:
                 slack_mu = now_mu() - self.core.get_rtio_counter_mu()
                 logger.info(
-                    "%s Shutter [%s] for beam [%s]",
+                    "%s shutters for beam [%s]",
                     "Opening" if state else "Closing",
-                    shutter.channel,
                     beam_info.name,
                 )
                 at_mu(self.core.get_rtio_counter_mu() + slack_mu)
 
             delay(-beam_info.shutter_delay)
             delay_mu(self.t_rtio_cycle_mu)
-            if state:
-                shutter.on()
-            else:
-                shutter.off()
-            delay_mu(self.t_rtio_cycle_mu)
+
+            for shutter_index in beam_shutter_indexes:
+                if shutter_index < 0:
+                    continue
+
+                shutter = self.beam_shutters[shutter_index]
+                if state:
+                    shutter.on()
+                else:
+                    shutter.off()
+                delay_mu(self.t_rtio_cycle_mu)
+
             delay(beam_info.shutter_delay)
 
     @kernel
