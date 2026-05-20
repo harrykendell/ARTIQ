@@ -137,6 +137,9 @@
           oitg
           py.pyqt6
           py.pyqtgraph
+          py.torch
+          py.gpytorch
+          py.botorch
           aqmain.qasync
         ];
         dontWrapQtApps = true; # Pulled in via the artiq package; we don't care.
