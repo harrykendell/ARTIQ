@@ -36,7 +36,7 @@ pip install -e "git+https://github.com/m-labs/artiq.git@release-8#egg=artiq"
 pip install -e "git+https://github.com/m-labs/artiq-comtools.git#egg=artiq-comtools"
 
 # ndscan
-pip install -e "git+https://github.com/OxfordIonTrapGroup/ndscan.git#egg=ndscan"
+pip install -e "git+https://github.com/harrykendell/ndscan.git#egg=ndscan"
 
 # generic
 pip install matplotlib
