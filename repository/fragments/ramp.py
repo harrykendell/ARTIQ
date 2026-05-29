@@ -82,7 +82,7 @@ class Ramp(Fragment):
             ]
     """
 
-    time_step_default = 10 * us
+    time_step_default = 50 * us
     duration_default: float = None
     add_final_point = True
 
@@ -229,52 +229,48 @@ class Ramp(Fragment):
         ] = []
         if self.suservos:
             for i in range(len(self.suservos)):
-                setters_and_param_handles.append(
-                    (
-                        self.get_device(self.suservos[i].suservo_device),
-                        self.make_or_reuse_param(
-                            values_name="suservo_detuning_start",
-                            devices=self.suservos,
-                            num=i,
-                            default_value=0.0 * MHz,
-                            unit="MHz",
-                        ),
-                        self.make_or_reuse_param(
-                            values_name="suservo_detuning_end",
-                            devices=self.suservos,
-                            num=i,
-                            default_value=0.0 * MHz,
-                            unit="MHz",
-                        ),
-                        self.make_or_reuse_param(
-                            values_name="suservo_setpoint_start",
-                            devices=self.suservos,
-                            num=i,
-                            default_value=self.suservos[i].setpoint,
-                            unit="V",
-                        ),
-                        self.make_or_reuse_param(
-                            values_name="suservo_setpoint_end",
-                            devices=self.suservos,
-                            num=i,
-                            default_value=self.suservos[i].setpoint,
-                            unit="V",
-                        ),
-                    )
-                )
+                setters_and_param_handles.append((
+                    self.get_device(self.suservos[i].suservo_device),
+                    self.make_or_reuse_param(
+                        values_name="suservo_detuning_start",
+                        devices=self.suservos,
+                        num=i,
+                        default_value=0.0 * MHz,
+                        unit="MHz",
+                    ),
+                    self.make_or_reuse_param(
+                        values_name="suservo_detuning_end",
+                        devices=self.suservos,
+                        num=i,
+                        default_value=0.0 * MHz,
+                        unit="MHz",
+                    ),
+                    self.make_or_reuse_param(
+                        values_name="suservo_setpoint_start",
+                        devices=self.suservos,
+                        num=i,
+                        default_value=self.suservos[i].setpoint,
+                        unit="V",
+                    ),
+                    self.make_or_reuse_param(
+                        values_name="suservo_setpoint_end",
+                        devices=self.suservos,
+                        num=i,
+                        default_value=self.suservos[i].setpoint,
+                        unit="V",
+                    ),
+                ))
         else:
             # If we don't have any SUServos to ramp, add a dummy object so that
             # the compiler doesn't complain, with points to a dummy parameter
             # handle
-            setters_and_param_handles.append(
-                (
-                    DummySUServoChannel(),
-                    self.dummy_param,
-                    self.dummy_param,
-                    self.dummy_param,
-                    self.dummy_param,
-                )
-            )
+            setters_and_param_handles.append((
+                DummySUServoChannel(),
+                self.dummy_param,
+                self.dummy_param,
+                self.dummy_param,
+                self.dummy_param,
+            ))
 
         return setters_and_param_handles
 
@@ -300,57 +296,53 @@ class Ramp(Fragment):
         ] = []
         if self.eoms:
             for i in range(len(self.eoms)):
-                setters_and_param_handles.append(
-                    (
-                        self.setattr_fragment(
-                            self.eoms[i].name,
-                            EomFrag,
-                            self.eoms[i],
-                            init=False,
-                        ),
-                        self.make_or_reuse_param(
-                            values_name="eom_detuning_start",
-                            devices=self.eoms,
-                            num=i,
-                            default_value=0.0 * MHz,
-                            unit="MHz",
-                        ),
-                        self.make_or_reuse_param(
-                            values_name="eom_detuning_end",
-                            devices=self.eoms,
-                            num=i,
-                            default_value=0.0 * MHz,
-                            unit="MHz",
-                        ),
-                        self.make_or_reuse_param(
-                            values_name="eom_att_start",
-                            devices=self.eoms,
-                            num=i,
-                            default_value=self.eoms[i].attenuation,
-                            unit="dB",
-                        ),
-                        self.make_or_reuse_param(
-                            values_name="eom_att_end",
-                            devices=self.eoms,
-                            num=i,
-                            default_value=self.eoms[i].attenuation,
-                            unit="dB",
-                        ),
-                    )
-                )
+                setters_and_param_handles.append((
+                    self.setattr_fragment(
+                        self.eoms[i].name,
+                        EomFrag,
+                        self.eoms[i],
+                        init=False,
+                    ),
+                    self.make_or_reuse_param(
+                        values_name="eom_detuning_start",
+                        devices=self.eoms,
+                        num=i,
+                        default_value=0.0 * MHz,
+                        unit="MHz",
+                    ),
+                    self.make_or_reuse_param(
+                        values_name="eom_detuning_end",
+                        devices=self.eoms,
+                        num=i,
+                        default_value=0.0 * MHz,
+                        unit="MHz",
+                    ),
+                    self.make_or_reuse_param(
+                        values_name="eom_att_start",
+                        devices=self.eoms,
+                        num=i,
+                        default_value=self.eoms[i].attenuation,
+                        unit="dB",
+                    ),
+                    self.make_or_reuse_param(
+                        values_name="eom_att_end",
+                        devices=self.eoms,
+                        num=i,
+                        default_value=self.eoms[i].attenuation,
+                        unit="dB",
+                    ),
+                ))
         else:
             # If we don't have any eoms to ramp, add a dummy object so that
             # the compiler doesn't complain, with points to a dummy parameter
             # handle
-            setters_and_param_handles.append(
-                (
-                    DummyEomFrag(),
-                    self.dummy_param,
-                    self.dummy_param,
-                    self.dummy_param,
-                    self.dummy_param,
-                )
-            )
+            setters_and_param_handles.append((
+                DummyEomFrag(),
+                self.dummy_param,
+                self.dummy_param,
+                self.dummy_param,
+                self.dummy_param,
+            ))
 
         return setters_and_param_handles
 
@@ -372,41 +364,37 @@ class Ramp(Fragment):
         ] = []
         if self.supplies:
             for i in range(len(self.supplies)):
-                setters_and_param_handles.append(
-                    (
-                        self.setattr_fragment(
-                            self.supplies[i].name,
-                            SetSupplies,
-                            self.supplies[i],
-                            init=False,
-                        ),
-                        self.make_or_reuse_param(
-                            values_name="supplies_start",
-                            devices=self.supplies,
-                            num=i,
-                            default_value=self.supplies[i].default_output,
-                            unit=self.supplies[i].unit,
-                        ),
-                        self.make_or_reuse_param(
-                            values_name="supplies_end",
-                            devices=self.supplies,
-                            num=i,
-                            default_value=self.supplies[i].default_output,
-                            unit=self.supplies[i].unit,
-                        ),
-                    )
-                )
+                setters_and_param_handles.append((
+                    self.setattr_fragment(
+                        self.supplies[i].name,
+                        SetSupplies,
+                        self.supplies[i],
+                        init=False,
+                    ),
+                    self.make_or_reuse_param(
+                        values_name="supplies_start",
+                        devices=self.supplies,
+                        num=i,
+                        default_value=self.supplies[i].default_output,
+                        unit=self.supplies[i].unit,
+                    ),
+                    self.make_or_reuse_param(
+                        values_name="supplies_end",
+                        devices=self.supplies,
+                        num=i,
+                        default_value=self.supplies[i].default_output,
+                        unit=self.supplies[i].unit,
+                    ),
+                ))
         else:
             # If we don't have any supplies to ramp, add a dummy object so that
             # the compiler doesn't complain, with points to a dummy parameter
             # handle
-            setters_and_param_handles.append(
-                (
-                    DummySetSupplies(),
-                    self.dummy_param,
-                    self.dummy_param,
-                )
-            )
+            setters_and_param_handles.append((
+                DummySetSupplies(),
+                self.dummy_param,
+                self.dummy_param,
+            ))
 
         return setters_and_param_handles
 
@@ -570,9 +558,9 @@ class Ramp(Fragment):
                 # First the Fastino as it writes into the past
                 if self.supplies_used:
                     for i in range(len(supply_values)):
-                        self.supplies_setters_params[i][0].set_outputs(
-                            [supply_values[i]]
-                        )
+                        self.supplies_setters_params[i][0].set_outputs([
+                            supply_values[i]
+                        ])
                         supply_values[i] += supply_steps[i]
 
                 delay_mu(14 * 7 * 4)  # Frame time for the fastino
