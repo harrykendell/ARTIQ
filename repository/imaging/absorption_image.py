@@ -1,10 +1,13 @@
+from asyncio.log import logger
 from collections.abc import Iterable
+from fileinput import filename
 from time import time
  
 from artiq.coredevice.core import Core
 from artiq.coredevice.dma import CoreDMA
 from artiq.experiment import kernel, rpc
 from artiq.language import delay, ms, now_mu, parallel, s, us
+from artiq.language.core import host_only
 import numpy as np
 from scipy.optimize import curve_fit
 from matplotlib import pyplot as plt
@@ -20,6 +23,7 @@ from ndscan.experiment import (
     make_fragment_scan_exp,
 )
  
+ 
 from artiq.coredevice.ttl import TTLInOut
 from ndscan.experiment.default_analysis import (
     DefaultAnalysis,
@@ -29,9 +33,10 @@ from ndscan.experiment.default_analysis import (
 from ndscan.experiment.parameters import BoolParamHandle, FloatParamHandle, ParamHandle
 from repository.fragments.beam_setter import ControlBeamsWithoutCoolingAOM
 from repository.fragments.mot import MOT
-from repository.imaging.PCO_Camera import PcoCamera, ROI_1, ROI_2, camera_name
+from repository.imaging.PCO_Camera import PcoCamera, camera_name, ROI
 from repository.imaging.processor import AbsImage, AbsImageSettings  # noqa: E402
 from repository.models.devices import SUServoedBeam
+from repository.imaging.tekscope import TekscopeExp
 # from repository.Dipole_trap.moving_stage import MovingStage
  
  
@@ -50,9 +55,17 @@ class AbsorptionImageExpFrag(ExpFragment):
         self.setattr_device("ccb")
  
         self.setattr_fragment(
-            "pco_camera", PcoCamera, num_images=3
+            "pco_camera",
+            PcoCamera,
+            num_images=3,
         )
         self.pco_camera: PcoCamera
+ 
+        self.setattr_fragment("tekscope", TekscopeExp, single_acquisition=True)
+        self.tekscope: TekscopeExp
+ 
+        # expsosure time for pcoedge cameras should be bigger than the imaging pulse because of camera has scan pixels line by line, like if we want to expose atoms for 100 us we should set the exposure time to be at least 150 us to make sure the whole cloud is exposed, for pixelfly camera which has global shutter we can set the exposure time to be the same as the imaging pulse duration.
+ 
         self.setattr_param_rebind(
             "exposure_time", self.pco_camera, "exposure_time", default=0.11 * ms
         )
@@ -102,15 +115,22 @@ class AbsorptionImageExpFrag(ExpFragment):
         self.expansion_time: FloatParamHandle
  
         # enum selection of ROI for retrieving images
-        #get the correct enum class based on the camera used
-        self.setattr_param(
-                "imaging_roi",
-                EnumParam,
-                "Select imaging ROI",
-                default=ROI_1.FULL,
-                enum_class=ROI_1,
-            )
+        # get the correct enum class based on the camera used
+        self.setattr_param_rebind(
+            "imaging_roi",
+            self.pco_camera,
+            "roi",
+            default=ROI.FULL_pixelfly,
+        )
         self.imaging_roi: ParamHandle
+ 
+        self.use_tekscope: BoolParamHandle = self.setattr_param(
+            "use_tekscope",
+            BoolParam,
+            "Whether to use the Tekscope for acquisition and saving",
+            default=False,
+            explanation="If False, the Tekscope will not be used for acquisition and saving. If True, a single acquisition will be performed on the Tekscope at the start of the experiment, and a screenshot and channel data will be saved. This is useful for debugging and monitoring the experiment, but may slow down the experiment if used in every run.",
+        )
  
         self.do_cmot: BoolParamHandle = self.setattr_param(
             "do_cmot", BoolParam, "Do the CMOT step", default=False
@@ -182,6 +202,34 @@ class AbsorptionImageExpFrag(ExpFragment):
             "gaussian_fit_centre_y"
         )
  
+    @host_only
+    def prepare(self) -> None:
+ 
+        self.is_edge = self.camera_used.get() == camera_name.SECOND
+ 
+        self.pco_edge_delay = self.pco_camera.trigger_delay
+ 
+        self.camera_busy_time = self.pco_camera.camera_busy_time
+ 
+        if self.is_edge:
+            if self.expansion_time.get() < self.pco_edge_delay:
+                raise ValueError(
+                    "Expansion time must be at least 120 us to account "
+                    "for the delay between trigger and exposure of the "
+                    "PCO Edge camera."
+                )
+ 
+        if not self.is_edge:
+            if self.imaging_roi.get() not in [
+                ROI.FULL_pixelfly,
+                ROI.MOT_pixelfly,
+                ROI.ODT_Reservoir_pixelfly,
+                ROI.ODT_Dimple_pixelfly,
+            ]:
+                raise ValueError("Invalid ROI selected for PIXELFLY camera.")
+ 
+        return super().prepare()
+ 
     @kernel
     def device_setup(self) -> None:
         self.core.reset()
@@ -193,27 +241,11 @@ class AbsorptionImageExpFrag(ExpFragment):
         self.mot.calculate_dma_handles()
         self.core.break_realtime()
  
-        # if (
-        #   self.odt_active.get()
-        #   or self.do_evaporation1.get()
-        #   or self.do_evaporation2.get()
-        # ):
         self.mot.set_dimple_trap_power(self.mot.power_dimple.get())
         # self.mot.set_reservoir_trap_power(self.mot.power_reservoir.get())
  
-        # self.mot.odt_reservoir.turn_beams_on()
-        # self.mot.odt_dimple.turn_beams_on()
-        # self.mot.cpt_shutter.off()
-        # self.absolute_moving_stage.set_stage_absolute(10.00, 0)
-        # self.absolute_moving_stage.move_stage_absolute()
- 
-        # delay(1 * s)
-        # move stage to imaging position
-        # self.moving_stage_trigger.pulse(10 * ms)  # trigger moving stage
- 
         self.mot.load()
         if self.do_cmot.get():
-            # self.kdc101()
             self.mot.compress(
                 evaporation_active=self.do_evaporation1.get()
                 or self.do_evaporation2.get(),
@@ -222,11 +254,6 @@ class AbsorptionImageExpFrag(ExpFragment):
             if self.do_pgc.get():
                 self.mot.pgc()
  
-        # pumping to F=1
-        # self.mot.set_repump_attenuation(31.0)
-        # delay(0.5 * ms)
- 
-        # dropping and locking mot again to resonance for imaging
         self.mot.drop(
             evaporation_active=self.do_evaporation1.get() or self.do_evaporation2.get(),
             odt_active=self.odt_active.get(),
@@ -236,16 +263,10 @@ class AbsorptionImageExpFrag(ExpFragment):
  
         # if odt is active turn on odt beams
         if self.odt_active.get():
-            delay(self.odt_hold_time.get())  # hold time in odt before imaging
+            delay(self.odt_hold_time.get())
             if not self.do_evaporation1.get() or self.do_evaporation2.get():
-                self.mot.drop_dimple()  # turn off dimple beam for imaging
-                self.mot.drop_reservoir()  # turn off reservoir beam for imaging
- 
-        if self.trap_frequency_odt.get():
-            delay(self.release_time.get())
-            self.mot.on_reservoir()  # turn off reservoir beam for imaging
-            delay(self.hold_timeafter_release.get())
-            self.mot.drop_reservoir()  # turn off reservoir beam for imaging
+                self.mot.drop_dimple()
+                self.mot.drop_reservoir()
  
         # Evaporation and then switch off odt beams
         if self.do_evaporation1.get():
@@ -255,50 +276,83 @@ class AbsorptionImageExpFrag(ExpFragment):
             if self.do_evaporation2.get():
                 self.mot.evaporation2()
  
-        # SHUTTER FOR THE cpt
-        # self.mot.cpt_shutter.on()
-        # delay(35 * ms)  # wait for the shutter to open properly
+        if self.is_edge:
+            delay(
+                self.expansion_time.get() - self.pco_edge_delay
+            )  # pco edge camera has a delay of about ~120 us between the trigger and the start of the exposure
+        else:
+            delay(self.expansion_time.get())
  
-        delay(self.expansion_time.get())
-        # self.moving_stage_trigger.on()
-        # delay(10 * us)  # wait for the stage to move
-        # self.moving_stage_trigger.off()
-        # self.mot.cpt_shutter.off()
- 
-        # image cloud
-        with parallel:
-            self.img_beam.turn_beams_on()
+        if self.is_edge:
+            BUSY_TIME = self.camera_busy_time  # Hardcoding the busy time for pcedge
+            # image cloud
             self.pco_camera.capture_image()
-        delay(self.exposure_time.get())
- 
-        self.img_beam.turn_beams_off()
-        delay(self.pco_camera.BUSY_TIME - self.exposure_time.get())
-        self.mot.clear_atoms()
- 
-        # reference image
-        with parallel:
+            delay(
+                self.pco_edge_delay
+            )  # wait for the camera to start exposing before turning on the imaging beams
             self.img_beam.turn_beams_on()
-            self.pco_camera.capture_image()
-        delay(self.exposure_time.get())
-        self.img_beam.turn_beams_off()
-        delay(self.pco_camera.BUSY_TIME - self.exposure_time.get())
+            delay(self.exposure_time.get())
+            self.img_beam.turn_beams_off()
+            self.mot.clear_atoms()  # takes 100ms
+            delay(BUSY_TIME)
  
-        # background image
-        self.pco_camera.capture_image()
-        delay(self.pco_camera.BUSY_TIME)
+            # reference image
+            self.pco_camera.capture_image()
+            delay(self.pco_edge_delay)
+            self.img_beam.turn_beams_on()
+            delay(self.exposure_time.get())
+            self.img_beam.turn_beams_off()
+            delay(BUSY_TIME)
+ 
+            # background image
+            self.pco_camera.capture_image()
+            delay(BUSY_TIME)
+ 
+        # if pco pixelfy is used
+        else:
+            BUSY_TIME = self.camera_busy_time  # Hardcoding the busy time for pixelfly
+            # image cloud
+            with parallel:
+                self.img_beam.turn_beams_on()
+                self.pco_camera.capture_image()
+            delay(self.exposure_time.get())
+            self.img_beam.turn_beams_off()
+            self.mot.clear_atoms()  # takes 100ms
+            delay(BUSY_TIME - self.exposure_time.get())
+ 
+            # reference image
+            with parallel:
+                self.img_beam.turn_beams_on()
+                self.pco_camera.capture_image()
+            delay(self.exposure_time.get())
+            self.img_beam.turn_beams_off()
+            delay(BUSY_TIME - self.exposure_time.get())
+ 
+            # background image
+            self.pco_camera.capture_image()
+            delay(BUSY_TIME)
  
         # leave the MOT to reload
-        # self.mot.set_repump_attenuation(17.0)
         self.mot.init()
         self.mot.load(wait_for_load=False)
  
         self.core.wait_until_mu(now_mu())
         self.update_images()
  
+        if self.use_tekscope.get():
+            self.save_tekscope_screenshot_csv()
+        else:
+            pass
+ 
+    @rpc(flags={"async"})
+    def save_tekscope_screenshot_csv(self):
+        self.tekscope.save_all_channels()
+        self.tekscope.save_screenshot()
+ 
     @rpc(flags={"async"})
     def update_images(self):
         images = self.pco_camera.retrieve_images(
-            roi=self.imaging_roi.get(), timeout=1 * s
+            roi=self.imaging_roi.get(), timeout=1.0 * s
         )
         if images is None:
             raise RuntimeError("Failed to retrieve images from camera")
