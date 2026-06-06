@@ -31,7 +31,7 @@ import pyqtgraph as pg
 import sys
  
 sys.path.append(__file__.split("artiq")[0] + "artiq")
-from repository.imaging.PCO_Camera import PcoCamera, ROI_1, ROI_2, camera_name  # noqa
+from repository.imaging.PCO_Camera import PcoCamera, ROI, camera_name  # noqa
  
  
 # logger.addHandler(pco.stream_handler)
@@ -124,7 +124,8 @@ class CameraWidget(QWidget):
  
         # combo box for selecting the ROI
         self.roi_combo = pg.ComboBox()
-        for roi in ROI_1:
+        # if camera used
+        for roi in ROI:
             self.roi_combo.addItem(roi.name.replace("_", " ").title(), roi.value)
  
         self.roi_combo.setCurrentIndex(2)
