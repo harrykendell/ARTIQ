@@ -201,6 +201,11 @@ class AbsorptionImageExpFrag(ExpFragment):
         self.gaussian_fit_centre_y: FloatChannel = self.setattr_result(
             "gaussian_fit_centre_y"
         )
+        self.custom_objective: FloatChannel = self.setattr_result("custom_objective")
+
+        self.all_images: OpaqueChannel = self.setattr_result(
+            "all_images", OpaqueChannel
+        )
  
     @host_only
     def prepare(self) -> None:
@@ -360,7 +365,9 @@ class AbsorptionImageExpFrag(ExpFragment):
         for num, img_name in enumerate(["TOF", "REF", "BG"]):
             # save for applet
             self.set_dataset(
-                f"Images.absorption.{img_name}", images[num], broadcast=True
+                f"Images.absorption.{img_name}",
+                np.asarray(images[num], dtype=np.uint16),
+                broadcast=True,
             )
         self.set_dataset(
             "Images.absorption.expansion_time",

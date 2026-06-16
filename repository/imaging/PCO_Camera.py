@@ -117,7 +117,6 @@ class PcoCamera(Fragment):
         self.trigger2: TTLInOut = self.pco_camera_edge
 
         self.debug = logger.getEffectiveLevel() <= logging.WARNING
-        self.counter = 0
 
     def host_setup(self):
         """
@@ -254,7 +253,6 @@ class PcoCamera(Fragment):
         Pulls all stored images off the camera and stores the first
         into the diagnostic dataset
         """
-        logger.warning("Recorded count=%s", self.cam.recorded_image_count)
 
         now = time.time()
         while time.time() - now < timeout:
@@ -274,15 +272,7 @@ class PcoCamera(Fragment):
         self.images, _ = self.cam.images(roi=roi.value)
         logger.info("Images retrieved")
         self.images = self.rotate_and_flip(self.images).astype(np.float64)
-        self.set_dataset("Images.Latest_image", self.images[-1], broadcast=True)
 
-        for img in self.images:
-            self.set_dataset(
-                f"Images.All.{self.counter}",
-                img,
-                broadcast=False,
-            )
-            self.counter += 1
         return self.images
 
     @host_only
@@ -332,12 +322,6 @@ class PcoCameraExpFrag(ExpFragment):
     @rpc(flags={"async"})
     def update_image(self):
         _ = self.pco_camera.retrieve_images()
-
-        self.ccb.issue(
-            "create_applet",
-            "Latest Image",
-            f"${{artiq_applet}}image Images.Latest_image --server {server_addr}",
-        )
 
 
 SingleImage = make_fragment_scan_exp(PcoCameraExpFrag)
