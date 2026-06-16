@@ -240,11 +240,11 @@ class PcoCamera(Fragment):
         """
         if self.use_edge:
             self.trigger2.on()
-            delay(1 * us)
+            delay(self.exposure_time.get())
             self.trigger2.off()
         else:
             self.trigger1.on()
-            delay(1 * us)
+            delay(self.exposure_time.get())
             self.trigger1.off()
 
     @host_only
