@@ -189,8 +189,7 @@ class AbsImage:
             self.settings.wavelength
         )  # cross-section
         sigma = sigma_0 * np.reciprocal(
-            1
-            + np.square(4 * np.square(self.settings.detuning / self.settings.linewidth))
+            1 + 4 * np.square(self.settings.detuning / self.settings.linewidth)
         )  # off resonance
         area = np.square(self.physical_scale)  # pixel area in SI units
 
