@@ -1,10 +1,10 @@
 from enum import Enum
 import logging
 import time
- 
+
 from matplotlib.path import Path
 import numpy as np
- 
+
 from artiq.coredevice.core import Core
 from artiq.coredevice.ttl import TTLInOut
 from artiq.experiment import delay, delay_mu, host_only, kernel, rpc
@@ -18,31 +18,31 @@ from ndscan.experiment import (
     ParamHandle,
 )
 from ndscan.experiment.parameters import FloatParamHandle
- 
+
 logger = logging.getLogger(__name__)
 logging.getLogger("pco").setLevel(logging.WARNING)
 from repository.Tekscope.mso24 import MSO24
- 
+
 # import time
 from time import time, strftime
- 
+
 # imort mkdir
 from pathlib import Path
- 
+
 DEFAULT_IP = "192.168.0.5"
- 
+
 channels = ["1", "2", "3", "4"]
- 
- 
+
+
 class TekscopeExp(Fragment):
     def build_fragment(self, single_acquisition=False):
         """Fragment to control the Tekscope oscilloscope and save screenshots and channel data"""
- 
+
         """if single aquisition is on True then tekscope set the trigger mode to single and wait for the trigger before saving the screenshot and channel data, this is set when experiment starts"""
- 
+
         self.setattr_device("core")
         self.core: Core
- 
+
         self.setattr_param(
             "timebase",
             FloatParam,
@@ -55,9 +55,9 @@ class TekscopeExp(Fragment):
             "The number of points to acquire",
             default=1000,
         )
- 
+
         self.use_single_acquisition = single_acquisition
- 
+
     @host_only
     def host_setup(self):
         tek = MSO24(DEFAULT_IP, save_dir=self.make_new_folder())
@@ -67,7 +67,7 @@ class TekscopeExp(Fragment):
             self.single_acquisition_on()
         super().host_setup()
         logger.info(f"Connected to Tekscope at {DEFAULT_IP}")
- 
+
     @host_only
     def host_cleanup(self):
         if hasattr(self, "tek"):
@@ -75,7 +75,7 @@ class TekscopeExp(Fragment):
         else:
             logger.warning("Tekscope was not connected during cleanup.")
         super().host_cleanup()
- 
+
     @host_only
     def save_screenshot(self, timeout=2 * s):
         filename = self.tek.screenshot()
@@ -89,7 +89,7 @@ class TekscopeExp(Fragment):
                 )
                 return
             time.sleep(0.1)  # Check every 100 ms
- 
+
     @host_only
     def save_all_channels(self, timeout=5 * s):
         """Save all channel data to CSV files and wait for them to be fully written"""
@@ -106,12 +106,12 @@ class TekscopeExp(Fragment):
                     )
                     return
                 time.sleep(0.1)  # Check every 100 ms
- 
+
     @host_only
     def single_acquisition_on(self):
         """Perform a single acquisition on the Tekscope and save the screenshot and channel data"""
         self.tek.write("ACQUIRE:STATE RUN")
- 
+
     @host_only
     def make_new_folder(self, base_path="/home/ae19663/Desktop/tekscope_files"):
         """Make a new folder with the current timestamp to save the files in"""
@@ -121,4 +121,10 @@ class TekscopeExp(Fragment):
         logger.info(f"Created new folder for Tekscope files: {new_folder}")
         # return the path to the new folder
         return new_folder
- 
+
+    @host_only
+    def get_waveform_artiq(self, channel="CH1"):
+        """Get the waveform data from the Tekscope and return it as a dictionary for ARTIQ"""
+        waveform_data = self.tek.get_waveform_for_artiq(channel)
+        logger.info(f"Retrieved waveform data for {channel}")
+        return waveform_data

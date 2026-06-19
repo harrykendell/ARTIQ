@@ -3,9 +3,14 @@ import logging
 from artiq.coredevice.core import Core
 from artiq.coredevice.ttl import TTLOut
 from artiq.language import delay, kernel, parallel
+from artiq.language.core import delay_mu
 from artiq.language.units import A, MHz, V, dB, ms, s, us
 from ndscan.experiment import Fragment
-from ndscan.experiment.parameters import FloatParam, FloatParamHandle
+from ndscan.experiment.parameters import (
+    FloatParam,
+    FloatParamHandle,
+)
+from ndscan.experiment.result_channels import OpaqueChannel
 from repository.fragments.beam_setter import ControlBeamsWithoutCoolingAOM
 from repository.fragments.default_beam_setter import (
     SetBeamsToDefaults,
@@ -16,6 +21,8 @@ from repository.fragments.ramp import Ramp, default
 from repository.fragments.supply_setter import SetSupplies
 from repository.models.devices import Eom, SUServoedBeam, VDrivenSupply
 from repository.gui.managers import SUServoManager
+from repository.fragments.read_adc import ReadSUServoADC
+from artiq.experiment import TFloat, TInt32, TInt64, TList, delay_mu, kernel, rpc
 
 
 logger = logging.getLogger(__name__)
@@ -40,7 +47,7 @@ DETUNING = {"CMOT": 5 * Γ_Rb, "PGC": 10 * Γ_Rb}  # This is beyond the normal 2
 BIASES = {"X1": 0.0002 * A, "X2": 0.0 * A, "Y": 0.04 * A, "Z": 0.07 * A}
 COMPRESSED_GRADIENTS = {"X1": 0 * A, "X2": 1.98 * A}
 REPUMP_ATTENUATION = {"CMOT": 9 * dB, "PGC": 0.5 * dB}
-POWER_3D_MOT = {"MOT_loading": 3.5 * V, "CMOT": 3.5 * V, "PGC": 3.5 * V}
+POWER_3D_MOT = {"MOT_loading": 3.5 * V, "CMOT": 1.9 * V}
 
 
 class MOT(Fragment):
@@ -234,7 +241,7 @@ class MOT(Fragment):
             ]
             suservos = [SUServoedBeam["MOT"], SUServoedBeam["CDT2"]]
             suservo_setpoint_start = [POWER_3D_MOT["MOT_loading"], 0.0 * V]
-            suservo_setpoint_end = [1.9 * V, 1.2 * V]
+            suservo_setpoint_end = [POWER_3D_MOT["CMOT"], 1.2 * V]
 
         self.cmot_ramp: CMOT_Ramp = self.setattr_fragment(
             "cmot_ramp",
@@ -555,6 +562,7 @@ class MOT(Fragment):
                 >= 0.99
             ):
                 logger.warning("Insufficient power to the MOT beam")
+
             delay(9.0 * self.loading_time.get() / 10.0)
 
     @kernel
@@ -661,7 +669,7 @@ class MOT(Fragment):
         self.unlock_ttl.on()
 
     @kernel
-    def relock_mot(self, time_to_shift=0.5 * ms) -> None:
+    def relock_mot(self, time_to_shift=2.0 * ms) -> None:
         """
         Relock the MOT ECDL
 

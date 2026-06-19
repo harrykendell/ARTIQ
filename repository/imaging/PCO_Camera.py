@@ -26,8 +26,8 @@ logging.getLogger("pco").setLevel(logging.WARNING)
 
 dimple_pixel_scan = 10
 MOT_SIZE = 300
-MOT_X = 800
-MOT_Y = 700
+MOT_X = 1000
+MOT_Y = 600
 
 
 def edge_roi_correct(roi):

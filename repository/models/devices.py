@@ -143,13 +143,13 @@ SUSERVOED_BEAMS = [
         name="IMG",
         suservo_device="suservo_aom_IMG",
         frequency=198.0 * MHz,
-        attenuation=17.5 * dB,
+        attenuation=18.0 * dB,
         # shutter_device="shutter_IMG",
         # shutter_delay=EBAY_SHUTTER_DELAY,
         setpoint=0.1 * V,
-        servo_enabled=False,
-        calib_gain=36.64e-3,
-        calib_offset=-0.87e-3,
+        # servo_enabled=True,
+        # calib_gain=36.64e-3,
+        # calib_offset=-0.87e-3,
     ),
     SUServoedBeam(
         name="PUMP",
@@ -180,7 +180,6 @@ SUSERVOED_BEAMS = [
         calib_gain=14696.973513,
         calib_offset=-443.552294,
         setpoint=3.0 * V,  # 0.324 * V,
-        # shutter_device="dummy_shutter",  # we don't have a shutter for this beam but need something to avoid errors
     ),
     SUServoedBeam(
         name="CDT2",
@@ -192,7 +191,6 @@ SUSERVOED_BEAMS = [
         calib_gain=12900.0,
         calib_offset=-38.0,
         setpoint=10.0 * V,
-        # shutter_device="dummy_shutter",  # we don't have a shutter for this beam but need something to avoid errors
     ),
 ]
 # Convert to dict for ease of use

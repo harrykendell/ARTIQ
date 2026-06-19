@@ -158,12 +158,10 @@
       pythonEnv = pkgs.python3.withPackages (ps: [
         aqmain.artiq
         ps.sip
-        ps.pip
         ps.pandas
         ps.numpy
         ps.scipy
         ps.matplotlib
-        ps.pyqt5
         ps.pydantic
         ps.pyvisa-py
         ps.ifaddr
@@ -172,6 +170,7 @@
         ps.toptica-lasersdk
         ps.pyvisa
         ps.pyqt5_sip
+        ps.pyqt5
         windfreak
         booster
         pco

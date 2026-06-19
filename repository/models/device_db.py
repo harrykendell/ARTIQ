@@ -2,7 +2,7 @@
 core_addr = "192.168.0.2"
 server_addr = "137.222.69.28"
 # default_core_addr = "192.168.1.75"
- 
+
 # standard core components
 device_db = {
     "core": {
@@ -59,7 +59,7 @@ device_db = {
         "arguments": {"address": 0xE2},
     },
 }
- 
+
 # DAC = Digital to Analog Converter
 # 32 channels 16bit DAC
 device_db["fastino"] = {
@@ -68,7 +68,7 @@ device_db["fastino"] = {
     "class": "Fastino",
     "arguments": {"channel": 0, "log2_width": 0},
 }
- 
+
 # freq synthesiser 50MHz - 4GHz (6.8GHz-ish if pushed)
 # boosted to 5GHz - 12GHz by the almazny
 # SPI = Serial Peripheral Interface
@@ -84,8 +84,8 @@ device_db["mirny_cpld"] = {
     "class": "Mirny",
     "arguments": {"spi_device": "spi_mirny", "refclk": 125000000.0, "clk_sel": "mmcx"},
 }
- 
- 
+
+
 for i in range(4):
     device_db.update({
         "ttl_mirny_sw" + str(i): {
@@ -105,7 +105,7 @@ for i in range(4):
             },
         },
     })
- 
+
 # device_db.update(
 #     {
 #         "mirny_almazny": {
@@ -130,7 +130,7 @@ for i in range(4):
             },
         }
     })
- 
+
 # 4x4 TTL IOs - switched by sets of 4
 # NB ttl0-ttl3 are OUT only
 for i in range(4):
@@ -174,12 +174,12 @@ for i in range(8):
             "arguments": {"channel": 26 + i},
         },
     })
- 
+
 # SU Servo is an 8-channel ADC (Sampler) and two 4-channel DDS (Urukuls) with a DSP
 # engine connecting the ADC data and the DDS output amplitudes to enable feedback.
 # It can be used to implement intensity stabilization of laser beams
 # with an amplifier and AOM driven by Urukul and a photodetector connected to Sampler.
- 
+
 # PGIA = Programmable Gain Instrumentation Amplifier
 # CPLD = Complex Programmable Logic Device
 # DDS = Direct Digital Synthesis
@@ -203,7 +203,7 @@ for i in range(8):
             "arguments": {"channel": 34 + i, "servo_device": "suservo"},
         }
     })
- 
+
 # Sampler
 device_db["spi_sampler_pgia"] = {
     "type": "local",
@@ -211,7 +211,7 @@ device_db["spi_sampler_pgia"] = {
     "class": "SPIMaster",
     "arguments": {"channel": 43},
 }
- 
+
 # Two Urukuls
 for i in range(2):
     device_db.update({
@@ -242,7 +242,7 @@ for i in range(2):
             },
         },
     })
- 
+
 # 2 front panel user controllable LEDs
 for i in range(3):
     device_db.update({
@@ -253,7 +253,7 @@ for i in range(3):
             "arguments": {"channel": 46 + i},
         }
     })
- 
+
 # Toptica Lasers
 device_db.update({
     "toptica_780": {
@@ -284,7 +284,7 @@ device_db.update({
         "command": "python controllers/aqctl_topticadlc.py -ip {ip} -p {port} --bind {bind}",
     },
 })
- 
+
 # Aliases
 aliases = {
     # photodiode on 3DMOT - given we don't enable servoing for the locking arm
@@ -314,7 +314,7 @@ aliases = {
     # probe - generic use
     "probe": "ttl11",
     # we need the dummy to also be a TTLOut not TTLInOut for typing reasons
-    "dummy_shutter": "ttl0",
+    "dummy_shutter": "shutter_2DMOT",
     # moving stage
     "moving_stage_ttl": "ttl11",
     # Shaking the Red Pitaya for the 852nm laser unlock
@@ -322,7 +322,5 @@ aliases = {
     "RedPitaya_trigger": "ttl10",
     "scope_trigger": "ttl11",
 }
- 
+
 device_db |= aliases
- 
- 

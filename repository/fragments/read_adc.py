@@ -167,7 +167,7 @@ class ReadSUServoADC(ReadADC):
         if self.suservo_profile_number == -1:
             self.suservo_profile_number = self.suservo_channel_number
 
-        self.suservo_has_been_setup = False
+        self.suservo_has_been_setup = True
 
     @kernel
     def device_setup(self) -> None:
