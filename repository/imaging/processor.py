@@ -189,7 +189,8 @@ class AbsImage:
             self.settings.wavelength
         )  # cross-section
         sigma = sigma_0 * np.reciprocal(
-            1 + 4 * np.square(self.settings.detuning / self.settings.linewidth)
+            1
+            + np.square(4 * np.square(self.settings.detuning / self.settings.linewidth))
         )  # off resonance
         area = np.square(self.physical_scale)  # pixel area in SI units
 
@@ -439,13 +440,13 @@ class AbsImage:
 
         # Create top and bottom grids with specific vertical spacing
         gs_top = GridSpec(1, 4, top=0.95, bottom=0.75, **grid_params)  # For raw images
-        gs_bottom = GridSpec(1, 4, top=0.68, bottom=0.12, **grid_params)  # For OD plot
+        gs_bottom = GridSpec(1, 4, top=0.68, bottom=0.16, **grid_params)  # For OD plot
 
         # Create all axes in a more compact way
         raw_axes = [fig.add_subplot(gs_top[0, i]) for i in range(3)]
         cax_raw = fig.add_subplot(gs_top[0, 3])
         od_ax = fig.add_subplot(gs_bottom[0, 0:3])
-        cax_od = fig.add_subplot(gs_bottom[0, 3])
+        cax_od = fig.add_axes([0.1, 0.07, 0.75, 0.025])
 
         # Group all content axes for setting properties
         axes = raw_axes + [od_ax]
@@ -596,11 +597,10 @@ class AbsImage:
         cb_od = fig.colorbar(
             im1,
             cax=cax_od,
-            orientation="vertical",
+            orientation="horizontal",
             label="Optical Density",
         )
         cb_od.ax.tick_params(labelsize=8)
-        cb_od.ax.yaxis.set_label_coords(3, 0.5)
 
         # For Qt integration, draw once to calculate sizes
         fig.canvas.draw_idle()
