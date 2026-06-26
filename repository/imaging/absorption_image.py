@@ -397,12 +397,6 @@ class AbsorptionImageExpFrag(ExpFragment):
             broadcast=True,
         )
 
-        self.set_dataset(
-            "Images.absorption.timestamp",
-            time(),
-            broadcast=True,
-        )
-
         settings = AbsImageSettings(
             magnification=self.magnification.get()
         )  # Set default magnification
@@ -410,6 +404,12 @@ class AbsorptionImageExpFrag(ExpFragment):
         self.set_dataset(
             "Images.absorption.settings",
             settings.to_dataset(),
+            broadcast=True,
+        )
+
+        self.set_dataset(
+            "Images.absorption.timestamp",
+            time(),
             broadcast=True,
         )
 
