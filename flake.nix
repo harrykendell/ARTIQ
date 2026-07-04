@@ -168,6 +168,7 @@
         ps.pint
         ps.lmfit
         ps.toptica-lasersdk
+        ps.boto3
         ps.pyvisa
         ps.pyqt5_sip
         ps.pyqt5

@@ -104,12 +104,7 @@ class AbsImage:
         self.settings = settings
 
         if self.settings.magnification is None:
-            # NB for now 50mm lens at 150mm distance focuses to 75mm away
-            # self.magnification = 75 / 150 = 0.5
-            raise ValueError(
-                "Please set magnification for the PCO camera\nNB: For nowa 50mm lens at"
-                " 150mm focuses to 75mm away, so set to 0.5"
-            )
+            raise ValueError("Please set magnification for the PCO camera\n")
         self.magnification = self.settings.magnification
 
     def all_info(self):
@@ -129,8 +124,8 @@ class AbsImage:
             "phase_space_density": {self.phase_space_density},
             "peak_optical_density": {self.peak[2]},
             "Peak density (atoms/cm^3)": {self.phase_space_density[0] * 1e-6:.2e},
-            "sigmax_mm": {self.best_values["sx"] * self.physical_scale * 1e3},
-            "sigmay_mm": {self.best_values["sy"] * self.physical_scale * 1e3},
+            "sigmax": {self.best_values["sx"]},
+            "sigmay": {self.best_values["sy"]},
         """
 
     @functools.cached_property
@@ -144,6 +139,12 @@ class AbsImage:
         smoothed_transmission = gaussian_filter(self.transmission, sigma=1)
         od = -np.log(smoothed_transmission, where=smoothed_transmission > 0)
         return od
+
+    @functools.cached_property
+    def peak_density(self):
+        """Returns the peak atomic density in atoms per cm^3"""
+        n_d = self.phase_space_density[0] * 1e-6
+        return n_d
 
     @functools.cached_property
     def transmission(self):
@@ -168,13 +169,13 @@ class AbsImage:
 
     @functools.cached_property
     def sigmax(self):
-        """Returns the fitted sigma_x in mm."""
-        return self.best_values["sx"] * self.physical_scale * 1e3
+        """Returns the fitted sigma_x in pixels"""
+        return self.best_values["sx"]
 
     @functools.cached_property
     def sigmay(self):
-        """Returns the fitted sigma_y in mm."""
-        return self.best_values["sy"] * self.physical_scale * 1e3
+        """Returns the fitted sigma_y in pixels"""
+        return self.best_values["sy"]
 
     @functools.cached_property
     def absorption(self):
@@ -204,20 +205,9 @@ class AbsImage:
             (area / sigma) * np.sum(optical_density) / 0.866
         )  # Divide by 1.5-sigma area
 
-    # @functools.cached_property
-    # def peak_atomic_density(self):
-    #     """Returns the peak atomic density in atoms per m^3"""
-    #     peak_atomic_density = self.atom_number / (
-    #         (2 * np.pi) ** (3 / 2)
-    #         * self.fit.best_values["sy"] * self.physical_scale
-    #         * self.fit.best_values["sx"] * self.physical_scale
-    #         * self.fit.best_values["sx"] * self.physical_scale
-    #     )
-    #     return peak_atomic_density
-
     @functools.cached_property
     def peak(self):
-        """Returns y, x, z of brightest pixel in absorption"""
+        """Returns y, x, z of brightest pixel in absorption in pixels"""
         y, x = np.unravel_index(
             np.argmax(self.optical_density), self.optical_density.shape
         )
@@ -226,7 +216,7 @@ class AbsImage:
 
     @functools.cached_property
     def centroid(self):
-        """Returns y, x, z of the centroid of the absorption image"""
+        """Returns y, x, z of the centroid of the absorption image in pixels"""
         y, x = self.xy
         A = np.sum(self.optical_density)
         y_c = int(np.sum(y * self.optical_density) / A)
@@ -253,18 +243,17 @@ class AbsImage:
 
     @functools.cached_property
     def x0(self):
-        """Returns the x0 of the fitted gaussian in mm."""
+        """Returns the x0 of the fitted gaussian in pixels."""
         return self.best_values["x0"]
 
     @functools.cached_property
     def y0(self):
-        """Returns the y0 of the fitted gaussian in mm."""
+        """Returns the y0 of the fitted gaussian in pixels."""
         return self.best_values["y0"]
 
     @functools.cached_property
     def fit(self):
         """Fits a 2D Gaussian against the absorption."""
-        # logging.info("Running 2D fit...")
 
         y_mg, x_mg = self.xy
         model = Model(ravel(gaussian_2D), independent_vars=["x", "y"])
@@ -294,12 +283,6 @@ class AbsImage:
         )
 
         return result
-
-    @functools.cached_property
-    def bimodal_fit(self, slice):
-        """Returns the parameters of the bimodal fit."""
-        # Implement bimodal fitting logic here
-        pass
 
     @functools.cached_property
     def best_values(self):
@@ -354,6 +337,11 @@ class AbsImage:
         """Returns the phase-space density of the cloud."""
         n, lambda_db, PSD = self.phase_space_density
         return PSD
+
+    @functools.cached_property
+    def peak_od(self):
+        """Returns the peak optical density of the cloud."""
+        return self.peak[2]
 
     @property
     def best_fit(self):
@@ -464,7 +452,7 @@ class AbsImage:
             """Helper function to plot images with common settings."""
             im = ax.imshow(
                 img,
-                cmap="gray",
+                cmap="viridis",
                 vmin=input_min,
                 vmax=input_max,
                 origin="lower",
@@ -512,8 +500,8 @@ class AbsImage:
             "cmap": "viridis",
             "origin": "lower",
             "extent": extent,
-            "vmin": vmin,
-            "vmax": vmax,
+            "vmin": 0.0,
+            "vmax": 4.0,
             "aspect": "equal",
         }
 
@@ -566,6 +554,70 @@ class AbsImage:
         od_ax.set_ylim(extent[2], extent[3])
 
         from matplotlib.lines import Line2D
+
+        # Show compact fit diagnostics as marginal slices through the fitted center.
+        x0_px = self.best_values["x0"]
+        y0_px = self.best_values["y0"]
+        x0_idx = int(np.clip(np.rint(x0_px), 0, self.width - 1))
+        y0_idx = int(np.clip(np.rint(y0_px), 0, self.height - 1))
+        x_pixels = np.arange(self.width, dtype=float)
+        y_pixels = np.arange(self.height, dtype=float)
+        marginal_slices = [
+            (
+                x_contour,
+                self.optical_density[y0_idx, :],
+                self.eval(x=x_pixels, y=np.full(self.width, y0_px)),
+                False,
+            ),
+            (
+                y_contour,
+                self.optical_density[:, x0_idx],
+                self.eval(x=np.full(self.height, x0_px), y=y_pixels),
+                True,
+            ),
+        ]
+
+        def plot_marginal_slice(axis_values, raw_slice, fit_slice, *, vertical):
+            finite_values = np.concatenate([
+                raw_slice[np.isfinite(raw_slice)],
+                fit_slice[np.isfinite(fit_slice)],
+            ])
+            if finite_values.size == 0:
+                return
+
+            value_min = min(0, np.min(finite_values))
+            value_max = np.max(finite_values)
+            value_range = value_max - value_min
+            if value_range <= 0:
+                return
+
+            raw_norm = np.clip((raw_slice - value_min) / value_range, 0, 1)
+            fit_norm = np.clip((fit_slice - value_min) / value_range, 0, 1)
+            baseline, axis_range = (
+                (extent[0], extent[1] - extent[0])
+                if vertical
+                else (extent[2], extent[3] - extent[2])
+            )
+
+            for norm, color, linewidth, zorder in [
+                (raw_norm, "white", 1.1, 4),
+                (fit_norm, "green", 1.5, 5),
+            ]:
+                marginal_coords = baseline + norm * 0.1 * axis_range
+                args = (
+                    (marginal_coords, axis_values)
+                    if vertical
+                    else (axis_values, marginal_coords)
+                )
+                od_ax.plot(
+                    *args,
+                    color=color,
+                    linewidth=linewidth,
+                    zorder=zorder,
+                )
+
+        for axis_values, raw_slice, fit_slice, vertical in marginal_slices:
+            plot_marginal_slice(axis_values, raw_slice, fit_slice, vertical=vertical)
 
         legend_elements = [
             Line2D([0], [0], color="red", lw=1, label="2σ Atom mask")
@@ -628,4 +680,4 @@ class AbsImage:
 
         plt.tight_layout()
 
-        return fig, axes + [cax_raw, cax_od]
+        return fig, axes + [cax_raw, cax_od], im1

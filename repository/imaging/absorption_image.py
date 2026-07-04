@@ -197,6 +197,8 @@ class AbsorptionImageExpFrag(ExpFragment):
         self.atom_number: FloatChannel = self.setattr_result("atom_number")
         self.sigmax_mm: FloatChannel = self.setattr_result("sigmax_mm")
         self.sigmay_mm: FloatChannel = self.setattr_result("sigmay_mm")
+        self.sigmax: FloatChannel = self.setattr_result("sigmax")
+        self.sigmay: FloatChannel = self.setattr_result("sigmay")
         self.phase_space_density: FloatChannel = self.setattr_result(
             "phase_space_density"
         )
@@ -422,8 +424,10 @@ class AbsorptionImageExpFrag(ExpFragment):
 
         self.atom_number.push(self.absimg.atom_number)
         self.info.push(self.absimg.all_info())
-        self.sigmax_mm.push(self.absimg.sigmax)
-        self.sigmay_mm.push(self.absimg.sigmay)
+        self.sigmax.push(self.absimg.sigmax)
+        self.sigmay.push(self.absimg.sigmay)
+        self.sigmax_mm.push(self.absimg.sigmax * self.absimg.physical_scale * 1e3)
+        self.sigmay_mm.push(self.absimg.sigmay * self.absimg.physical_scale * 1e3)
         self.phase_space_density.push(self.absimg.phase_space_density_1)
         self.gaussian_fit_centre_x.push(self.absimg.x0)
         self.gaussian_fit_centre_y.push(self.absimg.y0)
