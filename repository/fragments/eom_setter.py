@@ -81,7 +81,7 @@ class EomFrag(Fragment):
         """
         self.channel.set_att(self.config.attenuation)
         delay(2 * us)
-        self.channel.set_frequency(self.config.frequency)
+        self.set_freq(self.config.frequency)
         delay(2 * us)
         if self.config.mirny_enabled:
             self.channel.sw.on()
