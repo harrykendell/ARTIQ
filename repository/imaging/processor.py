@@ -58,6 +58,7 @@ class AbsImageSettings:
     pixel_size: float = 6.45e-6  # m
     fit_downsample: int = 5
     magnification: float = 0.19  # Set to None to force user to specify
+    time_of_flight: float = 0.0  # seconds, time of flight before imaging
 
     # need this to be pyon serializable for dataset storage
     def to_dataset(self):
@@ -81,16 +82,13 @@ class AbsImage:
         settings: AbsImageSettings = AbsImageSettings(),
     ):
         """AbsImage class for processing absorption images.
- 
+
         Args:
             data (np.ndarray): The atom/light image.
             ref (np.ndarray): The light image with no atoms.
             bg (np.ndarray): The background image with no light or atoms.
-            wavelength (float): The wavelength of the imaging transition.
-            detuning (float): The detuning from the imaging transition.
-            linewidth (float): The linewidth of the imaging transition.
-            pixel_size (float): The size of the pixels in the camera.
-            magnification (float): The magnification of the imaging system.\
+
+            settings (AbsImageSettings): The settings for the absorption image processing.
         """
         assert data.shape == ref.shape == bg.shape
         self.data_image = np.asarray(np.rot90(data), dtype=np.float64)
@@ -126,6 +124,7 @@ class AbsImage:
             "Peak density (atoms/cm^3)": {self.phase_space_density[0] * 1e-6:.2e},
             "sigmax": {self.best_values["sx"]},
             "sigmay": {self.best_values["sy"]},
+            "time_of_flight": {self.settings.time_of_flight},
         """
 
     @functools.cached_property
@@ -259,7 +258,7 @@ class AbsImage:
         model = Model(ravel(gaussian_2D), independent_vars=["x", "y"])
 
         y_c, x_c, A = self.centroid
-        model.set_param_hint("A", value=A, min=0, max=6)
+        model.set_param_hint("A", value=A, min=0, max=10)
         model.set_param_hint(
             "x0", value=x_c, min=-0.1 * self.width, max=1.1 * self.width
         )
@@ -500,8 +499,8 @@ class AbsImage:
             "cmap": "viridis",
             "origin": "lower",
             "extent": extent,
-            "vmin": 0.0,
-            "vmax": 4.0,
+            "vmin": vmin,
+            "vmax": vmax,
             "aspect": "equal",
         }
 
@@ -659,6 +658,7 @@ class AbsImage:
 
         textstr = "\n".join((
             rf"Atom number: $\mathbf{{{self.atom_number:.2e}}}$",
+            rf"Time of Flight (ms): $\mathbf{{{self.settings.time_of_flight * 1e3}}}$",
             rf"Peak OD: $\mathbf{{{self.optical_density[self.peak[0], self.peak[1]]:.2f}}}$",
             rf"Centroid (mm): ($\mathbf{{{centroid_mm[0]:.2f}}}$, $\mathbf{{{centroid_mm[1]:.2f}}}$)",
             rf"Peak center (mm): ($\mathbf{{{peak_mm[0]:.2f}}}$, $\mathbf{{{peak_mm[1]:.2f}}}$)",

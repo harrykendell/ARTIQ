@@ -400,7 +400,8 @@ class AbsorptionImageExpFrag(ExpFragment):
         )
 
         settings = AbsImageSettings(
-            magnification=self.magnification.get()
+            magnification=self.magnification.get(),
+            time_of_flight=self.expansion_time.get()
         )  # Set default magnification
 
         self.set_dataset(

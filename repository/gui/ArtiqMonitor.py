@@ -110,8 +110,8 @@ class MainWindow(QWidget):
 
         # Register for service state change notifications
         for _, service in self.client.services.items():
-            service.state_change_callback = (
-                lambda name, old, new: self.handle_service_state_change(name, old, new)
+            service.state_change_callback = lambda name, old, new: (
+                self.handle_service_state_change(name, old, new)
             )
 
         self.setWindowTitle("ARTIQ Monitor")
@@ -159,15 +159,13 @@ class MainWindow(QWidget):
             channel_layout.addWidget(reflected_label)
 
             frame.setLayout(channel_layout)
-            self.booster_frames.append(
-                {
-                    "frame": frame,
-                    "ch_label": ch_label,
-                    "state": state_label,
-                    "power": power_label,
-                    "reflected": reflected_label,
-                }
-            )
+            self.booster_frames.append({
+                "frame": frame,
+                "ch_label": ch_label,
+                "state": state_label,
+                "power": power_label,
+                "reflected": reflected_label,
+            })
 
             row = i // 4
             col = i % 4
@@ -268,20 +266,18 @@ class MainWindow(QWidget):
             laser_layout.addWidget(spectrum_canvas, 1)
 
             frame.setLayout(laser_layout)
-            self.dlc_frames.append(
-                {
-                    "frame": frame,
-                    "name": name_label,
-                    "state": state_label,
-                    "dl_current": dl_current_label,
-                    "amp_current": amp_current_label,
-                    "lock": lock_label,
-                    "spectrum_canvas": spectrum_canvas,
-                    "spectrum_axes": spectrum_axes,
-                    "x_lim": [np.inf, -np.inf],
-                    "y_lim": [np.inf, -np.inf],
-                }
-            )
+            self.dlc_frames.append({
+                "frame": frame,
+                "name": name_label,
+                "state": state_label,
+                "dl_current": dl_current_label,
+                "amp_current": amp_current_label,
+                "lock": lock_label,
+                "spectrum_canvas": spectrum_canvas,
+                "spectrum_axes": spectrum_axes,
+                "x_lim": [np.inf, -np.inf],
+                "y_lim": [np.inf, -np.inf],
+            })
 
             dlc_layout.addWidget(frame, 0, i)
 
@@ -429,6 +425,7 @@ class MainWindow(QWidget):
         tof = self.client.datasets.get("Images.absorption.TOF")
         ref = self.client.datasets.get("Images.absorption.REF")
         bg = self.client.datasets.get("Images.absorption.BG")
+        settings = self.client.datasets.get("Images.absorption.settings")
         if tof is None or ref is None or bg is None:
             return
 
@@ -436,7 +433,9 @@ class MainWindow(QWidget):
             data=tof[1],
             ref=ref[1],
             bg=bg[1],
-            settings=AbsImageSettings()
+            settings=AbsImageSettings.from_dataset(
+                settings[1] if settings is not None else None
+            ),
         )
 
         self.canvas.figure.clear()
@@ -818,15 +817,13 @@ class MainWindow(QWidget):
 
                 # Map state strings to DeviceState enum using dictionary
                 STATE_MAPPING = {val.value: val for val in DeviceState}
-                STATE_MAPPING.update(
-                    {
-                        DeviceState.ENABLED.value: (
-                            DeviceState.LOW_POWER
-                            if output_power < LOW_POWER_THRESHOLD
-                            else DeviceState.ENABLED
-                        )
-                    }
-                )
+                STATE_MAPPING.update({
+                    DeviceState.ENABLED.value: (
+                        DeviceState.LOW_POWER
+                        if output_power < LOW_POWER_THRESHOLD
+                        else DeviceState.ENABLED
+                    )
+                })
 
                 # Default to UNKNOWN if not in mapping
                 if "Tripped" in state_str:
