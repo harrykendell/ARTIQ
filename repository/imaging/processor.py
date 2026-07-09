@@ -658,7 +658,7 @@ class AbsImage:
 
         textstr = "\n".join((
             rf"Atom number: $\mathbf{{{self.atom_number:.2e}}}$",
-            rf"Time of Flight (ms): $\mathbf{{{self.settings.time_of_flight * 1e3}}}$",
+            rf"Time of Flight (ms): $\mathbf{{{self.settings.time_of_flight * 1e3:.4g}}}$",
             rf"Peak OD: $\mathbf{{{self.optical_density[self.peak[0], self.peak[1]]:.2f}}}$",
             rf"Centroid (mm): ($\mathbf{{{centroid_mm[0]:.2f}}}$, $\mathbf{{{centroid_mm[1]:.2f}}}$)",
             rf"Peak center (mm): ($\mathbf{{{peak_mm[0]:.2f}}}$, $\mathbf{{{peak_mm[1]:.2f}}}$)",
