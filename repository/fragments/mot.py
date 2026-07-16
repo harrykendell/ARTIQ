@@ -3,26 +3,23 @@ import logging
 from artiq.coredevice.core import Core
 from artiq.coredevice.ttl import TTLOut
 from artiq.language import delay, kernel, parallel
-from artiq.language.core import delay_mu
+from artiq.language.core import host_only
 from artiq.language.units import A, MHz, V, dB, ms, s, us
 from ndscan.experiment import Fragment
 from ndscan.experiment.parameters import (
     FloatParam,
     FloatParamHandle,
 )
-from ndscan.experiment.result_channels import OpaqueChannel
 from repository.fragments.beam_setter import ControlBeamsWithoutCoolingAOM
 from repository.fragments.default_beam_setter import (
     SetBeamsToDefaults,
     make_set_beams_to_default,
 )
 from repository.fragments.eom_setter import EomFrag
-from repository.fragments.ramp import Ramp, default
+from repository.fragments.ramp import Ramp
 from repository.fragments.supply_setter import SetSupplies
 from repository.models.devices import Eom, SUServoedBeam, VDrivenSupply
 from repository.gui.managers import SUServoManager
-from repository.fragments.read_adc import ReadSUServoADC
-from artiq.experiment import TFloat, TInt32, TInt64, TList, delay_mu, kernel, rpc
 
 
 logger = logging.getLogger(__name__)
@@ -31,23 +28,23 @@ logger = logging.getLogger(__name__)
 Γ_Rb = 6.065 * MHz  # Natural linewidth of Rb-87
 DURATION = {
     "LOADING": 30 * s,
-    "CMOT": 30 * ms,
-    "PGC": 20 * ms,
+    "CMOT": 1.0 * ms,
+    "PGC": 14.58 * ms,
     "EVAPORATION1": 50 * ms,
     "EVAPORATION2": 100 * ms,
 }
 SETTLE_TIME = {
-    "CMOT": 0.5 * ms,
-    "PGC": 0.5 * ms,
+    "CMOT": 0.522 * ms,
+    "PGC": 4.98 * ms,
     "ODT": 0 * ms,
     "EVAPORATION1": 0 * ms,
     "EVAPORATION2": 0 * ms,
 }
-DETUNING = {"CMOT": 5 * Γ_Rb, "PGC": 10 * Γ_Rb}  # This is beyond the normal 2Γ
+DETUNING = {"CMOT": 5 * Γ_Rb, "PGC": 9.94 * Γ_Rb}  # This is beyond the normal 2Γ
 BIASES = {"X1": 0.0002 * A, "X2": 0.0 * A, "Y": 0.04 * A, "Z": 0.07 * A}
 COMPRESSED_GRADIENTS = {"X1": 0 * A, "X2": 1.98 * A}
-REPUMP_ATTENUATION = {"CMOT": 9 * dB, "PGC": 0.5 * dB}
-POWER_3D_MOT = {"MOT_loading": 3.5 * V, "CMOT": 1.9 * V}
+REPUMP_ATTENUATION = {"CMOT": 0.6196 * dB, "PGC": 0.05 * dB}
+POWER_3D_MOT = {"MOT_loading": 3.5 * V, "CMOT": 1.9 * V, "PGC": 1.0 * V}
 
 
 class MOT(Fragment):
@@ -174,6 +171,14 @@ class MOT(Fragment):
             min=0.0 * V,
             max=15 * V,
         )
+        self.relock_duration: FloatParamHandle = self.setattr_param(
+            "relock_duration",
+            FloatParam,
+            "Duration of the relock ramp",
+            default=5 * ms,
+            unit="ms",
+            min=0.0 * ms,
+        )
 
         self.unlock_ttl: TTLOut = self.get_device("780_unlock")
 
@@ -214,10 +219,20 @@ class MOT(Fragment):
             unit="Γ",
             scale=Γ_Rb,
         )
-        self.CMOT_Repump_power_attenuation: FloatParamHandle = self.setattr_param(
-            "CMOT_Repump_power_attenuation",
+
+        self.CMOT_repump_detuning: FloatParamHandle = self.setattr_param(
+            "CMOT_repump_detuning",
             FloatParam,
-            "Power of the CMOT Repump beam",
+            "Detuning of the CMOT Repump beam",
+            default=0,
+            unit="Γ",
+            scale=Γ_Rb,
+        )
+
+        self.CMOT_repump_attenuation: FloatParamHandle = self.setattr_param(
+            "CMOT_repump_attenuation",
+            FloatParam,
+            "Attenuation of the CMOT Repump beam",
             default=REPUMP_ATTENUATION["CMOT"],
             unit="dB",
             min=0 * dB,
@@ -276,6 +291,25 @@ class MOT(Fragment):
             scale=Γ_Rb,
         )
 
+        self.PGC_repump_detuning: FloatParamHandle = self.setattr_param(
+            "PGC_repump_detuning",
+            FloatParam,
+            "Detuning of the PGC Repump beam",
+            default=0,
+            unit="Γ",
+            scale=Γ_Rb,
+        )
+
+        self.PGC_repump_attenuation: FloatParamHandle = self.setattr_param(
+            "PGC_repump_attenuation",
+            FloatParam,
+            "Attenuation of the PGC Repump beam",
+            default=REPUMP_ATTENUATION["PGC"],
+            unit="dB",
+            min=0.0 * dB,
+            max=14.0 * dB,
+        )
+
         class PGC_Ramp(Ramp):
             """
             The transition from CMOT to PGC
@@ -301,6 +335,9 @@ class MOT(Fragment):
                 *BIASES.values(),
                 self.PGC_detuning,
             ]
+            suservos = [SUServoedBeam["MOT"]]
+            suservo_setpoint_start = [POWER_3D_MOT["CMOT"]]
+            suservo_setpoint_end = [POWER_3D_MOT["PGC"]]
 
         self.pgc_ramp: PGC_Ramp = self.setattr_fragment(
             "pgc_ramp",
@@ -469,14 +506,14 @@ class MOT(Fragment):
             )
 
     @kernel
-    def clear_background_atoms_around_odt(self, clearout_time=0.5 * ms) -> None:
+    def clear_background_atoms_around_odt(self, clearout_time=3.0 * ms) -> None:
         """
         Clear out atoms from the background around the ODT
 
         **Timeline:** advances by approx `clearout_time` seconds
         """
 
-        self.y_coil.set_outputs([1 * A])
+        self.y_coil.set_outputs([0.7 * A])
         delay(clearout_time)
         self.y_coil.set_to_defaults()
 
@@ -545,6 +582,10 @@ class MOT(Fragment):
         self.all_beams.turn_beams_off()
         # self.shutter_2d.on()
 
+        # set detuning of the MOT suservo to some value that is not too far from the default, so that we can load atoms
+        # self.suervoed_beam_mot = SUServoedBeam["MOT"]
+        # self.suervoed_beam_mot.frequency
+
         if clearout:
             self.clear_atoms(clearout_time=clearout_time)
 
@@ -566,18 +607,37 @@ class MOT(Fragment):
             delay(9.0 * self.loading_time.get() / 10.0)
 
     @kernel
-    def compress(self, evaporation_active, odt_active) -> None:
+    def compress(
+        self,
+        evaporation_active,
+        odt_active,
+        shutter2d_in_cmot_pgc,
+        power_dimple,
+        power_reservoir,
+    ) -> None:
         """
         Compress into a CMOT
 
         **Timeline:** advances by `self.CMOT_duration` + `self.CMOT_settle_time`
         """
         # Unlock the MOT
+        TOPTICA_HOLD_JITTER = (
+            150 * us
+        )  # The Toptica PID only runs at 30kHz so give it time to hold
+        delay(-TOPTICA_HOLD_JITTER)
         self.unlock_mot()
+        delay(TOPTICA_HOLD_JITTER)
+
+        # 2d shutter off
+        if not shutter2d_in_cmot_pgc:
+            self.shutter_2d.off()
 
         if evaporation_active or odt_active:
             self.odt_dimple.turn_beams_on()
-            # self.odt_reservoir.turn_beams_on()
+            self.odt_reservoir.turn_beams_on()
+
+            # self.set_dimple_trap_power(power_dimple)
+            # self.set_reservoir_trap_power(power_reservoir)
         else:
             pass
 
@@ -585,9 +645,13 @@ class MOT(Fragment):
         # self.shutter_2d.off()
         with parallel:
             # Fix EOM frequency
-            self.eom.set_freq(self.eom.config.frequency + self.CMOT_detuning.get())
+            self.eom.set_freq(
+                self.eom.config.frequency
+                + self.CMOT_detuning.get()
+                + self.CMOT_repump_detuning.get()
+            )
             self.eom.set_att(
-                self.eom.config.attenuation + self.CMOT_Repump_power_attenuation.get()
+                self.eom.config.attenuation + self.CMOT_repump_attenuation.get()
             )
             self.cmot_ramp.do()
             delay(self.cmot_ramp.duration.get())
@@ -604,7 +668,14 @@ class MOT(Fragment):
         # Do the ramp - MOT freq, coil to biases
         with parallel:
             # Fix EOM frequency
-            self.eom.set_freq(self.eom.config.frequency + self.PGC_detuning.get())
+            self.eom.set_freq(
+                self.eom.config.frequency
+                + self.PGC_detuning.get()
+                + self.PGC_repump_detuning.get()
+            )
+            self.eom.set_att(
+                self.eom.config.attenuation + self.PGC_repump_attenuation.get()
+            )
             self.pgc_ramp.do()
 
         delay(self.PGC_settle_time.get())
@@ -669,20 +740,18 @@ class MOT(Fragment):
         self.unlock_ttl.on()
 
     @kernel
-    def relock_mot(self, time_to_shift=2.0 * ms) -> None:
+    def relock_mot(self) -> None:
         """
-        Relock the MOT ECDL
+        Relock the MOT ECDLImmediately reset detuning then after `relock_duration` reset the TTL to off so the PID continues
 
-        Unpush and then after `time_to_shift` seconds, turn the TTL off
+        **Timeline:** does not advance the timeline
 
-        **Timeline:** advances a single TTL+Fastino write
-
-        However it writes the lock signal into the future by `time_to_shift`
+        However it writes the ramp and TTL into the future by `relock_duration`
         """
         self.push_780.set_to_defaults()
-        delay(time_to_shift)
+        delay(self.relock_duration.get())
         self.unlock_ttl.off()
-        delay(-time_to_shift)
+        delay(-self.relock_duration.get())
 
     @kernel
     def drop(self, evaporation_active, odt_active, cmot_active, pgc_active) -> None:
@@ -702,11 +771,11 @@ class MOT(Fragment):
         else:
             self.all_beams.turn_beams_off()
 
+        self.set_repump_attenuation(
+            30 * dB
+        )  # set repump to high attenuation so that we don't pump into F=2, imaging will be only F=2 to F'=3
         # For imaging we need to be back on resonance, only relock if we did cmot or pgc
-        if cmot_active or pgc_active:
-            self.relock_mot()
-        else:
-            pass
+        self.relock_mot()
 
     @kernel
     def pump_intoF2(self) -> None:
@@ -751,4 +820,13 @@ class MOT(Fragment):
     @kernel
     def get_reservoir_trap_power(self, ch=7):
         print("Reservoir trap power:", SUServoManager.SUServoManager.get_adc(ch))
+        return SUServoManager.SUServoManager.get_adc(ch)
+
+    @kernel
+    def set_MOT_beam_power(self, power_mot=0.5) -> None:
+        self.mot_beam.set_setpoint_volts("MOT", power_mot)
+
+    @kernel
+    def get_MOT_beam_power(self, ch=0):
+        print("MOT beam power:", SUServoManager.SUServoManager.get_adc(ch))
         return SUServoManager.SUServoManager.get_adc(ch)

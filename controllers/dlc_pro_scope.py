@@ -150,5 +150,5 @@ def main():
         sys.stderr.write("Device not found")
 
 
-# if __name__ == "__main__":
-#     main()
+if __name__ == "__main__":
+    main()

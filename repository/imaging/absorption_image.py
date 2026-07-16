@@ -1,6 +1,3 @@
-from asyncio.log import logger
-from collections.abc import Iterable
-from fileinput import filename
 from time import time
 
 from artiq.coredevice.core import Core
@@ -10,13 +7,11 @@ from artiq.experiment import kernel, rpc
 from artiq.language import delay, ms, now_mu, parallel, s, us
 from artiq.language.core import host_only
 import numpy as np
-from scipy.optimize import curve_fit
-from matplotlib import pyplot as plt
+
 
 # from repository.models.device_db import server_addr
 from ndscan.experiment import (
     BoolParam,
-    EnumParam,
     ExpFragment,
     FloatChannel,
     FloatParam,
@@ -26,11 +21,7 @@ from ndscan.experiment import (
 
 
 from artiq.coredevice.ttl import TTLInOut
-from ndscan.experiment.default_analysis import (
-    DefaultAnalysis,
-    OnlineFit,
-    CustomAnalysis,
-)
+
 from ndscan.experiment.parameters import BoolParamHandle, FloatParamHandle, ParamHandle
 from repository.fragments.beam_setter import ControlBeamsWithoutCoolingAOM
 from repository.fragments.mot import MOT
@@ -38,6 +29,7 @@ from repository.imaging.PCO_Camera import PcoCamera, camera_name, ROI
 from repository.imaging.processor import AbsImage, AbsImageSettings  # noqa: E402
 from repository.models.devices import SUServoedBeam
 from repository.imaging.tekscope import TekscopeExp
+
 # from repository.Dipole_trap.moving_stage import MovingStage
 
 
@@ -62,13 +54,14 @@ class AbsorptionImageExpFrag(ExpFragment):
         )
         self.pco_camera: PcoCamera
 
-        self.setattr_fragment("tekscope", TekscopeExp, single_acquisition=True)
-        self.tekscope: TekscopeExp
+        self.tekscope: TekscopeExp = self.setattr_fragment(
+            "tekscope", TekscopeExp, single_acquisition=True
+        )
 
         # expsosure time for pcoedge cameras should be bigger than the imaging pulse because of camera has scan pixels line by line, like if we want to expose atoms for 100 us we should set the exposure time to be at least 150 us to make sure the whole cloud is exposed, for pixelfly camera which has global shutter we can set the exposure time to be the same as the imaging pulse duration.
 
         self.setattr_param_rebind(
-            "exposure_time", self.pco_camera, "exposure_time", default=0.11 * ms
+            "exposure_time", self.pco_camera, "exposure_time", default=0.03 * ms
         )
         self.exposure_time: FloatParamHandle
 
@@ -79,17 +72,17 @@ class AbsorptionImageExpFrag(ExpFragment):
 
         self.mot: MOT = self.setattr_fragment("MOT", MOT, manual_init=False)
         self.suservo: SUServo = self.get_device("suservo")
-        self.mot_voltages_temp = [0.0] * 10
-        self.mot_voltages: OpaqueChannel = self.setattr_result(
-            "mot_voltages", OpaqueChannel
-        )
+        # self.mot_voltages_temp = [0.0] * 10
+        # self.mot_voltages: OpaqueChannel = self.setattr_result(
+        #     "mot_voltages", OpaqueChannel
+        # )
 
         self.img_beam: ControlBeamsWithoutCoolingAOM = self.setattr_fragment(
             "img_beam", ControlBeamsWithoutCoolingAOM, [SUServoedBeam["IMG"]]
         )
 
-        self.setattr_device("moving_stage_ttl")
-        self.moving_stage_trigger: TTLInOut = self.moving_stage_ttl
+        self.setattr_device("scope_trigger")
+        self.scope_trigger: TTLInOut = self.scope_trigger
 
         # self.setattr_fragment("absolute_moving_stage", MovingStage)
         # self.absolute_moving_stage: MovingStage
@@ -106,7 +99,7 @@ class AbsorptionImageExpFrag(ExpFragment):
             "magnification",
             FloatParam,
             "Magnification for imaging",
-            default=1.0,
+            default=0.29,
         )
         self.magnification: FloatParamHandle
 
@@ -114,11 +107,18 @@ class AbsorptionImageExpFrag(ExpFragment):
             "expansion_time",
             FloatParam,
             "Expansion time before imaging",
-            default=0.5 * ms,
+            default=25 * ms,
             min=1.0 * us,
             unit="ms",
         )
         self.expansion_time: FloatParamHandle
+
+        self.shutter2d_in_cmot_pgc: BoolParamHandle = self.setattr_param(
+            "shutter_2d_in_cmot_pgc",
+            BoolParam,
+            "Whether to keep the 2D MOT shutter on during CMOT and PGC",
+            default=False,
+        )
 
         # enum selection of ROI for retrieving images
         # get the correct enum class based on the camera used
@@ -173,7 +173,7 @@ class AbsorptionImageExpFrag(ExpFragment):
             "ODT_hold_time",
             FloatParam,
             "Hold time in ODT after CMOT/PGC before imaging",
-            default=50.0 * ms,
+            default=100.0 * ms,
             min=0.0 * ms,
             unit="ms",
         )
@@ -210,16 +210,31 @@ class AbsorptionImageExpFrag(ExpFragment):
             "gaussian_fit_centre_y"
         )
         self.custom_objective: FloatChannel = self.setattr_result("custom_objective")
-        self.tekscope_ch1: OpaqueChannel = self.setattr_result(
-            "tekscope_ch1", OpaqueChannel
-        )
-        self.tekscope_ch2: OpaqueChannel = self.setattr_result(
-            "tekscope_ch2", OpaqueChannel
-        )
-        self.tekscope_t: OpaqueChannel = self.setattr_result("tekscope_t", OpaqueChannel)
+
+        self.peak_od: FloatChannel = self.setattr_result("peak_od")
+        # self.all_images: OpaqueChannel = self.setattr_result(
+        #     "all_images", OpaqueChannel
+        # )
+
+        # self.tekscope_ch1: OpaqueChannel = self.setattr_result(
+        #     "tekscope_ch1", OpaqueChannel
+        # )
+        # self.tekscope_ch2: OpaqueChannel = self.setattr_result(
+        #     "tekscope_ch2", OpaqueChannel
+        # )
+        # self.tekscope_ch3: OpaqueChannel = self.setattr_result(
+        #     "tekscope_ch3", OpaqueChannel
+        # )
+        # self.tekscope_t: OpaqueChannel = self.setattr_result(
+        #     "tekscope_t", OpaqueChannel
+        # )
 
     @host_only
     def prepare(self) -> None:
+        # if self.expansion_time.get() < self.mot.relock_duration.get():
+        #     raise ValueError(
+        #         "Expansion time must be at least the relock duration of the MOT Laser."
+        #     )
 
         self.is_edge = self.camera_used.get() == camera_name.SECOND
 
@@ -251,27 +266,44 @@ class AbsorptionImageExpFrag(ExpFragment):
         self.core.reset()
         self.device_setup_subfragments()
 
+    # @rpc
+    # def hold_pid2(self, value: bool):
+    #     """Hold or release the PID2 lock on the Toptica DLC Pro"""
+    #     self.laser.dl.lock.pid2.hold.set(value)
+
     @kernel
     def run_once(self):
         self.core.break_realtime()
         self.mot.calculate_dma_handles()
         self.core.break_realtime()
 
-        self.mot.set_dimple_trap_power(self.mot.power_dimple.get())
+        # self.mot.set_dimple_trap_power(self.mot.power_dimple.get())
         # self.mot.set_reservoir_trap_power(self.mot.power_reservoir.get())
 
         self.mot.load(wait_for_load=False)
-        # For debugging we want to monitor the mot photodiode while loading (suservo_ch0 adc)
-        for i in range(10):
-            self.mot_voltages_temp[i] = self.suservo.get_adc(0)
-            delay(self.mot.loading_time.get() / 10.0)
-        self.mot_voltages.push(self.mot_voltages_temp)
+        # # For debugging we want to monitor the mot photodiode while loading (suservo_ch0 adc)
+        # for i in range(10):
+        #     # self.mot_voltages_temp[i] = self.suservo.get_adc(0)
+        #     if i == 5:
+        #         if self.use_tekscope.get():
+        #             self.initialize_tekscope()
+        #         # self.hold_pid2(True)
+        #     delay(self.mot.loading_time.get() / 10.0)
+        # # self.mot_voltages.push(self.mot_voltages_temp)
+
+        delay(self.mot.loading_time.get() - 20 * ms)
+        # 2d shutter off
+        self.mot.shutter_2d.off()
+        delay(20 * ms)
 
         if self.do_cmot.get():
             self.mot.compress(
                 evaporation_active=self.do_evaporation1.get()
                 or self.do_evaporation2.get(),
                 odt_active=self.odt_active.get(),
+                shutter2d_in_cmot_pgc=self.shutter2d_in_cmot_pgc.get(),
+                power_dimple=self.mot.power_dimple.get(),
+                power_reservoir=self.mot.power_reservoir.get(),
             )
             if self.do_pgc.get():
                 self.mot.pgc()
@@ -308,6 +340,7 @@ class AbsorptionImageExpFrag(ExpFragment):
         if self.is_edge:
             BUSY_TIME = self.camera_busy_time  # Hardcoding the busy time for pcedge
             # image cloud
+            self.mot.clear_background_atoms_around_odt()
             self.pco_camera.capture_image()
             delay(
                 self.pco_edge_delay
@@ -357,6 +390,7 @@ class AbsorptionImageExpFrag(ExpFragment):
             delay(BUSY_TIME)
 
         # leave the MOT to reload
+        # self.hold_pid2(False)
         self.mot.init()
         self.mot.load(wait_for_load=False)
 
@@ -369,17 +403,24 @@ class AbsorptionImageExpFrag(ExpFragment):
             pass
 
     @rpc(flags={"async"})
-    def save_tekscope_screenshot_csv(self):
+    def save_tekscope_screenshot_csv(self, timeout: float = 1.0 * s):
 
         wf = self.tekscope.get_waveform_artiq("CH1")
         time_axis = wf["time"]
-        wf2 = self.tekscope.get_waveform_artiq("CH2")
+        # wf2 = self.tekscope.get_waveform_artiq("CH2")
+        # wf3 = self.tekscope.get_waveform_artiq("CH3")
         self.tekscope_ch1.push(wf["voltage"])
-        self.tekscope_ch2.push(wf2["voltage"])
+        # self.tekscope_ch2.push(wf2["voltage"])
+        # self.tekscope_ch3.push(wf3["voltage"])
         self.tekscope_t.push(time_axis)
 
     @rpc(flags={"async"})
+    def initialize_tekscope(self):
+        self.tekscope.ready_for_trigger()
+
+    @rpc(flags={"async"})
     def update_images(self):
+        # print roi for debugging
         images = self.pco_camera.retrieve_images(
             roi=self.imaging_roi.get(), timeout=1.0 * s
         )
@@ -401,7 +442,7 @@ class AbsorptionImageExpFrag(ExpFragment):
 
         settings = AbsImageSettings(
             magnification=self.magnification.get(),
-            time_of_flight=self.expansion_time.get()
+            time_of_flight=self.expansion_time.get(),
         )  # Set default magnification
 
         self.set_dataset(
@@ -432,44 +473,28 @@ class AbsorptionImageExpFrag(ExpFragment):
         self.phase_space_density.push(self.absimg.phase_space_density_1)
         self.gaussian_fit_centre_x.push(self.absimg.x0)
         self.gaussian_fit_centre_y.push(self.absimg.y0)
+        self.peak_od.push(self.absimg.peak_od)
 
-        # # Custom objective 1 : # symmetric cloud
-        # self.custom_objective.push(abs(self.absimg.sigmax - self.absimg.sigmay))
+        # Custom objective 1 : # maximizing atom number
+        # self.custom_objective.push(1e9 - self.absimg.atom_number)
 
-        # Custom objective 2 : # maximizing atom number
-        self.custom_objective.push(1e9 - self.absimg.atom_number)
+        # Reference values for normalization
+        N_ref = 2e8  # current atom number
+        sigma_0_x = 1.60  # σₓ (mm)
+        sigma_0_y = 1.55  # σᵧ (mm)
+        sigma_x = self.absimg.sigmax * self.absimg.physical_scale * 1e3
+        sigma_y = self.absimg.sigmay * self.absimg.physical_scale * 1e3
+        exponent = 1.5  # Exponent for the size terms
 
-        # ensure that every image in a scan is saved for later analysis
-        # using uint16 saves about 4x space since pixels are easily 0-65,535 anyway
-        # self.all_images.push(np.asarray(images, dtype=np.uint16))
+        # Custom objective 2 :
 
-        # Volume of the cloud assuming Gaussian distribution, 3D
-        # V = (2π)^(3/2) σx σy σz
-        V = (
-            (2 * np.pi) ** (3 / 2)
-            * self.absimg.sigmax
-            * self.absimg.sigmay
-            * self.absimg.sigmax  # σz = σx
+        self.custom_objective.push(
+            -np.log(self.absimg.atom_number / N_ref)
+            + exponent * (np.log(sigma_x / sigma_0_x) + np.log(sigma_y / sigma_0_y))
         )
 
-        # Number density
-        n = self.absimg.atom_number / V
-
-        alpha = 0.5  # weight for atom no. density
-        # Custom objective 3 : # maximizing number density & atom number
-        # self.custom_objective.push(
-        #     -1 * ((alpha * (n / 1e11)) + (1 - alpha) * (self.absimg.atom_number / 1e9))
-        # )
-
-        # Custom objective 4 : #number density
-        # self.custom_objective.push(1e11 - n)
-
-        # Custom objective 5 : # maximizing PSD
-        # self.custom_objective.push(
-        #     1e-4 - self.absimg.phase_space_density_1)
-
     # def get_default_analyses(self):
-    # return [OnlineFit("line", data={"x": self.expansion_time, "y": self.sigmax_mm})]
+    # return [OnlineFit("line", data={"x": self.expansion_time, "y": self.sigmax})]
 
     # self.ccb.issue(
     #     "create_applet",

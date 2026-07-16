@@ -3,9 +3,9 @@ import logging
 from artiq.coredevice.core import Core
 from artiq.coredevice.ttl import TTLInOut
 from artiq.experiment import EnumerationValue, delay, kernel, ms
-from ndscan.experiment import BoolParam, ExpFragment, FloatParam
+from ndscan.experiment import ExpFragment, FloatParam
 from ndscan.experiment.entry_point import make_fragment_scan_exp
-from ndscan.experiment.parameters import BoolParamHandle, FloatParamHandle
+from ndscan.experiment.parameters import FloatParamHandle
 from repository.fragments.supply_setter import SetSupplies
 from repository.models.devices import VDrivenSupply
 from repository.utils.get_local_devices import get_local_devices
@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 class UnlockAndPushExp(ExpFragment):
     """
-    Assert an unlock on a laser and push it over
+    Assert an unlock on a laser and push it over then bring it back to its default value after a delay.
 
     Breaks out the :class:`~SetSupplies` Fragment.
     """
@@ -52,11 +52,6 @@ class UnlockAndPushExp(ExpFragment):
         )
         self.time_to_shift: FloatParamHandle
 
-        self.setattr_param(
-            "reset", BoolParam, "Relock the laser instead", default=False
-        )
-        self.reset: BoolParamHandle
-
         # NB this means TTLIn cant be used but due to type checking we have no option
         unlocks = [dev for dev in get_local_devices(self, TTLInOut) if "unlock" in dev]
         self.setattr_argument(
@@ -72,28 +67,26 @@ class UnlockAndPushExp(ExpFragment):
 
     @kernel
     def run_once(self):
-        self.core.reset()
+        self.core.break_realtime()
 
-        if self.reset.get():
-            """
-            Relock an ECDL
+        """
+        Unlock an ECDL
+        """
+        self.unlock_ttl.on()
+        self.setter.set_outputs([self.offset.get()])
+        delay(200 * ms)
 
-            Unpush and then after `time_to_shift` seconds, turn the TTL off
-            """
-            self.setter.set_to_defaults()
-            delay(self.time_to_shift.get())
-            self.unlock_ttl.off()
-            logging.warning("Relocking %s", self.laser)
+        """
+        Relock an ECDL
 
-        else:
-            """
-            Unlock an ECDL
-            """
-            self.unlock_ttl.on()
-            self.setter.set_outputs([self.offset.get()])
-            logging.warning(
-                "%s left unlocked and pushed by %s MHz", self.laser, self.offset.get()
-            )
+        Unpush and then after `time_to_shift` seconds, turn the TTL off
+        """
+        self.setter.set_to_defaults()
+        delay(self.time_to_shift.get())
+        self.unlock_ttl.off()
+        logging.warning("Relocking %s", self.laser)
+
+        delay(200 * ms)
 
 
 SetAnalogCurrentSupplyExp = make_fragment_scan_exp(UnlockAndPushExp)

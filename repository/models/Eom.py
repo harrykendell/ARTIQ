@@ -19,11 +19,13 @@ class Eom(DEVICE):
     """
     A simple class that holds information about an EOM driven by a mirny/almazny
 
+    NOTE: The frequency is the Almazny frequency, which is double the Mirny frequency.
+
     """
 
     name: str  # friendly name to access by
 
-    frequency: float  # The mirny frequency
+    frequency: float  # The Almazny frequency (double the mirny frequency) in Hz
     attenuation: float
 
     mirny_ch: str

@@ -46,7 +46,7 @@ VDRIVEN_SUPPLIES = [
         fastino="fastino",
         ch=3,
         gain=2.0 * A / V,
-        max_output=1.0 * A,
+        max_output=0.3 * A,
         default_output=0.0 * A,
     ),
     VDrivenSupply(
@@ -130,7 +130,7 @@ SUSERVOED_BEAMS = [
     SUServoedBeam(
         name="MOT",
         suservo_device="suservo_aom_MOT",
-        frequency=192.0 * MHz,
+        frequency=190.5 * MHz,
         attenuation=17.0 * dB,
         shutter_device="shutter_3DMOT,shutter_2DMOT",
         shutter_delay=THORLABS_SHUTTER_DELAY,
@@ -146,7 +146,7 @@ SUSERVOED_BEAMS = [
         attenuation=18.0 * dB,
         # shutter_device="shutter_IMG",
         # shutter_delay=EBAY_SHUTTER_DELAY,
-        setpoint=0.1 * V,
+        setpoint=0.07 * V,
         # servo_enabled=True,
         # calib_gain=36.64e-3,
         # calib_offset=-0.87e-3,
@@ -186,11 +186,11 @@ SUSERVOED_BEAMS = [
         suservo_device="suservo_aom_CDT2",
         frequency=110.0 * MHz,
         attenuation=18.0 * dB,
-        servo_enabled=False,
-        photodiode_offset=0.0115 * V,
-        calib_gain=12900.0,
-        calib_offset=-38.0,
-        setpoint=10.0 * V,
+        servo_enabled=True,
+        photodiode_offset=0.00 * V,
+        calib_gain=1046.0,
+        calib_offset=-196.8,
+        setpoint=0.0 * V,
     ),
 ]
 # Convert to dict for ease of use

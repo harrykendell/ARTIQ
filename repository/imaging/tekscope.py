@@ -128,3 +128,10 @@ class TekscopeExp(Fragment):
         waveform_data = self.tek.get_waveform_for_artiq(channel)
         logger.info(f"Retrieved waveform data for {channel}")
         return waveform_data
+     
+    #ready for trigger
+    @host_only
+    def ready_for_trigger(self):
+        """Set the Tekscope to ready for trigger mode"""
+        self.tek.write("ACQUIRE:STATE RUN")
+        logger.info("Tekscope set to ready for trigger mode")

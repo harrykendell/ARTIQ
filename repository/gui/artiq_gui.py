@@ -30,7 +30,7 @@ from managers.SUServoManager import SUServoManager
 
 from artiq.coredevice.core import Core
 from artiq.experiment import EnvExperiment, kernel, rpc
-from artiq.language import BooleanValue, ms
+from artiq.language import StringValue, BooleanValue, ms
 
 
 class Switch(QWidget):
@@ -753,6 +753,13 @@ class ArtiqGUIExperiment(EnvExperiment):
             tooltip="Enable remote X forwarded display",
         )
 
+        self.setattr_argument(
+            "display",
+            StringValue("127.0.0.1:11.0"),
+            group="GUI",
+            tooltip="The remote X forwarded display",
+        )
+
         self.suservo = self.get_device("suservo")
         self.suservo_chs = [self.get_device(f"suservo_ch{i}") for i in range(8)]
         self.shutters = [
@@ -823,20 +830,18 @@ class ArtiqGUIExperiment(EnvExperiment):
 
         os.environ.pop("XAUTHORITY", None)
 
-        for num in range(10, 15):
-            os.environ["DISPLAY"] = f"localhost:{num}"
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    "-c",
-                    "from PyQt5.QtWidgets import QApplication;app = QApplication([])",
-                ],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-            )
-            if result.returncode == 0:
-                print(f"Connected to display localhost:{num}")
-                return True
+        os.environ["DISPLAY"] = self.display
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                "from PyQt5.QtWidgets import QApplication;app = QApplication([])",
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        if result.returncode == 0:
+            return True
         raise RuntimeError(
             "Could not find a working display localhost:10 to localhost:15"
             " - Ensure localhost is set to 127.0.0.1 in /etc/hosts"

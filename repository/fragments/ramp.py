@@ -70,6 +70,7 @@ class Ramp(Fragment):
                 default,
                 OTHER_RAMP,
                 -DETUNING["CMOT"],
+            ]
             supplies_end = [
                 VDrivenSupply["X1"].default_output * 1.5,
                 VDrivenSupply["X2"].default_output * 1.5,

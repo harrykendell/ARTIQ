@@ -149,31 +149,30 @@
 # Frequency_Modulation = make_fragment_scan_exp(SinusoidalFrequencyModulation)
 
 
+# Compute timing
+# samples_per_sec = (
+#     self.N.get() * self.f_m.get()
+# )  # sample_rate ≤ 0.9e6 (safety margin)
 
-   # Compute timing
-        # samples_per_sec = (
-        #     self.N.get() * self.f_m.get()
-        # )  # sample_rate ≤ 0.9e6 (safety margin)
+# Precompute kernel-invariant timing
+# dt = 1.0 / samples_per_sec  # seconds between sample/ time-steps
+# dt = 1.0 / float(self.N.get() * self.f_m.get())
 
-        # Precompute kernel-invariant timing
-        # dt = 1.0 / samples_per_sec  # seconds between sample/ time-steps
-        dt = 1.0 / float(self.N.get() * self.f_m.get())
+# # # hardware timing constraints (use mu to avoid float drift)
+# # t_frame_mu = self.fastino.t_frame
+# # margin_mu = self.core.seconds_to_mu(0 * us)  # small safety margin
+# # step_mu = max(self.core.seconds_to_mu(dt), t_frame_mu + margin_mu)
 
-        # # hardware timing constraints (use mu to avoid float drift)
-        # t_frame_mu = self.fastino.t_frame
-        # margin_mu = self.core.seconds_to_mu(0 * us)  # small safety margin
-        # step_mu = max(self.core.seconds_to_mu(dt), t_frame_mu + margin_mu)
+# # Precompute phase step for efficiency
+# phase_step = (2.0 * np.pi * float(self.f_m.get()))/ float(self.N.get())
 
-        # Precompute phase step for efficiency
-        phase_step = (2.0 * np.pi * float(self.f_m.get()))/ float(self.N.get())
+# #  Record DMA sequence
+# with self.core_dma.record("sine_wave"):
+#     for i in range(self.N.get()):
+#         # Method  1: using phase step
+#         phase = i * phase_step
+#         self.setter.set_outputs([self.f_dev.get() * np.sin(phase)])
+#         delay_mu(0)
 
-        #  Record DMA sequence
-        with self.core_dma.record("sine_wave"):
-            for i in range(self.N.get()):
-                # Method  1: using phase step
-                phase = i * phase_step
-                self.setter.set_outputs([self.f_dev.get() * np.sin(phase)])
-                delay_mu(0)
-
-            # let the last write settle
-            # delay_mu(t_frame_mu + margin_mu)
+#     # let the last write settle
+#     # delay_mu(t_frame_mu + margin_mu)

@@ -26,8 +26,8 @@ logging.getLogger("pco").setLevel(logging.WARNING)
 
 dimple_pixel_scan = 10
 MOT_SIZE = 300
-MOT_X = 1000
-MOT_Y = 600
+MOT_X = 800
+MOT_Y = 550
 
 
 def edge_roi_correct(roi):
@@ -50,7 +50,8 @@ class ROI(Enum):
         MOT_X + MOT_SIZE,
         MOT_Y + MOT_SIZE,
     )
-    ODT_Reservoir_pixelfly = (1, 450, 1392, 750)
+    ODT_Reservoir_pixelfly = (700, 430, 989, 550)
+    # ODT_Reservoir_pixelfly = (400, 300, 989, 700) refrence saved for future use for the moving stage flexiboity in axial direction
     ODT_Dimple_pixelfly = (1, 550 - dimple_pixel_scan, 1260, 650 - dimple_pixel_scan)
 
     FULL_EDGE = (1, 1, 2000, 2000)
