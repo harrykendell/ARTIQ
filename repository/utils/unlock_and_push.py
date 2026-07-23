@@ -7,6 +7,7 @@ from ndscan.experiment import ExpFragment, FloatParam
 from ndscan.experiment.entry_point import make_fragment_scan_exp
 from ndscan.experiment.parameters import FloatParamHandle
 from repository.fragments.supply_setter import SetSupplies
+from repository.imaging.tekscope import TekscopeExp
 from repository.models.devices import VDrivenSupply
 from repository.utils.get_local_devices import get_local_devices
 
@@ -43,6 +44,10 @@ class UnlockAndPushExp(ExpFragment):
         )
         self.offset: FloatParamHandle
 
+        self.tekscope: TekscopeExp = self.setattr_fragment(
+            "tekscope", TekscopeExp, single_acquisition=True
+        )
+
         self.setattr_param(
             "time_to_shift",
             FloatParam,
@@ -74,7 +79,7 @@ class UnlockAndPushExp(ExpFragment):
         """
         self.unlock_ttl.on()
         self.setter.set_outputs([self.offset.get()])
-        delay(200 * ms)
+        delay(10 * ms)
 
         """
         Relock an ECDL
