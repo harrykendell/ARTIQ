@@ -1,5 +1,6 @@
 import dataclasses
 import functools
+import math
 import warnings
 import numpy as np
 import scipy.constants as const
@@ -7,7 +8,7 @@ import matplotlib.pyplot as plt
 from lmfit import Model
 from matplotlib.gridspec import GridSpec
 from matplotlib.ticker import FuncFormatter
-from scipy.ndimage import gaussian_filter
+from scipy.ndimage import gaussian_filter, label
 from dataclasses import dataclass
 from artiq.language.units import MHz
 
@@ -54,11 +55,18 @@ class AbsImageSettings:
     detuning: float = 0 * MHz
     linewidth: float = 6.065 * MHz
     atom_mass: float = 1.443e-25  # kg, mass of Rb87
-    temperature: float = 40e-6  # K
     pixel_size: float = 6.45e-6  # m
     fit_downsample: int = 5
     magnification: float = 0.19  # Set to None to force user to specify
-    time_of_flight: float = 0.0  # seconds, time of flight before imaging
+    time_of_flight: float = 0.0  # s; retained in serialized image settings
+
+    # PSD estimation parameters
+    temperature: float = 40e-6  # K
+
+    # Image processing and fit controls. Defaults reproduce the regression-tested
+    # beam-aware fit while remaining compatible with older serialized settings.
+    beam_threshold: float = 0.05
+    image_smoothing_sigma: float = 1.0
 
     # need this to be pyon serializable for dataset storage
     def to_dataset(self):
@@ -72,7 +80,6 @@ class AbsImageSettings:
 class AbsImage:
     nm = 1e-9
     um = 1e-6
-    threshold = 0.05  # multiple of maximum light to count as in the beam
 
     def __init__(
         self,
@@ -82,13 +89,16 @@ class AbsImage:
         settings: AbsImageSettings = AbsImageSettings(),
     ):
         """AbsImage class for processing absorption images.
-
+ 
         Args:
             data (np.ndarray): The atom/light image.
             ref (np.ndarray): The light image with no atoms.
             bg (np.ndarray): The background image with no light or atoms.
-
-            settings (AbsImageSettings): The settings for the absorption image processing.
+            wavelength (float): The wavelength of the imaging transition.
+            detuning (float): The detuning from the imaging transition.
+            linewidth (float): The linewidth of the imaging transition.
+            pixel_size (float): The size of the pixels in the camera.
+            magnification (float): The magnification of the imaging system.\
         """
         assert data.shape == ref.shape == bg.shape
         self.data_image = np.asarray(np.rot90(data), dtype=np.float64)
@@ -102,7 +112,12 @@ class AbsImage:
         self.settings = settings
 
         if self.settings.magnification is None:
-            raise ValueError("Please set magnification for the PCO camera\n")
+            # NB for now 50mm lens at 150mm distance focuses to 75mm away
+            # self.magnification = 75 / 150 = 0.5
+            raise ValueError(
+                "Please set magnification for the PCO camera\nNB: For nowa 50mm lens at"
+                " 150mm focuses to 75mm away, so set to 0.5"
+            )
         self.magnification = self.settings.magnification
 
     def all_info(self):
@@ -125,6 +140,8 @@ class AbsImage:
             "sigmax": {self.best_values["sx"]},
             "sigmay": {self.best_values["sy"]},
             "time_of_flight": {self.settings.time_of_flight},
+            "sigmax_mm": {self.best_values["sx"] * self.physical_scale * 1e3},
+            "sigmay_mm": {self.best_values["sy"] * self.physical_scale * 1e3},
         """
 
     @functools.cached_property
@@ -133,47 +150,121 @@ class AbsImage:
         scale = self.settings.pixel_size * (1 / self.settings.magnification)
         return scale
 
-    @functools.cached_property
-    def optical_density(self):
-        smoothed_transmission = gaussian_filter(self.transmission, sigma=1)
-        od = -np.log(smoothed_transmission, where=smoothed_transmission > 0)
-        return od
+    @staticmethod
+    def _largest_component(mask):
+        """Return the largest connected True component in a boolean mask."""
+        labelled, count = label(mask)
+        if count == 0:
+            return mask
+        sizes = np.bincount(labelled.ravel())
+        sizes[0] = 0
+        return labelled == int(np.argmax(sizes))
+
+    @staticmethod
+    def _robust_location_scale(values):
+        """Return median and a MAD-based robust standard deviation."""
+        values = np.asarray(values)
+        values = values[np.isfinite(values)]
+        if values.size == 0:
+            return 0.0, 1.0
+        median = float(np.median(values))
+        mad = float(np.median(np.abs(values - median)))
+        return median, max(1.4826 * mad, 1e-6)
 
     @functools.cached_property
-    def peak_density(self):
-        """Returns the peak atomic density in atoms per cm^3"""
-        n_d = self.phase_space_density[0] * 1e-6
-        return n_d
+    def smoothed_atoms(self):
+        """Dark-subtracted atom frame used to form transmission."""
+        return gaussian_filter(
+            np.subtract(self.data_image, self.bg_image),
+            sigma=self.settings.image_smoothing_sigma,
+        )
+
+    @functools.cached_property
+    def smoothed_light(self):
+        """Dark-subtracted reference frame used to form transmission."""
+        return gaussian_filter(
+            np.subtract(self.ref_image, self.bg_image),
+            sigma=self.settings.image_smoothing_sigma,
+        )
+
+    @functools.cached_property
+    def beam_mask(self):
+        """Pixels reliably illuminated by the absorption-imaging beam.
+
+        The reference image, rather than the atom image, defines where the
+        transmission denominator is trustworthy. The largest connected beam is
+        retained.
+        """
+        light = self.smoothed_light
+        finite_light = light[np.isfinite(light)]
+        if finite_light.size == 0:
+            return np.ones_like(light, dtype=bool)
+
+        light_peak = float(np.nanpercentile(finite_light, 99.9))
+        if not np.isfinite(light_peak) or light_peak <= 0:
+            mask = np.isfinite(light) & (light > 0)
+        else:
+            mask = np.isfinite(light) & (
+                light > self.settings.beam_threshold * light_peak
+            )
+
+        mask = self._largest_component(mask)
+        if not np.any(mask):
+            return np.isfinite(light)
+
+        return mask
 
     @functools.cached_property
     def transmission(self):
-        """Returns the beam and dark-field compensated transmission image.
-        Dark-field is subtracted from both the atom image and the beam image,
-        and the atom image is divided by the beam image, giving the transmission t^2.
-        The values should optimally lie in the range of [0, 1] but can realistically be
-        in the range of [-0.1, 1.5] due to noise and beam variation across images."""
+        """Beam- and dark-field-compensated transmission.
 
-        atoms = np.subtract(self.data_image, self.bg_image)
-        light = np.subtract(self.ref_image, self.bg_image)
+        The lower bound is clipped to keep the logarithm finite. Pixels outside ``beam_mask`` are set to one.
+        """
+        transmission = np.ones_like(self.smoothed_atoms, dtype=np.float64)
+        valid = self.beam_mask & np.isfinite(self.smoothed_light)
+        valid &= self.smoothed_light > 0
 
-        # If the light data is below some threshold, we assume that any
-        # atom data at this location is invalid and treat as if no transmission.
-        # The threshold value was selected experimentally
-        threshold = np.max(atoms) * AbsImage.threshold
-        transmission = np.divide(atoms, light, where=light > threshold)
-        transmission[light <= threshold] = 1
-        np.clip(transmission, a_min=0, a_max=1, out=transmission)
-
+        np.divide(
+            self.smoothed_atoms,
+            self.smoothed_light,
+            out=transmission,
+            where=valid,
+        )
+        transmission[valid] = np.maximum(transmission[valid], 1e-4)
+        transmission[~valid] = 1.0
         return transmission
 
     @functools.cached_property
+    def optical_density(self):
+        """Signed optical density used for fitting.
+
+        Negative values are retained inside the illuminated beam. This avoids
+        rectifying camera and reference-frame noise into a positive OD pedestal.
+        """
+        od = np.zeros_like(self.transmission, dtype=np.float64)
+        od[self.beam_mask] = -np.log(self.transmission[self.beam_mask])
+        return od
+
+    @functools.cached_property
+    def cloud_optical_density(self):
+        """Positive atom-cloud OD after removal of the fitted background offset."""
+        cloud_od = np.zeros_like(self.optical_density, dtype=np.float64)
+        z0 = float(self.best_values.get("z0", 0.0))
+        cloud_od[self.beam_mask] = np.clip(
+            self.optical_density[self.beam_mask] - z0,
+            0,
+            None,
+        )
+        return cloud_od
+
+    @functools.cached_property
     def sigmax(self):
-        """Returns the fitted sigma_x in pixels"""
+        """Returns the fitted sigma_x in pixels."""
         return self.best_values["sx"]
 
     @functools.cached_property
     def sigmay(self):
-        """Returns the fitted sigma_y in pixels"""
+        """Returns the fitted sigma_y in pixels."""
         return self.best_values["sy"]
 
     @functools.cached_property
@@ -183,45 +274,45 @@ class AbsImage:
 
     @functools.cached_property
     def atom_number(self):
-        """Calculates the total atom number from the transmission ROI values."""
-        # light and camera parameters
-        sigma_0 = (3 / (2 * np.pi)) * np.square(
-            self.settings.wavelength
-        )  # cross-section
+        """Calculate atom number from background-corrected cloud OD."""
+        sigma_0 = (3 / (2 * np.pi)) * np.square(self.settings.wavelength)
         sigma = sigma_0 * np.reciprocal(
             1
             + np.square(4 * np.square(self.settings.detuning / self.settings.linewidth))
-        )  # off resonance
+        )
         area = np.square(self.physical_scale)  # pixel area in SI units
 
-        optical_density = self.optical_density[self.sigma_mask]
+        integration_mask = self.sigma_mask & self.beam_mask
+        optical_density = self.cloud_optical_density[integration_mask]
 
-        if np.max(optical_density) < 0.1:
-            # logging.warning("There don't seem to be any atoms in the image")
+        if optical_density.size == 0 or np.max(optical_density) < 0.1:
             return -np.inf
 
-        return (
-            (area / sigma) * np.sum(optical_density) / 0.866
-        )  # Divide by 1.5-sigma area
+        # Divided by 1.5-sigma area for a 2D Gaussian to get the total number of atoms
+        return (area / sigma) * np.sum(optical_density) / 0.866
 
     @functools.cached_property
     def peak(self):
-        """Returns y, x, z of brightest pixel in absorption in pixels"""
+        """Return y, x, and peak background-corrected cloud OD in pixels."""
         y, x = np.unravel_index(
-            np.argmax(self.optical_density), self.optical_density.shape
+            np.argmax(self.cloud_optical_density),
+            self.cloud_optical_density.shape,
         )
-        z = self.optical_density[y, x]
-        return y, x, z
+        return y, x, self.cloud_optical_density[y, x]
 
     @functools.cached_property
     def centroid(self):
-        """Returns y, x, z of the centroid of the absorption image in pixels"""
+        """Return y, x, and OD at the cloud's positive-OD centroid in pixels."""
         y, x = self.xy
-        A = np.sum(self.optical_density)
-        y_c = int(np.sum(y * self.optical_density) / A)
-        x_c = int(np.sum(x * self.optical_density) / A)
-        z_c = self.optical_density[y_c, x_c]
-        return y_c, x_c, z_c
+        weights = self.cloud_optical_density
+        total = float(np.sum(weights))
+        if not np.isfinite(total) or total <= 0:
+            y_c = int(np.clip(round(self.best_values["y0"]), 0, self.height - 1))
+            x_c = int(np.clip(round(self.best_values["x0"]), 0, self.width - 1))
+        else:
+            y_c = int(np.clip(round(np.sum(y * weights) / total), 0, self.height - 1))
+            x_c = int(np.clip(round(np.sum(x * weights) / total), 0, self.width - 1))
+        return y_c, x_c, weights[y_c, x_c]
 
     @functools.cached_property
     def sigma_mask(self):
@@ -238,7 +329,7 @@ class AbsImage:
 
         array = np.zeros(self.data_image.shape, dtype="bool")
         array[maj_axis / np.square(b) + min_axis / np.square(a) <= bound] = True
-        return array
+        return array & self.beam_mask
 
     @functools.cached_property
     def x0(self):
@@ -250,37 +341,157 @@ class AbsImage:
         """Returns the y0 of the fitted gaussian in pixels."""
         return self.best_values["y0"]
 
+    def _fit_initial_values(self):
+        """Estimate cloud geometry without assuming a zero OD background."""
+        od = self.optical_density
+        mask = self.beam_mask & np.isfinite(od)
+        y, x = self.xy
+
+        values = od[mask]
+        if values.size == 0:
+            return {
+                "A": 0.01,
+                "x0": self.width / 2,
+                "y0": self.height / 2,
+                "sx": max(self.width / 8, 1),
+                "sy": max(self.height / 8, 1),
+                "z0": 0.0,
+            }
+
+        z0 = float(np.nanpercentile(values, 20))
+        initial_image = np.zeros_like(od, dtype=np.float64)
+        initial_image[mask] = np.clip(od[mask] - z0, 0, None)
+        initial_image = gaussian_filter(initial_image, sigma=1)
+
+        lower_half = values[values <= np.nanmedian(values)]
+        _, noise = self._robust_location_scale(lower_half)
+        peak = float(np.nanmax(initial_image[mask]))
+        threshold = max(self.settings.beam_threshold * peak, 3.0 * noise)
+        candidate = mask & (initial_image >= threshold)
+
+        # Prefer the connected feature containing the strongest absorption.
+        peak_flat = int(np.nanargmax(np.where(mask, initial_image, np.nan)))
+        peak_y, peak_x = np.unravel_index(peak_flat, od.shape)
+        labelled, count = label(candidate)
+        if count and labelled[peak_y, peak_x] != 0:
+            component = labelled == labelled[peak_y, peak_x]
+            if np.count_nonzero(component) >= 3:
+                candidate = component
+
+        weights = np.where(candidate, initial_image, 0.0)
+        total = float(np.sum(weights))
+        if total <= 0 or np.count_nonzero(weights) < 3:
+            weights = np.where(mask, initial_image, 0.0)
+            total = float(np.sum(weights))
+
+        if total <= 0:
+            return {
+                "A": max(peak, 0.01),
+                "x0": self.width / 2,
+                "y0": self.height / 2,
+                "sx": max(self.width / 8, 1),
+                "sy": max(self.height / 8, 1),
+                "z0": z0,
+            }
+
+        x0 = float(np.sum(x * weights) / total)
+        y0 = float(np.sum(y * weights) / total)
+        sx = float(np.sqrt(np.sum(np.square(x - x0) * weights) / total))
+        sy = float(np.sqrt(np.sum(np.square(y - y0) * weights) / total))
+        amplitude = (
+            float(np.nanmax(initial_image[candidate])) if np.any(candidate) else peak
+        )
+
+        return {
+            "A": max(amplitude, 0.01),
+            "x0": x0,
+            "y0": y0,
+            "sx": sx,
+            "sy": sy,
+            "z0": z0,
+        }
+
+    @functools.cached_property
+    def fit_sampling_step(self):
+        """Adaptive two-axis downsampling used by the Gaussian fit."""
+        initial = self._fit_initial_values()
+        configured = max(1, int(self.settings.fit_downsample))
+
+        # Keep roughly six samples across the smaller 2-sigma diameter.
+        scale_step = max(
+            1,
+            int(math.floor(min(initial["sx"], initial["sy"]) / 3.0)),
+        )
+        return min(configured, scale_step)
+
     @functools.cached_property
     def fit(self):
-        """Fits a 2D Gaussian against the absorption."""
-
+        """Fit a robust Gaussian-plus-offset model within the reference beam."""
         y_mg, x_mg = self.xy
+        od = self.optical_density
+        initial = self._fit_initial_values()
         model = Model(ravel(gaussian_2D), independent_vars=["x", "y"])
 
-        y_c, x_c, A = self.centroid
-        model.set_param_hint("A", value=A, min=0, max=10)
+        model.set_param_hint("A", value=initial["A"], min=0)
         model.set_param_hint(
-            "x0", value=x_c, min=-0.1 * self.width, max=1.1 * self.width
+            "x0",
+            value=initial["x0"],
+            min=0,
+            max=self.width - 1,
         )
         model.set_param_hint(
-            "y0", value=y_c, min=-0.1 * self.width, max=1.1 * self.height
+            "y0",
+            value=initial["y0"],
+            min=0,
+            max=self.height - 1,
+        )
+        model.set_param_hint(
+            "sx",
+            value=initial["sx"],
+            max=self.width,
+        )
+        model.set_param_hint(
+            "sy",
+            value=initial["sy"],
+            max=self.height,
+        )
+        model.set_param_hint(
+            "theta",
+            value=0,
+            min=-np.pi / 2,
+            max=np.pi / 2,
+            vary=False,
+        )
+        model.set_param_hint(
+            "z0",
+            value=initial["z0"],
+            min=-1,
+            max=1,
+            vary=True,
         )
 
-        model.set_param_hint("sx", value=self.width / 4, min=1, max=self.width)
-        model.set_param_hint("sy", value=self.height / 4, min=1, max=self.height)
-        model.set_param_hint(
-            "theta", value=0, min=-np.pi / 2, max=np.pi / 2, vary=False
-        )
-        model.set_param_hint("z0", value=0, vary=False)
+        step = self.fit_sampling_step
+        sample_mask = np.zeros_like(self.beam_mask, dtype=bool)
+        sample_mask[::step, ::step] = True
+        fit_mask = self.beam_mask & sample_mask & np.isfinite(od)
+
+        if np.count_nonzero(fit_mask) < 7:
+            fit_mask = self.beam_mask & np.isfinite(od)
+        if np.count_nonzero(fit_mask) < 7:
+            raise ValueError("Too few illuminated pixels for an absorption-image fit")
 
         result = model.fit(
-            np.ravel(self.optical_density[:: self.settings.fit_downsample]),
-            x=x_mg[:: self.settings.fit_downsample],
-            y=y_mg[:: self.settings.fit_downsample],
-            max_nfev=1000,
-            fit_kws={"xtol": 1e-7},
+            od[fit_mask],
+            x=x_mg[fit_mask],
+            y=y_mg[fit_mask],
+            method="least_squares",
+            max_nfev=4000,
+            fit_kws={
+                "xtol": 1e-7,
+                "ftol": 1e-8,
+                "gtol": 1e-8,
+            },
         )
-
         return result
 
     @functools.cached_property
@@ -344,67 +555,21 @@ class AbsImage:
 
     @property
     def best_fit(self):
-        """Returns the evaluated best fit.
-
-        The fit has been reshaped to the original image size.
-        """
+        """Evaluate the complete Gaussian-plus-offset fit on the image grid."""
         return self.eval(x=self.xy[1], y=self.xy[0]).reshape(self.height, self.width)
 
+    @property
+    def best_fit_cloud(self):
+        """Evaluate only the positive Gaussian cloud component of the fit."""
+        return self.best_fit - float(self.best_values.get("z0", 0.0))
+
     def eval(self, *, x, y):
-        """Evaluates the fit at the given coordinates."""
+        """Evaluate the complete Gaussian-plus-offset fit."""
         return self.fit.eval(x=x, y=y)
 
-    @staticmethod
-    def fake(num_gaussians=1):
-        """
-        Creates a randomised fake AbsImage object for testing purposes.
-        """
-        height, width = 1392, 1040
-        posy = np.random.uniform(width / 3, width * 2 / 3)
-        posx = np.random.uniform(height / 3, height * 2 / 3)
-
-        x, y = np.mgrid[0:height, 0:width]
-        fake_ref = gaussian_2D(
-            x,
-            y,
-            A=np.random.uniform(10000, 16000),
-            x0=posx,
-            y0=posy,
-            sx=np.random.uniform(width / 4, width / 2),
-            sy=np.random.uniform(height / 4, height / 2),
-            theta=np.random.uniform(0, np.pi),
-        )
-
-        sx = np.random.uniform(width / 20, width / 5)
-        sy = np.random.uniform(height / 20, height / 5)
-        atom_cloud = fake_ref * 0
-        for num in range(1, num_gaussians + 1):
-            atom_cloud += gaussian_2D(
-                x,
-                y,
-                A=np.random.uniform(-1, -0.0) / num_gaussians,
-                x0=posx * np.random.uniform(0.7, 1.3 / num**0.5),
-                y0=posy * np.random.uniform(0.7, 1.3 / num**0.5),
-                sx=sx * np.random.uniform(0.5, 1.5 / num**0.5),
-                sy=sy * np.random.uniform(0.5, 1.5 / num**0.5),
-                theta=np.random.uniform(0, np.pi),
-                z0=1 / num_gaussians,
-            )
-
-        fake_data = gaussian_filter(np.multiply(fake_ref, atom_cloud), width // 20)
-
-        # add some noise
-        noise = 0
-        fake_ref += np.random.normal(0, noise, size=fake_ref.shape)
-        fake_data += np.random.normal(0, noise, size=fake_data.shape)
-        fake_bg = np.random.normal(0, noise, size=fake_ref.shape)
-
-        return AbsImage(
-            data=fake_data,
-            ref=fake_ref,
-            bg=fake_bg,
-            magnification=0.5,
-        )
+    def eval_cloud(self, *, x, y):
+        """Evaluate only the Gaussian cloud component."""
+        return self.eval(x=x, y=y) - float(self.best_values.get("z0", 0.0))
 
     def plot(self, fig=None):
         """
@@ -490,11 +655,19 @@ class AbsImage:
         extent = [0, self.width * scale_mm, 0, self.height * scale_mm]
         formatter = FuncFormatter(lambda x, pos: f"{x:.1f}")
 
-        # Plot parameters
-        vmin, vmax = (
-            min(np.min(self.optical_density), np.min(self.best_fit)),
-            max(np.max(self.optical_density), np.max(self.best_fit)),
+        # Plot the cloud-only OD so the display remains clear even though the
+        # fit uses signed OD internally.
+        display_od = self.cloud_optical_density
+        display_fit = self.best_fit_cloud
+        illuminated_values = display_od[self.beam_mask]
+        vmax = max(
+            float(np.nanpercentile(illuminated_values, 99.9))
+            if illuminated_values.size
+            else 0,
+            float(self.best_values["A"]),
+            1e-6,
         )
+        vmin = 0.0
         plot_params = {
             "cmap": "viridis",
             "origin": "lower",
@@ -516,7 +689,7 @@ class AbsImage:
         )
 
         # OD plot
-        im1 = od_ax.imshow(self.optical_density, **plot_params)
+        im1 = od_ax.imshow(display_od, **plot_params)
         od_ax.set(xlabel="Horizontal position (mm)", ylabel="Vertical position (mm)")
         od_ax.xaxis.labelpad = 2
         od_ax.yaxis.labelpad = 2
@@ -539,7 +712,7 @@ class AbsImage:
         od_ax.contour(
             x_contour,
             y_contour,
-            self.best_fit,
+            display_fit,
             levels=[self.fit.best_values["A"] * np.exp(-1)],
             colors="green",
             linewidths=1,
@@ -564,14 +737,14 @@ class AbsImage:
         marginal_slices = [
             (
                 x_contour,
-                self.optical_density[y0_idx, :],
-                self.eval(x=x_pixels, y=np.full(self.width, y0_px)),
+                display_od[y0_idx, :],
+                self.eval_cloud(x=x_pixels, y=np.full(self.width, y0_px)),
                 False,
             ),
             (
                 y_contour,
-                self.optical_density[:, x0_idx],
-                self.eval(x=np.full(self.height, x0_px), y=y_pixels),
+                display_od[:, x0_idx],
+                self.eval_cloud(x=np.full(self.height, x0_px), y=y_pixels),
                 True,
             ),
         ]
@@ -659,7 +832,7 @@ class AbsImage:
         textstr = "\n".join((
             rf"Atom number: $\mathbf{{{self.atom_number:.2e}}}$",
             rf"Time of Flight (ms): $\mathbf{{{self.settings.time_of_flight * 1e3:.4g}}}$",
-            rf"Peak OD: $\mathbf{{{self.optical_density[self.peak[0], self.peak[1]]:.2f}}}$",
+            rf"Peak OD: $\mathbf{{{self.peak[2]:.2f}}}$",
             rf"Centroid (mm): ($\mathbf{{{centroid_mm[0]:.2f}}}$, $\mathbf{{{centroid_mm[1]:.2f}}}$)",
             rf"Peak center (mm): ($\mathbf{{{peak_mm[0]:.2f}}}$, $\mathbf{{{peak_mm[1]:.2f}}}$)",
             rf"$\sigma_x$ (mm): $\mathbf{{{self.best_values['sx'] * scale_mm:.2f}}}$",
@@ -680,4 +853,4 @@ class AbsImage:
 
         plt.tight_layout()
 
-        return fig, axes + [cax_raw, cax_od], im1
+        return fig, axes + [cax_raw, cax_od]
