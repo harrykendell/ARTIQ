@@ -41,7 +41,7 @@ SETTLE_TIME = {
     "EVAPORATION2": 0 * ms,
 }
 DETUNING = {"CMOT": 5 * Γ_Rb, "PGC": 9.94 * Γ_Rb}  # This is beyond the normal 2Γ
-BIASES = {"X1": 0.0002 * A, "X2": 0.0 * A, "Y": 0.04 * A, "Z": 0.07 * A}
+BIASES = {"X1": 0.0002 * A, "X2": 0.0 * A, "Y": 0.04 * A, "Z": 0.01 * A}
 COMPRESSED_GRADIENTS = {"X1": 0 * A, "X2": 1.98 * A}
 REPUMP_ATTENUATION = {"CMOT": 0.6196 * dB, "PGC": 0.05 * dB}
 POWER_3D_MOT = {"MOT_loading": 3.5 * V, "CMOT": 1.9 * V, "PGC": 1.0 * V}
@@ -145,6 +145,12 @@ class MOT(Fragment):
             VDrivenSupply["Y"],
             init=False,
         )
+        self.z_coil: SetSupplies = self.setattr_fragment(
+            "z_coil",
+            SetSupplies,
+            VDrivenSupply["Z"],
+            init=False,
+        )
 
         self.push_780: SetSupplies = self.setattr_fragment(
             "push_780",
@@ -153,6 +159,24 @@ class MOT(Fragment):
             init=False,
         )
 
+        self.PGC_Z_current: FloatParamHandle = self.setattr_param(
+            "PGC_Z_current",
+            FloatParam,
+            "Bias current for the Z coil during PGC",
+            default=BIASES["Z"],
+            unit="A",
+            min=0.0 * A,
+            max=0.1 * A,
+        )
+        self.PGC_Y_current: FloatParamHandle = self.setattr_param(
+            "PGC_Y_current",
+            FloatParam,
+            "Bias current for the Y coil during PGC",
+            default=BIASES["Y"],
+            unit="A",
+            min=0.0 * A,
+            max=0.1 * A,
+        )
         self.power_dimple: FloatParamHandle = self.setattr_param(
             "power_dimple",
             FloatParam,
@@ -175,7 +199,7 @@ class MOT(Fragment):
             "relock_duration",
             FloatParam,
             "Duration of the relock ramp",
-            default=5 * ms,
+            default=1.0 * ms,
             unit="ms",
             min=0.0 * ms,
         )
@@ -323,16 +347,16 @@ class MOT(Fragment):
             supplies = VDrivenSupply[
                 "X1",
                 "X2",
-                "Y",
-                "Z",
                 "push_780",
             ]
             supplies_start = [
-                *BIASES.values(),
+                BIASES["X1"],
+                BIASES["X2"],
                 self.CMOT_detuning,
             ]
             supplies_end = [
-                *BIASES.values(),
+                BIASES["X1"],
+                BIASES["X2"],
                 self.PGC_detuning,
             ]
             suservos = [SUServoedBeam["MOT"]]
@@ -633,7 +657,7 @@ class MOT(Fragment):
             self.shutter_2d.off()
 
         if evaporation_active or odt_active:
-            self.odt_dimple.turn_beams_on()
+            # self.odt_dimple.turn_beams_on()
             self.odt_reservoir.turn_beams_on()
 
             # self.set_dimple_trap_power(power_dimple)
@@ -666,15 +690,18 @@ class MOT(Fragment):
         **Timeline:** advances by `self.PGC_duration` + `self.PGC_settle_time`
         """
         # Do the ramp - MOT freq, coil to biases
+        # We must do these fastino writes in advance to avoid colliding with the ramp
+        self.z_coil.set_outputs([self.PGC_Z_current.get()])
+        self.y_coil.set_outputs([self.PGC_Y_current.get()])
         with parallel:
             # Fix EOM frequency
+            self.eom.set_att(
+                self.eom.config.attenuation + self.PGC_repump_attenuation.get()
+            )
             self.eom.set_freq(
                 self.eom.config.frequency
                 + self.PGC_detuning.get()
                 + self.PGC_repump_detuning.get()
-            )
-            self.eom.set_att(
-                self.eom.config.attenuation + self.PGC_repump_attenuation.get()
             )
             self.pgc_ramp.do()
 
