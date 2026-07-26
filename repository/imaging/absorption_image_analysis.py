@@ -179,11 +179,11 @@ class AnalysisResultExpFrag(AbsorptionImageExpFrag):
                 plt.ylabel(ylabel)
 
                 title = (
-                    "MOT Temperature (X direction)"
+                    "Temperature (X direction)"
                     if diametertype == "x"
-                    else "MOT Temperature (Y direction)"
+                    else "Temperature (Y direction)"
                     if diametertype == "y"
-                    else "MOT Temperature Fit"
+                    else "Temperature Fit"
                 )
                 plt.title(title)
 

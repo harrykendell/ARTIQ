@@ -72,7 +72,7 @@ class FluorescenceImageExpFrag(ExpFragment):
 
         # By ignoring shutters we don't drop the MOT for `shutter_delay`
         # if it was already loaded
-        self.mot_beam_setter.turn_beams_on()
+        self.mot_beam_setter.on()
         self.img_beam_setter.turn_beams_off(ignore_shutters=True)
         self.coil_setter.set_to_defaults()
         delay(10 * s)
@@ -102,10 +102,10 @@ class FluorescenceImageExpFrag(ExpFragment):
 
         # reference image
         with parallel:
-            self.mot_beam_setter.turn_beams_on()
+            self.mot_beam_setter.on()
             self.pco_camera.capture_image()
         delay(self.exposure_time.get())
-        self.mot_beam_setter.turn_beams_off()
+        self.mot_beam_setter.off()
         delay(150 * ms)
 
         # background image
@@ -115,8 +115,8 @@ class FluorescenceImageExpFrag(ExpFragment):
 
         # leave the MOT to reload
         self.coil_setter.set_to_defaults()
-        self.mot_beam_setter.turn_beams_on()
-        self.img_beam_setter.turn_beams_off()
+        self.mot_beam_setter.on()
+        self.img_beam_setter.off()
 
         self.core.wait_until_mu(now_mu())
         self.update_image()

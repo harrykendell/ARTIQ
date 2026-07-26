@@ -1,32 +1,29 @@
-from enum import Enum
 import logging
 import time
+from enum import Enum
 
 import numpy as np
 import pco
-from pco import sdk
-
 from artiq.coredevice.core import Core
 from artiq.coredevice.ttl import TTLInOut
 from artiq.experiment import delay, delay_mu, host_only, kernel, rpc
 from artiq.language.units import ms, s, us
 from ndscan.experiment import (
+    EnumParam,
     ExpFragment,
     FloatParam,
     Fragment,
-    make_fragment_scan_exp,
-    EnumParam,
     ParamHandle,
+    make_fragment_scan_exp,
 )
 from ndscan.experiment.parameters import FloatParamHandle
-from repository.models.device_db import server_addr
 
 logger = logging.getLogger(__name__)
 logging.getLogger("pco").setLevel(logging.WARNING)
 
 dimple_pixel_scan = 10
 MOT_SIZE = 300
-MOT_X = 800
+MOT_X = 680
 MOT_Y = 550
 
 
@@ -50,7 +47,8 @@ class ROI(Enum):
         MOT_X + MOT_SIZE,
         MOT_Y + MOT_SIZE,
     )
-    ODT_Reservoir_pixelfly = (700, 430, 989, 550)
+    ODT_Reservoir_pixelfly = (650, 470, 750, 550)
+    # ODT_Reservoir_pixelfly = (500, 430, 989, 550)
     # ODT_Reservoir_pixelfly = (400, 300, 989, 700) refrence saved for future use for the moving stage flexiboity in axial direction
     ODT_Dimple_pixelfly = (1, 550 - dimple_pixel_scan, 1260, 650 - dimple_pixel_scan)
 
@@ -66,8 +64,8 @@ class ROI(Enum):
 
 
 class camera_name(Enum):
-    FIRST = "pco.pixelfly usb"
-    SECOND = "pco.edge 4.2m LT rolling shutter"
+    PIXELFLY = "pco.pixelfly usb"
+    EDGE = "pco.edge 4.2m LT rolling shutter"
 
 
 class BUSY_TIME(Enum):
@@ -106,7 +104,7 @@ class PcoCamera(Fragment):
             "camera_used",
             EnumParam,
             "Select which camera to use",
-            default=camera_name.FIRST,
+            default=camera_name.PIXELFLY,
             enum_class=camera_name,
         )
         self.camera_used: ParamHandle
@@ -124,12 +122,10 @@ class PcoCamera(Fragment):
         Setup the host-side camera controls
         """
 
-        FIRST = 19701804
-        SECOND = 61011464
-        if self.camera_used.get() == camera_name.FIRST:
-            self.cam = pco.Camera(serial=FIRST)
-        elif self.camera_used.get() == camera_name.SECOND:
-            self.cam = pco.Camera(serial=SECOND)
+        if self.camera_used.get() == camera_name.PIXELFLY:
+            self.cam = pco.Camera(serial=19701804)
+        elif self.camera_used.get() == camera_name.EDGE:
+            self.cam = pco.Camera(serial=61011464)
         else:
             raise ValueError(f"Unknown camera selected: {self.camera_used.get()}")
         # don't specify an interface or unclosed cameras cause indefinite hangs
@@ -137,9 +133,9 @@ class PcoCamera(Fragment):
         # exposure time for pcoedge cameras should be bigger than the imaging pulse because of camera has scan pixels line by line, like if we want to expose atoms for 100 us we should set the exposure time to be at least 150 us to make sure the whole cloud is exposed, for pixelfly camera which has global shutter we can set the exposure time to be the same as the imaging pulse duration.
         # so we will add 50 us to the exposure time for pcoedge cameras to make sure the whole cloud is exposed, and for pixelfly camera we will set the exposure time to be the same as the imaging pulse duration.
 
-        if self.camera_used.get() == camera_name.SECOND:
+        if self.camera_used.get() == camera_name.EDGE:
             expsoure_time = self.exposure_time.get() + 50 * us
-        elif self.camera_used.get() == camera_name.FIRST:
+        elif self.camera_used.get() == camera_name.PIXELFLY:
             expsoure_time = self.exposure_time.get()
         else:
             raise ValueError(f"Unknown camera selected: {self.camera_used.get()}")
@@ -152,7 +148,7 @@ class PcoCamera(Fragment):
         }
 
         self.cam.auto_exposure_off()
-        if self.camera_used.get() == camera_name.SECOND:
+        if self.camera_used.get() == camera_name.EDGE:
             self.cam.sdk.set_roi(*self.roi.get().value)
 
         logger.warning("ROI requested %s", self.roi.get().value)
@@ -163,7 +159,7 @@ class PcoCamera(Fragment):
             logger.info(f"{self.cam.camera_name} ({self.cam.camera_serial})")
             logger.info(self.cam.configuration)
             logger.info("running in trigger_mode %s", self.cam.configuration["trigger"])
-        self.use_edge = self.camera_used.get() == camera_name.SECOND
+        self.use_edge = self.camera_used.get() == camera_name.EDGE
         super().host_setup()
 
     @rpc(flags={"async"})
@@ -171,22 +167,22 @@ class PcoCamera(Fragment):
         """
         Set the region of interest for imaging, this can be used to speed up retrieval of images by only retrieving a subset of the pixels.
         """
-        if self.camera_used.get() == camera_name.SECOND:
+        if self.camera_used.get() == camera_name.EDGE:
             self.cam.sdk.set_roi(*roi.value)
         # for pixelfly cameras we can set the roi when retrieving images, so we don't
 
     @property
     def camera_busy_time(self):
-        if self.camera_used.get() == camera_name.FIRST:
+        if self.camera_used.get() == camera_name.PIXELFLY:
             return self.BUSY_TIME.PCO_pixelfly.value
-        elif self.camera_used.get() == camera_name.SECOND:
+        elif self.camera_used.get() == camera_name.EDGE:
             return self.BUSY_TIME.PCO_edge.value
         else:
             raise ValueError(f"Unknown camera selected: {self.camera_used.get()}")
 
     @property
     def trigger_delay(self):
-        if self.camera_used.get() == camera_name.SECOND:
+        if self.camera_used.get() == camera_name.EDGE:
             return 120 * us
 
         return 0 * us
@@ -304,7 +300,7 @@ class PcoCameraExpFrag(ExpFragment):
         )
 
         self.setattr_param_rebind(
-            "camera_used", self.pco_camera, "camera_used", default=camera_name.FIRST
+            "camera_used", self.pco_camera, "camera_used", default=camera_name.PIXELFLY
         )
 
         logging.debug("PCO camera fragment setup complete")

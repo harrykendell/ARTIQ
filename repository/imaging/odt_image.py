@@ -90,14 +90,14 @@ class ODTAbsorptionImageExpFrag(ExpFragment):
         delay(100 * ms)
 
         # load the MOT
-        self.mot_beam_setter.turn_beams_on()
-        self.img_beam_setter.turn_beams_off()
-        self.odt_beam_setter.turn_beams_off()
+        self.mot_beam_setter.on()
+        self.img_beam_setter.off()
+        self.odt_beam_setter.off()
         self.coil_setter.set_to_defaults()
         delay(self.load_time.get())
 
         # turn on the ODT
-        self.odt_beam_setter.turn_beams_on()
+        self.odt_beam_setter.on()
         delay(100 * ms)  # allow it to settle
 
         # release MOT and propagate cloud -
@@ -106,22 +106,22 @@ class ODTAbsorptionImageExpFrag(ExpFragment):
             self.coil_setter.turn_off()
             self.mot_beam_setter.turn_beams_off(ignore_shutters=True)
         delay(self.hold_time_in_ODT.get())
-        self.odt_beam_setter.turn_beams_off()
+        self.odt_beam_setter.off()
 
         # image atoms trapped in ODT
         with parallel:
-            self.img_beam_setter.turn_beams_on()
+            self.img_beam_setter.on()
             self.pco_camera.capture_image()
         delay(self.exposure_time.get())
-        self.img_beam_setter.turn_beams_off()
+        self.img_beam_setter.off()
         delay(self.pco_camera.BUSY_TIME)
 
         # reference image
         with parallel:
-            self.img_beam_setter.turn_beams_on()
+            self.img_beam_setter.on()
             self.pco_camera.capture_image()
         delay(self.exposure_time.get())
-        self.img_beam_setter.turn_beams_off()
+        self.img_beam_setter.off()
         delay(self.pco_camera.BUSY_TIME)
 
         # background image
@@ -131,8 +131,8 @@ class ODTAbsorptionImageExpFrag(ExpFragment):
 
         # leave the MOT to reload
         self.coil_setter.set_to_defaults()
-        self.mot_beam_setter.turn_beams_on()
-        self.img_beam_setter.turn_beams_off()
+        self.mot_beam_setter.on()
+        self.img_beam_setter.off()
 
         self.core.wait_until_mu(now_mu())
         self.update_images()

@@ -113,7 +113,7 @@ class TrapFrequencyExpFrag(ExpFragment):
         self.mot.calculate_dma_handles()
         self.core.break_realtime()
 
-        self.mot.odt_reservoir.turn_beams_on()
+        self.mot.odt_reservoir.on()
         self.mot.load()
         if self.do_cmot.get():
             self.mot.compress(False, True)
@@ -126,25 +126,25 @@ class TrapFrequencyExpFrag(ExpFragment):
         self.mot.dipole_trap_com_shift()  # apply perturbation to excite COM motion
         # delay(0.5*ms)  # wait for perturbation to finish
         delay(self.wait_after_perturbation.get())
-        self.mot.odt_reservoir.turn_beams_off()  # turn off reservoir beam for imaging
+        self.mot.odt_reservoir.off()  # turn off reservoir beam for imaging
         delay(self.expansion_time.get())
 
         # image cloud
         with parallel:
-            self.img_beam.turn_beams_on()
+            self.img_beam.on()
             self.pco_camera.capture_image()
         delay(self.exposure_time.get())
-        self.img_beam.turn_beams_off()
-        # self.mot.drop_reservoir()  # turn off reservoir beam for imaging
+        self.img_beam.off()
+        # self.mot.odt_reservoir.off()  # turn off reservoir beam for imaging
         delay(self.pco_camera.BUSY_TIME - self.exposure_time.get())
         self.mot.clear_atoms()
 
         # reference image
         with parallel:
-            self.img_beam.turn_beams_on()
+            self.img_beam.on()
             self.pco_camera.capture_image()
         delay(self.exposure_time.get())
-        self.img_beam.turn_beams_off()
+        self.img_beam.off()
         delay(self.pco_camera.BUSY_TIME - self.exposure_time.get())
 
         # background image

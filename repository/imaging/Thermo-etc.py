@@ -139,8 +139,8 @@ class AbsorptionImageExpFrag(ExpFragment):
         self.mot.set_dimple_trap_power(self.mot.power_dimple.get())
         self.mot.set_reservoir_trap_power(self.mot.power_reservoir.get())
 
-        # self.mot.odt_reservoir.turn_beams_on()
-        # self.mot.odt_dimple.turn_beams_on()
+        # self.mot.odt_reservoir.on()
+        # self.mot.odt_dimple.on()
         # kdc_main()  # move stage to imaging position
         # delay(4 * s)  # wait for power to stabilize
         # self.mot.cpt_shutter.off()
@@ -169,14 +169,14 @@ class AbsorptionImageExpFrag(ExpFragment):
         if self.odt_active.get():
             delay(self.odt_hold_time.get())  # hold time in odt before imaging
             if not self.do_evaporation1.get() or self.do_evaporation2.get():
-                self.mot.drop_dimple()  # turn off dimple beam for imaging
-                self.mot.drop_reservoir()  # turn off reservoir beam for imaging
+                self.mot.odt_dimple.off()  # turn off dimple beam for imaging
+                self.mot.odt_reservoir.off()  # turn off reservoir beam for imaging
 
         if self.trap_frequency_odt.get():
             delay(self.release_time.get())
-            self.mot.on_reservoir()  # turn off reservoir beam for imaging
+            self.mot.odt_reservoir.on()  # turn off reservoir beam for imaging
             delay(self.hold_timeafter_release.get())
-            self.mot.drop_reservoir()  # turn off reservoir beam for imaging
+            self.mot.odt_reservoir.off()  # turn off reservoir beam for imaging
 
         # Evaporation and then switch off odt beams
         if self.do_evaporation1.get():
@@ -198,20 +198,20 @@ class AbsorptionImageExpFrag(ExpFragment):
 
         # image cloud
         # with parallel:
-        #   self.img_beam.turn_beams_on()
+        #   self.img_beam.on()
         #  self.pco_camera.capture_image()
         # delay(self.exposure_time.get())
 
-        # self.img_beam.turn_beams_off()
+        # self.img_beam.off()
         # delay(self.pco_camera.BUSY_TIME - self.exposure_time.get())
         # self.mot.clear_atoms()
 
         # reference image
         # with parallel:
-        #    self.img_beam.turn_beams_on()
+        #    self.img_beam.on()
         #    self.pco_camera.capture_image()
         # delay(self.exposure_time.get())
-        # self.img_beam.turn_beams_off()
+        # self.img_beam.off()
         # delay(self.pco_camera.BUSY_TIME - self.exposure_time.get())
 
         # background image

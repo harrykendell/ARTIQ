@@ -248,6 +248,13 @@ class ControlBeamsWithoutCoolingAOM(Fragment):
             delay_mu(self.t_rtio_cycle_mu)
 
     @kernel
+    def on(self, ignore_shutters=False, already_on=False):
+        """
+        Alias for :meth:`turn_beams_on`
+        """
+        self.turn_beams_on(ignore_shutters=ignore_shutters, already_on=already_on)
+
+    @kernel
     def turn_beams_off(self, ignore_shutters=False):
         """
         This method will turn off the beam at the cursor and then close the
@@ -332,6 +339,13 @@ class ControlBeamsWithoutCoolingAOM(Fragment):
                 delay_mu(self.t_rtio_cycle_mu)
 
                 delay(-beam_info.shutter_delay)
+
+    @kernel
+    def off(self, ignore_shutters=False):
+        """
+        Alias for :meth:`turn_beams_off`
+        """
+        self.turn_beams_off(ignore_shutters=ignore_shutters)
 
     @kernel
     def _set_shutters(self, state=True, ignore_delay=False):
