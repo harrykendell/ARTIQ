@@ -57,7 +57,7 @@ class AbsImageSettings:
     atom_mass: float = 1.443e-25  # kg, mass of Rb87
     pixel_size: float = 6.45e-6  # m
     fit_downsample: int = 5
-    magnification: float = 0.19  # Set to None to force user to specify
+    magnification: float = 0.227  # Set to None to force user to specify
     time_of_flight: float = 0.0  # s; retained in serialized image settings
 
     # PSD estimation parameters

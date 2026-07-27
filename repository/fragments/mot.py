@@ -32,7 +32,7 @@ DURATION = {
     "EVAPORATION2": 100 * ms,
 }
 SETTLE_TIME = {
-    "CMOT": 0.522 * ms,
+    "CMOT": 2.0 * ms,
     "PGC": 4.98 * ms,
     "ODT": 0 * ms,
     "EVAPORATION1": 0 * ms,

@@ -91,7 +91,7 @@ class AbsorptionImageExpFrag(ExpFragment):
             "magnification",
             FloatParam,
             "Magnification for imaging",
-            default=0.29,
+            default=0.227,  # calibrated 27/06/2026 rid28410 + rid28411
         )
         self.magnification: FloatParamHandle
 
