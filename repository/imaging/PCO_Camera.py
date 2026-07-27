@@ -130,7 +130,7 @@ class PcoCamera(Fragment):
             self.cam = pco.Camera(serial=19701804)
             expsoure_time = self.exposure_time.get()
             self.trigger = self.trigger1
-            self.trigger_delay = 0 * us
+            self.trigger_delay = 6 * us # Empirically determined from max light accumulated
         else:
             raise ValueError(f"Unknown camera selected: {self.camera_used.get()}")
         self.cam.default_configuration()
