@@ -178,13 +178,11 @@ class AbsorptionImageExpFrag(ExpFragment):
     def prepare(self) -> None:
         self.is_edge = self.camera_used.get() == camera_name.EDGE
 
-        self.trigger_delay = self.pco_camera.trigger_delay
-
         self.camera_busy_time = self.pco_camera.camera_busy_time
 
-        if self.expansion_time.get() < self.trigger_delay:
+        if self.expansion_time.get() < self.pco_camera.trigger_delay:
             raise ValueError(
-                f"Expansion time must be at least {self.trigger_delay}s to account "
+                f"Expansion time must be at least {self.pco_camera.trigger_delay}s to account "
                 "for the delay between trigger and exposure of the camera."
             )
 
@@ -251,18 +249,17 @@ class AbsorptionImageExpFrag(ExpFragment):
             if self.do_evaporation2.get():
                 self.mot.evaporation2()
 
-        delay(self.expansion_time.get() - self.trigger_delay)
+        delay(self.expansion_time.get())
 
         # THE 3 IMAGES FOR ABSORPTION IMAGING
-        # Note: self.trigger_delay = 0 for the pixelfly camera, 120 us for the edge camera
 
-        # @Deepak why is this here?!
-        if self.is_edge:
-            self.mot.clear_background_atoms_around_odt()
+        # TODO: This is a hack to clear background atoms around the ODT for the edge camera
+        # probably needs removing or doing more robustly
+        # if self.is_edge:
+        #     self.mot.clear_background_atoms_around_odt()
 
         # TOF IMAGE
         self.pco_camera.capture_image()
-        delay(self.trigger_delay)
         self.img_beam.on()
         delay(self.exposure_time.get())
         self.img_beam.off()
@@ -274,9 +271,6 @@ class AbsorptionImageExpFrag(ExpFragment):
 
         # REF IMAGE
         self.pco_camera.capture_image()
-        delay(
-            self.trigger_delay
-        )  # 0 for the pixelfly camera, 120 us for the edge camera
         self.img_beam.on()
         delay(self.exposure_time.get())
         self.img_beam.off()

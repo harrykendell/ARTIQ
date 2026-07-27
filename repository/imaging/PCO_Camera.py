@@ -135,8 +135,10 @@ class PcoCamera(Fragment):
 
         if self.camera_used.get() == camera_name.EDGE:
             expsoure_time = self.exposure_time.get() + 50 * us
+            self.trigger = self.trigger2
         elif self.camera_used.get() == camera_name.PIXELFLY:
             expsoure_time = self.exposure_time.get()
+            self.trigger = self.trigger1
         else:
             raise ValueError(f"Unknown camera selected: {self.camera_used.get()}")
         self.cam.default_configuration()
@@ -213,14 +215,9 @@ class PcoCamera(Fragment):
         Initialise the camera ready to be triggered
         """
         self.core.break_realtime()
-        if self.use_edge:
-            self.trigger2.output()
-            delay_mu(10)
-            self.trigger2.off()
-        else:
-            self.trigger1.output()
-            delay_mu(10)
-            self.trigger1.off()
+        self.trigger.output()
+        delay_mu(10)
+        self.trigger.off()
 
         self.cam.stop()
         self.cam.record(self.num_images, mode="sequence non blocking")
@@ -233,16 +230,16 @@ class PcoCamera(Fragment):
         """
         Capture an image, this doesn't advance the timeline.
 
+        We write the trigger into the past by trigger delay so that the camera is triggered at the correct time.
+
         Another image should not be captured until the previous one has been exposed
         """
-        if self.use_edge:
-            self.trigger2.on()
-            delay(self.exposure_time.get())
-            self.trigger2.off()
-        else:
-            self.trigger1.on()
-            delay(self.exposure_time.get())
-            self.trigger1.off()
+        delay(-self.trigger_delay)
+        self.trigger.on()
+        delay(self.exposure_time.get())
+        self.trigger.off()
+
+        delay(-self.exposure_time.get() + self.trigger_delay)
 
     @host_only
     def retrieve_images(self, timeout=5.0 * s, roi: ROI = ROI.FULL_pixelfly):
