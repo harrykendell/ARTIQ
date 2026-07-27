@@ -6,7 +6,7 @@ from artiq.coredevice.dma import CoreDMA
 from artiq.coredevice.suservo import SUServo
 from artiq.coredevice.ttl import TTLInOut
 from artiq.experiment import kernel, rpc
-from artiq.language import delay, ms, now_mu, parallel, s, us
+from artiq.language import delay, ms, now_mu, parallel, sequential, s, us
 from artiq.language.core import host_only
 
 # from repository.models.device_db import server_addr
@@ -259,9 +259,11 @@ class AbsorptionImageExpFrag(ExpFragment):
         self.img_beam.off()
 
         # wait for the img pulse to dissipate before flushing atoms beams
-        with parallel:  # timeline advances by max(100ms, camera_busy_time)
+        with parallel:
             delay(self.camera_busy_time)
-            self.mot.clear_atoms(100 * ms)
+            with sequential:
+                delay(self.exposure_time.get())
+                self.mot.clear_atoms(50 * ms)
 
         # REF IMAGE
         self.pco_camera.capture_image()
