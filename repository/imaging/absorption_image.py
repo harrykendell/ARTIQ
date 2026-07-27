@@ -116,11 +116,11 @@ class AbsorptionImageExpFrag(ExpFragment):
         self.imaging_roi: ParamHandle
 
         self.do_cmot: BoolParamHandle = self.setattr_param(
-            "do_cmot", BoolParam, "Do the CMOT step", default=False
+            "do_cmot", BoolParam, "Do the CMOT step", default=True
         )
 
         self.do_pgc: BoolParamHandle = self.setattr_param(
-            "do_pgc", BoolParam, "Do the PGC step", default=False
+            "do_pgc", BoolParam, "Do the PGC step", default=True
         )
 
         self.trap_frequency_odt: BoolParamHandle = self.setattr_param(
@@ -179,12 +179,6 @@ class AbsorptionImageExpFrag(ExpFragment):
         self.is_edge = self.camera_used.get() == camera_name.EDGE
 
         self.camera_busy_time = self.pco_camera.camera_busy_time
-
-        if self.expansion_time.get() < self.pco_camera.trigger_delay:
-            raise ValueError(
-                f"Expansion time must be at least {self.pco_camera.trigger_delay}s to account "
-                "for the delay between trigger and exposure of the camera."
-            )
 
         if not self.is_edge and self.imaging_roi.get() not in [
             ROI.FULL_pixelfly,

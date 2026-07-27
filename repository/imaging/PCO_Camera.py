@@ -121,24 +121,16 @@ class PcoCamera(Fragment):
         """
         Setup the host-side camera controls
         """
-
-        if self.camera_used.get() == camera_name.PIXELFLY:
-            self.cam = pco.Camera(serial=19701804)
-        elif self.camera_used.get() == camera_name.EDGE:
-            self.cam = pco.Camera(serial=61011464)
-        else:
-            raise ValueError(f"Unknown camera selected: {self.camera_used.get()}")
-        # don't specify an interface or unclosed cameras cause indefinite hangs
-
-        # exposure time for pcoedge cameras should be bigger than the imaging pulse because of camera has scan pixels line by line, like if we want to expose atoms for 100 us we should set the exposure time to be at least 150 us to make sure the whole cloud is exposed, for pixelfly camera which has global shutter we can set the exposure time to be the same as the imaging pulse duration.
-        # so we will add 50 us to the exposure time for pcoedge cameras to make sure the whole cloud is exposed, and for pixelfly camera we will set the exposure time to be the same as the imaging pulse duration.
-
         if self.camera_used.get() == camera_name.EDGE:
+            self.cam = pco.Camera(serial=61011464)
             expsoure_time = self.exposure_time.get() + 50 * us
             self.trigger = self.trigger2
+            self.trigger_delay = 120 * us
         elif self.camera_used.get() == camera_name.PIXELFLY:
+            self.cam = pco.Camera(serial=19701804)
             expsoure_time = self.exposure_time.get()
             self.trigger = self.trigger1
+            self.trigger_delay = 0 * us
         else:
             raise ValueError(f"Unknown camera selected: {self.camera_used.get()}")
         self.cam.default_configuration()
@@ -181,13 +173,6 @@ class PcoCamera(Fragment):
             return self.BUSY_TIME.PCO_edge.value
         else:
             raise ValueError(f"Unknown camera selected: {self.camera_used.get()}")
-
-    @property
-    def trigger_delay(self):
-        if self.camera_used.get() == camera_name.EDGE:
-            return 120 * us
-
-        return 0 * us
 
     def host_cleanup(self):
         if hasattr(self, "cam"):
