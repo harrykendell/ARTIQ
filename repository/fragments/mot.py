@@ -358,7 +358,7 @@ class MOT(Fragment):
                 self.PGC_detuning,
             ]
             suservos = [SUServoedBeam["MOT"]]
-            suservo_setpoint_start = [POWER_3D_MOT["CMOT"]]
+            suservo_setpoint_start = [self.cmot_ramp]
             suservo_setpoint_end = [POWER_3D_MOT["PGC"]]
 
         self.pgc_ramp: PGC_Ramp = self.setattr_fragment(
