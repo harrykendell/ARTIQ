@@ -46,7 +46,7 @@ class TuneSUServoExpFrag(ExpFragment):
             "kp",
             FloatParam,
             description="Proportional gain of the IIR filter",
-            default=-1.0,
+            default=-0.5,
         )
 
         self.setattr_param(

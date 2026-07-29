@@ -42,7 +42,7 @@ class SUServoManager:  # {{{
             ("ys", [1.0] * 8, None),
             ("en_iirs", [0] * 8, None),
             ("offsets", [2.5] * 8, "V"),
-            ("Ps", [-1.0] * 8, None),
+            ("Ps", [-0.5] * 8, None),
             ("Is", [-200000.0] * 8, None),
             ("Gls", [-200.0] * 8, None),
             ("en_shutters", [0] * 4, None),

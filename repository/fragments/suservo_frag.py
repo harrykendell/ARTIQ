@@ -478,7 +478,7 @@ class SUServoFrag(Fragment):
         )
 
     @kernel
-    def set_iir_params(self, kp=-1.0, ki=-200000.0, gain_limit=-200.0, delay=0.0):
+    def set_iir_params(self, kp=-0.5, ki=-200000.0, gain_limit=-200.0, delay=0.0):
         """
         Set loop filter parameters for the suservo. See ARTIQ documentation for
         details. Note all of kp,ki,gain_limit should usually be negative.
