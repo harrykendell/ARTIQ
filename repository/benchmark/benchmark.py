@@ -19,10 +19,10 @@ from repository.imaging.processor import AbsImageSettings
 
 logger = logging.getLogger(__name__)
 
-MOT_TOF_TIMES = tuple(value * ms for value in range(16))
-CMOT_TOF_TIMES = tuple(value * ms for value in range(4, 16))
+MOT_TOF_TIMES = tuple(value * ms for value in range(1, 7))
+CMOT_TOF_TIMES = tuple(value * ms for value in range(5, 11))
 PGC_TOF_TIMES = tuple(value * ms for value in range(4, 31))
-ODT_TOF_TIMES = (0.5 * ms,) + tuple(value * ms for value in range(1, 31))
+ODT_TOF_TIMES = (0.5 * ms,) + tuple(value * ms for value in range(5, 31, 3))
 
 TOF_LOADING_TIME = 10 * s
 RB87_MASS = 86.909180520 * constants.atomic_mass
