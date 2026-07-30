@@ -209,7 +209,8 @@ class AbsorptionImageExpFrag(ExpFragment):
         # for i in range(10):
         #     # self.mot_voltages_temp[i] = self.suservo.get_adc(0)
         #     delay(self.mot.loading_time.get() / 10.0)
-        # # self.mot_voltages.push(self.mot_voltages_temp)
+        # self.mot_voltages.push(self.mot_voltages_temp)
+        
         delay(self.mot.loading_time.get())
 
         if self.do_cmot.get():

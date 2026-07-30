@@ -1,4 +1,5 @@
 import logging
+import os
 from copy import deepcopy
 
 import numpy as np
@@ -12,18 +13,18 @@ logger = logging.getLogger(__name__)
 TOF_REPEATS_PER_POINT = 3
 
 _CHILD_EXPERIMENTS = (
-    "LoadUnloadBench",
-    "MOTBench",
-    "CMOTBench",
-    "PGCBench",
-    "ODTBench",
+    ("LoadUnloadBench", "load_unload.py"),
+    ("MOTBench", "benchmark.py"),
+    ("CMOTBench", "benchmark.py"),
+    ("PGCBench", "benchmark.py"),
+    ("ODTBench", "benchmark.py"),
 )
 
 
 class _BenchmarkArgumentInterface(ArgumentInterface):
     """Apply experiment-owned ndscan defaults before persisted GUI state."""
 
-    def build(self, fragments, default_scan):
+    def build(self, fragments, default_scan, default_axis):
         self._default_scan = default_scan
         super().build(fragments, scannable=True)
 
@@ -49,7 +50,13 @@ def make_benchmark_scan_exp(
 
             tof_times = getattr(fragment_class, "TOF_TIMES", None)
             default_scan = {}
+            default_axis = None
             if tof_times is not None:
+                expansion_time = self.fragment.expansion_time
+                default_axis = {
+                    "fqn": expansion_time.parameter.fqn,
+                    "path": expansion_time.owner._stringize_path(),
+                }
                 default_scan = {
                     "axes": [
                         {
@@ -58,8 +65,7 @@ def make_benchmark_scan_exp(
                                 "values": list(tof_times),
                                 "randomise_order": False,
                             },
-                            "fqn": f"{self.fragment.fqn}.expansion_time",
-                            "path": "*",
+                            **default_axis,
                         }
                     ],
                     "num_repeats": 1,
@@ -73,6 +79,7 @@ def make_benchmark_scan_exp(
                 self,
                 [self.fragment],
                 default_scan,
+                default_axis,
             )
             self.setattr_device("scheduler")
 
@@ -93,10 +100,13 @@ class ExperimentalBenchmark(EnvExperiment):
 
     def run(self):
         child_rids = []
+        parent_file = self.scheduler.expid["file"]
+        benchmark_dir = os.path.dirname(parent_file)
 
-        for class_name in _CHILD_EXPERIMENTS:
+        for class_name, file_name in _CHILD_EXPERIMENTS:
             expid = dict(self.scheduler.expid)
             expid["class_name"] = class_name
+            expid["file"] = os.path.join(benchmark_dir, file_name)
             child_rids.append(
                 self.scheduler.submit(
                     self.scheduler.pipeline_name,
