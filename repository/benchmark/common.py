@@ -1,6 +1,8 @@
 import logging
 from copy import deepcopy
 
+import numpy as np
+from artiq.experiment import EnvExperiment
 from artiq.language import PYONValue
 from ndscan.experiment.entry_point import ArgumentInterface, make_fragment_scan_exp
 from ndscan.utils import PARAMS_ARG_KEY
@@ -8,6 +10,14 @@ from ndscan.utils import PARAMS_ARG_KEY
 logger = logging.getLogger(__name__)
 
 TOF_REPEATS_PER_POINT = 3
+
+_CHILD_EXPERIMENTS = (
+    "LoadUnloadBench",
+    "MOTBench",
+    "CMOTBench",
+    "PGCBench",
+    "ODTBench",
+)
 
 
 class _BenchmarkArgumentInterface(ArgumentInterface):
@@ -73,3 +83,32 @@ def make_benchmark_scan_exp(
     _BenchmarkScan.__qualname__ = name
     _BenchmarkScan.__doc__ = base_class.__doc__
     return _BenchmarkScan
+
+
+class ExperimentalBenchmark(EnvExperiment):
+    """Run all benchmarks"""
+
+    def build(self):
+        self.setattr_device("scheduler")
+
+    def run(self):
+        child_rids = []
+
+        for class_name in _CHILD_EXPERIMENTS:
+            expid = dict(self.scheduler.expid)
+            expid["class_name"] = class_name
+            child_rids.append(
+                self.scheduler.submit(
+                    self.scheduler.pipeline_name,
+                    expid,
+                    self.scheduler.priority,
+                    None,
+                    False,
+                )
+            )
+
+        self.set_dataset(
+            "benchmark.child_rids",
+            np.asarray(child_rids, dtype=np.int64),
+            broadcast=True,
+        )
