@@ -21,8 +21,12 @@ from PyQt5.QtWidgets import (
 
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 from managers.boosterTelemetry import BoosterTelemetry
-from managers.FastinoManager import DeltaElektronikaManager, FastinoManager
+from managers.FastinoManager import (
+    FastinoManager,
+    VDrivenSupplyManager,
+)
 from managers.MirnyManager import MirnyManager
+from VDrivenSupplyGUI import VDrivenSuppliesGUI
 
 # disable formatting
 # flake8: noqa
@@ -31,6 +35,7 @@ from managers.SUServoManager import SUServoManager
 from artiq.coredevice.core import Core
 from artiq.experiment import EnvExperiment, kernel, rpc
 from artiq.language import StringValue, BooleanValue, ms
+from repository.models.devices import VDRIVEN_SUPPLIES
 
 
 class Switch(QWidget):
@@ -775,9 +780,7 @@ class ArtiqGUIExperiment(EnvExperiment):
         self.mirnyManager: MirnyManager
 
         self.fastino = self.get_device("fastino")
-        self.useFastino = False
-        self.fastinoManager: FastinoManager
-        self.deltaElektronikaManager: DeltaElektronikaManager
+        self.vdrivenSupplyManager: VDrivenSupplyManager
 
     def run(self):
         # Startups run methods
@@ -794,13 +797,15 @@ class ArtiqGUIExperiment(EnvExperiment):
         # Mirny
         self.mirnyManager = MirnyManager(self, self.core, self.mirny_chs, self.almazny)
 
-        # Fastino
-        if self.useFastino:
-            self.fastinoManager = FastinoManager(self, self.core, self.fastino)
-        else:
-            self.deltaElektronikaManager = DeltaElektronikaManager(
-                self, self.core, self.fastino
-            )
+        # Voltage-driven supplies. devices.py is the source of truth for names,
+        # channels, gains, limits, units and disabled state.
+        self.vdrivenSupplyManager = VDrivenSupplyManager(
+            self,
+            self.core,
+            self.fastino,
+            list(VDRIVEN_SUPPLIES.values()),
+            name="fastino",
+        )
 
         # now ours
         app = QApplication(sys.argv)
@@ -815,12 +820,8 @@ class ArtiqGUIExperiment(EnvExperiment):
         mirnyGUI = MirnyGUI(self.mirnyManager)
         mirnyGUI.show()
 
-        if self.useFastino:
-            fastinoGUI = FastinoGUI(self.fastinoManager)
-            fastinoGUI.show()
-        else:
-            deltaGUI = DeltaElektronikaGUI(self.deltaElektronikaManager)
-            deltaGUI.show()
+        vdrivenGUI = VDrivenSuppliesGUI(self.vdrivenSupplyManager)
+        vdrivenGUI.show()
 
         app.exec_()
 
