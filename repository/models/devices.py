@@ -1,6 +1,5 @@
 from artiq.language.units import A, MHz, V, dB, ms
-from ndscan.experiment import FloatParam, Fragment
-from repository.models import Eom, Shutter, SUServoedBeam, VDrivenSupply
+from repository.models import Eom, SUServoedBeam, VDrivenSupply
 from repository.models.Device import device_arrays
 
 EOMS = [
@@ -37,7 +36,7 @@ VDRIVEN_SUPPLIES = [
         name="Y",
         fastino="fastino",
         ch=2,
-        gain=2.0 * A / V,
+        gain=0.5 * A / V,
         max_output=1.0 * A,
         default_output=0.0 * A,
     ),
@@ -73,26 +72,6 @@ VDRIVEN_SUPPLIES = [
         default_output=0.0 * MHz,
         unit="MHz",
     ),
-    # VDrivenSupply(
-    #     name="GreenTA",
-    #     fastino="fastino",
-    #     ch=6,
-    #     gain=0.4 * A / V,  # 4A max * V / 10V -> 0.4 A/V
-    #     max_output=2.0 * A,
-    #     default_output=1.450 * A,
-    #     disabled=True,
-    #     # TODO: Actually set me up
-    # ),
-    # VDrivenSupply(
-    #     name="Dispenser",
-    #     fastino="fastino",
-    #     ch=7,
-    #     gain=1.0 * A / V,
-    #     max_output=3.0 * A,
-    #     default_output=2.70 * A,
-    #     disabled=True,
-    #     # TODO: Actually set me up
-    # ),
 ]
 # Convert to dict for ease of use
 VDRIVEN_SUPPLIES = {supply.name: supply for supply in VDRIVEN_SUPPLIES}
@@ -100,25 +79,6 @@ VDRIVEN_SUPPLIES = {supply.name: supply for supply in VDRIVEN_SUPPLIES}
 THORLABS_SHUTTER_DELAY = 35.0 * ms
 EBAY_SHUTTER_DELAY = 25.0 * ms
 # the switch on time is actually quick fast. The limit is the dislike of short pulses
-SHUTTERS = [
-    Shutter(
-        name="MOT2D",
-        ttl="shutter_2DMOT",
-        delay=THORLABS_SHUTTER_DELAY,
-    ),
-    Shutter(
-        name="MOT3D",
-        ttl="shutter_3DMOT",
-        delay=THORLABS_SHUTTER_DELAY,
-    ),
-    Shutter(
-        name="CPT",
-        ttl="shutter_LATTICE",
-        delay=THORLABS_SHUTTER_DELAY,
-    ),
-]
-# Convert to dict for ease of use
-SHUTTERS = {beam.name: beam for beam in SHUTTERS}
 
 SUSERVOED_BEAMS = [
     SUServoedBeam(
@@ -200,76 +160,6 @@ SUSERVOED_BEAMS = {beam.name: beam for beam in SUSERVOED_BEAMS}
 device_arrays.update({
     Eom: EOMS,
     VDrivenSupply: VDRIVEN_SUPPLIES,
-    Shutter: SHUTTERS,
     SUServoedBeam: SUSERVOED_BEAMS,
     # Add other classes as needed
 })
-
-
-class DefaultValues(Fragment):
-    """
-    This Fragment provides the global store for default values for all devices.
-    This then allows them to be set in the GUI and scanned with a global source of truth.
-
-    It must be added to the experiment's Fragment tree to be used:
-    ```python
-        DEVICE.fragment = frag.setattr_fragment("DefaultValues", DefaultValues)
-    ```
-    """
-
-    def build_fragment(self):
-        for eom in Eom.values():
-            eom: Eom
-            self.setattr_param(
-                f"Eom_{eom.name}_frequency",
-                FloatParam,
-                f"Default frequency for Eom {eom.name}",
-                default=eom.frequency,
-                min=0.0,
-                unit="MHz",
-            )
-            self.setattr_param(
-                f"Eom_{eom.name}_attenuation",
-                FloatParam,
-                f"Default attenuation for Eom {eom.name}",
-                default=eom.attenuation,
-                min=0.0,
-                max=31.5,
-                unit="dB",
-            )
-        for sus in SUServoedBeam.values():
-            sus: SUServoedBeam
-            self.setattr_param(
-                f"SUServoedBeam_{sus.name}_frequency",
-                FloatParam,
-                f"Default frequency for SUServoedBeam {sus.name}",
-                default=sus.frequency,
-                min=0.0,
-                unit="MHz",
-            )
-            self.setattr_param(
-                f"SUServoedBeam_{sus.name}_attenuation",
-                FloatParam,
-                f"Default attenuation for SUServoedBeam {sus.name}",
-                default=sus.attenuation,
-                min=0.0,
-                max=31.5,
-                unit="dB",
-            )
-            self.setattr_param(
-                f"SUServoedBeam_{sus.name}_setpoint",
-                FloatParam,
-                f"Default setpoint for SUServoedBeam {sus.name}",
-                default=sus.setpoint,
-                min=0.0,
-                unit="V",
-            )
-        for vds in VDrivenSupply.values():
-            vds: VDrivenSupply
-            self.setattr_param(
-                f"VDrivenSupply_{vds.name}_default_output",
-                FloatParam,
-                f"Default output for VDrivenSupply {vds.name}",
-                default=vds.default_output,
-                unit=vds.unit,
-            )
