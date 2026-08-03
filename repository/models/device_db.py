@@ -287,11 +287,11 @@ device_db.update({
 
 # Aliases
 aliases = {
-    # photodiode on 3DMOT - given we don't enable servoing for the locking arm
-    "MOT_photodiode": "suservo_ch0",
     # 780 Laser
     "780_unlock": "ttl4",
     "suservo_aom_LOCK": "suservo_ch0",
+    # photodiode on 3DMOT - given we don't enable servoing for the locking arm
+    "MOT_photodiode": "suservo_aom_LOCK",
     "suservo_aom_MOT": "suservo_ch1",  # has its photodiode on it's channel
     "suservo_aom_IMG": "suservo_ch2",
     "suservo_aom_PUMP": "suservo_ch3",
