@@ -39,7 +39,7 @@ SETTLE_TIME = {
     "EVAPORATION2": 0 * ms,
 }
 DETUNING = {"CMOT": 5 * Γ_Rb, "PGC": 9.94 * Γ_Rb}  # This is beyond the normal 2Γ
-BIASES = {"X1": 0.0002 * A, "X2": 0.0 * A, "Y": 0.04 * A, "Z": 0.01 * A}
+BIASES = {"X1": 0.0002 * A, "X2": 0.0 * A, "Y": 0.01 * A, "Z": 0.01 * A}
 COMPRESSED_GRADIENTS = {"X1": 0 * A, "X2": 1.98 * A}
 REPUMP_ATTENUATION = {"CMOT": 0.6196 * dB, "PGC": 0.05 * dB}
 POWER_3D_MOT = {"MOT_loading": 3.5 * V, "CMOT": 1.9 * V, "PGC": 1.0 * V}
