@@ -1,3 +1,4 @@
+import logging
 from time import time
 
 import numpy as np
@@ -6,7 +7,7 @@ from artiq.coredevice.dma import CoreDMA
 from artiq.coredevice.suservo import SUServo
 from artiq.coredevice.ttl import TTLInOut
 from artiq.experiment import kernel, rpc
-from artiq.language import delay, ms, now_mu, parallel, sequential, s, us
+from artiq.language import delay, ms, now_mu, parallel, s, sequential, us
 from artiq.language.core import host_only
 
 # from repository.models.device_db import server_addr
@@ -18,13 +19,18 @@ from ndscan.experiment import (
     OpaqueChannel,
     make_fragment_scan_exp,
 )
+from ndscan.experiment.annotations import curve_1d
+from ndscan.experiment.default_analysis import CustomAnalysis
 from ndscan.experiment.parameters import BoolParamHandle, FloatParamHandle, ParamHandle
 
 from repository.fragments.beam_setter import ControlBeamsWithoutCoolingAOM
 from repository.fragments.mot import MOT
+from repository.imaging.analysis import fit_gravity, fit_temperature
 from repository.imaging.PCO_Camera import ROI, PcoCamera, camera_name
 from repository.imaging.processor import AbsImage, AbsImageSettings
 from repository.models.devices import SUServoedBeam
+
+logger = logging.getLogger(__name__)
 
 # from repository.Dipole_trap.moving_stage import MovingStage
 
@@ -210,7 +216,7 @@ class AbsorptionImageExpFrag(ExpFragment):
         #     # self.mot_voltages_temp[i] = self.suservo.get_adc(0)
         #     delay(self.mot.loading_time.get() / 10.0)
         # self.mot_voltages.push(self.mot_voltages_temp)
-        
+
         delay(self.mot.loading_time.get())
 
         if self.do_cmot.get():
@@ -359,14 +365,151 @@ class AbsorptionImageExpFrag(ExpFragment):
                 + exponent * (np.log(sigma_x / sigma_0_x) + np.log(sigma_y / sigma_0_y))
             )
 
-        # def get_default_analyses(self):
-        # return [OnlineFit("line", data={"x": self.expansion_time, "y": self.sigmax})]
+    def get_default_analyses(self):
+        return [
+            CustomAnalysis(
+                [self.expansion_time],
+                self._analyse_tof_benchmark,
+                [
+                    FloatChannel("atom_number_mean"),
+                    FloatChannel("atom_number_std"),
+                    FloatChannel("temperature_x", unit="K", scale=1),
+                    FloatChannel("temperature_x_err", unit="K", scale=1),
+                    FloatChannel("temperature_y", unit="K", scale=1),
+                    FloatChannel("temperature_y_err", unit="K", scale=1),
+                    FloatChannel("sigma0_x", unit="um", scale=1e-6),
+                    FloatChannel("sigma0_y", unit="um", scale=1e-6),
+                    FloatChannel(
+                        "magnification_pixel_size",
+                        unit="um/px",
+                        scale=1e-6,
+                    ),
+                    FloatChannel(
+                        "gravity_pixel_size",
+                        unit="um/px",
+                        scale=1e-6,
+                    ),
+                    FloatChannel(
+                        "gravity_pixel_size_err",
+                        unit="um/px",
+                        scale=1e-6,
+                    ),
+                    FloatChannel(
+                        "gravity_initial_velocity_y",
+                        unit="mm/s",
+                        scale=1e-3,
+                    ),
+                    OpaqueChannel("fit_time", "Fit time (s)"),
+                ],
+            )
+        ]
 
-        # self.ccb.issue(
-        #     "create_applet",
-        #     "AbsorptionImage",
-        #     f"${{python}} -m repository.imaging.applet --server {server_addr}",
-        # )
+    def _analyse_tof_benchmark(self, axis_values, result_values, analysis_result):
+        times = np.asarray(axis_values[self.expansion_time], dtype=float)
+        atom_numbers = np.asarray(result_values[self.atom_number], dtype=float)
+
+        if atom_numbers.size:
+            atom_number_mean = np.mean(atom_numbers)
+            atom_number_std = np.std(atom_numbers)
+        else:
+            atom_number_mean = atom_number_std = np.nan
+        analysis_result["atom_number_mean"].push(atom_number_mean)
+        analysis_result["atom_number_std"].push(atom_number_std)
+
+        pixel_size = AbsImageSettings.pixel_size / self.magnification.get()
+        analysis_result["magnification_pixel_size"].push(pixel_size)
+
+        temperature_results = {}
+        for label, channel in (("x", self.sigmax), ("y", self.sigmay)):
+            result = fit_temperature(times, result_values[channel], pixel_size)
+            temperature_results[label] = result
+            if result is None:
+                result = {
+                    "fit_params": (np.nan, np.nan),
+                    "sigma0": np.nan,
+                    "temperature": np.nan,
+                    "temperature_error": np.nan,
+                }
+
+            analysis_result[f"temperature_{label}"].push(result["temperature"])
+            analysis_result[f"temperature_{label}_err"].push(
+                result["temperature_error"]
+            )
+            analysis_result[f"sigma0_{label}"].push(result["sigma0"])
+
+        finite_times = times[np.isfinite(times) & (times >= 0)]
+        if finite_times.size:
+            fit_times = np.linspace(0.0, float(np.max(finite_times)), 300)
+        else:
+            fit_times = np.array([])
+        analysis_result["fit_time"].push(fit_times)
+        temperature_fit_sigmas = {}
+        for label in ("x", "y"):
+            result = temperature_results[label]
+            if result is None:
+                continue
+            sigma0_squared, sigma_v_squared = result["fit_params"]
+            temperature_fit_sigmas[label] = np.sqrt(
+                sigma0_squared + sigma_v_squared * fit_times**2
+            )
+
+        gravity_result = fit_gravity(
+            times,
+            result_values[self.gaussian_fit_centre_y],
+        )
+        if gravity_result is not None:
+            gravity_times = fit_times
+            gravity_position = np.polyval(gravity_result["fit_params"], gravity_times)
+        else:
+            gravity_result = {
+                "pixel_size": np.nan,
+                "pixel_size_error": np.nan,
+                "initial_velocity": np.nan,
+            }
+            gravity_times = np.array([])
+            gravity_position = np.array([])
+
+        gravity_pixel_size = gravity_result["pixel_size"]
+        gravity_pixel_size_error = gravity_result["pixel_size_error"]
+        if np.isfinite(gravity_pixel_size) and np.isfinite(gravity_pixel_size_error):
+            agrees = bool(
+                abs(gravity_pixel_size - pixel_size) <= 3.0 * gravity_pixel_size_error
+            )
+            if not agrees:
+                logger.warning(
+                    "Magnification pixel size %.4g m does not agree with the gravity"
+                    " fit %.4g +/- %.2g m",
+                    pixel_size,
+                    gravity_pixel_size,
+                    gravity_pixel_size_error,
+                )
+
+        analysis_result["gravity_pixel_size"].push(gravity_pixel_size)
+        analysis_result["gravity_pixel_size_err"].push(gravity_pixel_size_error)
+        analysis_result["gravity_initial_velocity_y"].push(
+            gravity_result["initial_velocity"]
+        )
+        annotations = []
+        for label, channel in (("x", self.sigmax), ("y", self.sigmay)):
+            if label in temperature_fit_sigmas:
+                annotations.append(
+                    curve_1d(
+                        self.expansion_time,
+                        analysis_result["fit_time"],
+                        channel,
+                        temperature_fit_sigmas[label],
+                    )
+                )
+        if gravity_times.size:
+            annotations.append(
+                curve_1d(
+                    self.expansion_time,
+                    analysis_result["fit_time"],
+                    self.gaussian_fit_centre_y,
+                    gravity_position,
+                )
+            )
+        return annotations
 
 
 AbsorptionImage = make_fragment_scan_exp(AbsorptionImageExpFrag)
