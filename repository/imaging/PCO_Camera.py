@@ -130,7 +130,9 @@ class PcoCamera(Fragment):
             self.cam = pco.Camera(serial=19701804)
             expsoure_time = self.exposure_time.get()
             self.trigger = self.trigger1
-            self.trigger_delay = 6 * us # Empirically determined from max light accumulated
+            self.trigger_delay = (
+                6 * us
+            )  # Empirically determined from max light accumulated
         else:
             raise ValueError(f"Unknown camera selected: {self.camera_used.get()}")
         self.cam.default_configuration()
@@ -145,9 +147,9 @@ class PcoCamera(Fragment):
         if self.camera_used.get() == camera_name.EDGE:
             self.cam.sdk.set_roi(*self.roi.get().value)
 
-        logger.warning("ROI requested %s", self.roi.get().value)
+        logger.info("ROI requested %s", self.roi.get().value)
 
-        logger.warning("Camera ROI %s", self.cam.sdk.get_roi())
+        logger.info("Camera ROI %s", self.cam.sdk.get_roi())
 
         if self.debug:
             logger.info(f"{self.cam.camera_name} ({self.cam.camera_serial})")
