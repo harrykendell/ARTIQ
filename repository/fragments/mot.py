@@ -39,7 +39,7 @@ SETTLE_TIME = {
     "EVAPORATION2": 0 * ms,
 }
 DETUNING = {"CMOT": 5 * Γ_Rb, "PGC": 9.94 * Γ_Rb}  # This is beyond the normal 2Γ
-BIASES = {"X1": 0.0002 * A, "X2": 0.0 * A, "Y": 0.01 * A, "Z": 0.01 * A}
+BIASES = {"X1": 0.00 * A, "X2": 0.0 * A, "Y": 0.01 * A, "Z": 0.01 * A}
 COMPRESSED_GRADIENTS = {"X1": 0 * A, "X2": 1.98 * A}
 REPUMP_ATTENUATION = {"CMOT": 0.6196 * dB, "PGC": 0.05 * dB}
 POWER_3D_MOT = {"MOT_loading": 3.5 * V, "CMOT": 1.9 * V, "PGC": 1.0 * V}
@@ -150,6 +150,20 @@ class MOT(Fragment):
             init=False,
         )
 
+        self.x_coil: SetSupplies = self.setattr_fragment(
+            "x_coil",
+            SetSupplies,
+            VDrivenSupply["X1"],
+            init=False,
+        )
+
+        self.x_gradient_coil: SetSupplies = self.setattr_fragment(
+            "x_gradient_coil",
+            SetSupplies,
+            VDrivenSupply["X2"],
+            init=False,
+        )
+
         self.push_780: SetSupplies = self.setattr_fragment(
             "push_780",
             SetSupplies,
@@ -175,6 +189,17 @@ class MOT(Fragment):
             min=0.0 * A,
             max=0.1 * A,
         )
+
+        self.PGC_X_current: FloatParamHandle = self.setattr_param(
+            "PGC_X_current",
+            FloatParam,
+            "Bias current for the X coil during PGC",
+            default=BIASES["X1"],
+            unit="A",
+            min=0.0 * A,
+            max=0.1 * A,
+        )
+
         self.power_dimple: FloatParamHandle = self.setattr_param(
             "power_dimple",
             FloatParam,
@@ -231,7 +256,7 @@ class MOT(Fragment):
             "Time to wait after CMOT ramp",
             default=SETTLE_TIME["CMOT"],
             unit="ms",
-            min=0.5 * ms,
+            min=0.0 * ms,
         )
         self.CMOT_detuning: FloatParamHandle = self.setattr_param(
             "CMOT_detuning",
@@ -270,9 +295,8 @@ class MOT(Fragment):
             """
 
             duration_default = DURATION["CMOT"]
-            supplies = VDrivenSupply["X1", "X2", "push_780"]
+            supplies = VDrivenSupply["X2", "push_780"]
             supplies_end = [
-                COMPRESSED_GRADIENTS["X1"],  # X1
                 COMPRESSED_GRADIENTS["X2"],  # X2
                 self.CMOT_detuning,
             ]
@@ -342,21 +366,9 @@ class MOT(Fragment):
 
             duration_default = DURATION["PGC"]
 
-            supplies = VDrivenSupply[
-                "X1",
-                "X2",
-                "push_780",
-            ]
-            supplies_start = [
-                BIASES["X1"],
-                BIASES["X2"],
-                self.CMOT_detuning,
-            ]
-            supplies_end = [
-                BIASES["X1"],
-                BIASES["X2"],
-                self.PGC_detuning,
-            ]
+            supplies = VDrivenSupply["push_780",]
+            supplies_start = [self.CMOT_detuning]
+            supplies_end = [self.PGC_detuning]
             suservos = [SUServoedBeam["MOT"]]
             suservo_setpoint_start = [self.cmot_ramp]
             suservo_setpoint_end = [POWER_3D_MOT["PGC"]]
@@ -635,7 +647,8 @@ class MOT(Fragment):
             )
             self.cmot_ramp.do()
             delay(self.cmot_ramp.duration.get())
-
+        delay(100 * us)
+        self.x_gradient_coil.set_outputs([0 * A])
         delay(self.CMOT_settle_time.get())
 
     @kernel
@@ -647,6 +660,7 @@ class MOT(Fragment):
         """
         # Do the ramp - MOT freq, coil to biases
         # We must do these fastino writes in advance to avoid colliding with the ramp
+        self.x_coil.set_outputs([self.PGC_X_current.get()])
         self.z_coil.set_outputs([self.PGC_Z_current.get()])
         self.y_coil.set_outputs([self.PGC_Y_current.get()])
         with parallel:

@@ -29,7 +29,7 @@ VDRIVEN_SUPPLIES = [
         fastino="fastino",
         ch=1,
         gain=2.0 * A / V,
-        max_output=1.99 * A,
+        max_output=2.5 * A,
         default_output=1.0 * A,
     ),
     VDrivenSupply(

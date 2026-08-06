@@ -348,12 +348,12 @@ class AbsorptionImageExpFrag(ExpFragment):
         self.peak_od.push(self.absimg.peak_od)
 
         # Reference values for normalization
-        N_ref = 2e8  # current atom number
-        sigma_0_x = 1.70  # σₓ (mm)
-        sigma_0_y = 1.55  # σᵧ (mm)
+        N_ref = 1.11e8  # current atom number
+        sigma_0_x = 1.7  # σₓ (mm)
+        sigma_0_y = 1.14  # σᵧ (mm)
         sigma_x = self.absimg.sigmax * self.absimg.physical_scale * 1e3
         sigma_y = self.absimg.sigmay * self.absimg.physical_scale * 1e3
-        exponent = 1.5  # Exponent for the size terms
+        exponent = 2.0  # Exponent for the size terms
 
         # Custom objective 2 :
         if self.absimg.atom_number <= 0:
