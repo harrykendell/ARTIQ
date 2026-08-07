@@ -61,7 +61,7 @@ class AbsImageSettings:
     time_of_flight: float = 0.0  # s; retained in serialized image settings
 
     # PSD estimation parameters
-    temperature: float = 40e-6  # K
+    temperature: float = 26.54e-6  # K
 
     # Image processing and fit controls. Defaults reproduce the regression-tested
     # beam-aware fit while remaining compatible with older serialized settings.
