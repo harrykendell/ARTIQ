@@ -27,22 +27,22 @@ logger = logging.getLogger(__name__)
 DURATION = {
     "LOADING": 30 * s,
     "CMOT": 1.0 * ms,
-    "PGC": 14.58 * ms,
+    "PGC": 21 * ms,
     "EVAPORATION1": 50 * ms,
     "EVAPORATION2": 100 * ms,
 }
 SETTLE_TIME = {
     "CMOT": 2.0 * ms,
-    "PGC": 4.98 * ms,
+    "PGC": 5.0 * ms,
     "ODT": 0 * ms,
     "EVAPORATION1": 0 * ms,
     "EVAPORATION2": 0 * ms,
 }
-DETUNING = {"CMOT": 5 * Γ_Rb, "PGC": 9.94 * Γ_Rb}  # This is beyond the normal 2Γ
-BIASES = {"X1": 0.00 * A, "X2": 0.0 * A, "Y": 0.01 * A, "Z": 0.01 * A}
+DETUNING = {"CMOT": 8 * Γ_Rb, "PGC": 17 * Γ_Rb}  # This is beyond the normal 2Γ
+BIASES = {"X1": 0.00011 * A, "X2": 0.0 * A, "Y": 0.00034 * A, "Z": 0.03854 * A}
 COMPRESSED_GRADIENTS = {"X1": 0 * A, "X2": 1.98 * A}
 REPUMP_ATTENUATION = {"CMOT": 0.6196 * dB, "PGC": 0.05 * dB}
-POWER_3D_MOT = {"MOT_loading": 3.5 * V, "CMOT": 1.9 * V, "PGC": 1.0 * V}
+POWER_3D_MOT = {"MOT_loading": 3.5 * V, "CMOT": 3.5 * V, "PGC": 2.0 * V}
 
 
 class MOT(Fragment):
