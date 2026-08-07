@@ -6,7 +6,7 @@ from artiq.coredevice.core import Core
 from artiq.coredevice.dma import CoreDMA
 from artiq.coredevice.suservo import SUServo
 from artiq.coredevice.ttl import TTLInOut
-from artiq.experiment import kernel, rpc
+from artiq.experiment import EnumerationValue, kernel, rpc
 from artiq.language import delay, ms, now_mu, parallel, s, sequential, us
 from artiq.language.core import host_only
 
@@ -17,6 +17,7 @@ from ndscan.experiment import (
     FloatChannel,
     FloatParam,
     OpaqueChannel,
+    RestartKernelTransitoryError,
     make_fragment_scan_exp,
 )
 from ndscan.experiment.annotations import curve_1d
@@ -290,7 +291,7 @@ class AbsorptionImageExpFrag(ExpFragment):
         self.core.wait_until_mu(now_mu())
         self.update_images()
 
-    @rpc(flags={"async"})
+    @rpc
     def update_images(self):
         # print roi for debugging
         images = self.pco_camera.retrieve_images(
@@ -335,6 +336,22 @@ class AbsorptionImageExpFrag(ExpFragment):
             bg=images[2],
             settings=settings,
         )
+
+        # If the image seems invalid dont log it
+        if self.absimg.atom_number < 0.0 or self.absimg.fit.summary()["rsquared"] < 0.7:
+            logger.error("No atoms detected - Fix and retry from Interactive Args")
+            with self.interactive(title="Zero atoms detected; retry?") as interactive:
+                interactive.setattr_argument(
+                    "retry",
+                    EnumerationValue(
+                        ["Retry", "Use point", "Abort"], "Retry", quickstyle=True
+                    ),
+                    tooltip="Check the laser is locked then confirm to retry the point",
+                )
+            if interactive.retry == "Retry":
+                raise RestartKernelTransitoryError("No atoms detected; retrying")
+            if interactive.retry == "Abort":
+                raise RuntimeError("Scan aborted after a failed point")
 
         self.atom_number.push(self.absimg.atom_number)
         self.info.push(self.absimg.all_info())
