@@ -38,7 +38,7 @@ SETTLE_TIME = {
     "EVAPORATION1": 0 * ms,
     "EVAPORATION2": 0 * ms,
 }
-DETUNING = {"CMOT": 8 * Γ_Rb, "PGC": 17 * Γ_Rb}  # This is beyond the normal 2Γ
+DETUNING = {"CMOT": 8 * Γ_Rb, "PGC": 16 * Γ_Rb}  # This is beyond the normal 2Γ
 BIASES = {"X1": 0.00011 * A, "X2": 0.0 * A, "Y": 0.00034 * A, "Z": 0.03854 * A}
 COMPRESSED_GRADIENTS = {"X1": 0 * A, "X2": 1.98 * A}
 REPUMP_ATTENUATION = {"CMOT": 0.6196 * dB, "PGC": 0.05 * dB}
@@ -225,7 +225,7 @@ class MOT(Fragment):
             default=1.0 * ms,
             unit="ms",
             min=0.0 * ms,
-        )
+            )
 
         self.unlock_ttl: TTLOut = self.get_device("780_unlock")
 
@@ -333,15 +333,6 @@ class MOT(Fragment):
             FloatParam,
             "Detuning of the PGC ramp",
             default=DETUNING["PGC"],
-            unit="Γ",
-            scale=Γ_Rb,
-        )
-
-        self.PGC_repump_detuning: FloatParamHandle = self.setattr_param(
-            "PGC_repump_detuning",
-            FloatParam,
-            "Detuning of the PGC Repump beam",
-            default=0,
             unit="Γ",
             scale=Γ_Rb,
         )
@@ -671,7 +662,6 @@ class MOT(Fragment):
             self.eom.set_freq(
                 self.eom.config.frequency
                 + self.PGC_detuning.get()
-                + self.PGC_repump_detuning.get()
             )
             self.pgc_ramp.do()
 
