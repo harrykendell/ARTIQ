@@ -197,6 +197,23 @@ class AbsImage:
             "physical_scale_m_per_px": finite_number(self.physical_scale),
         }
 
+    def reuse_analysis_payload(self, payload, *, frame_timestamp):
+        """Install producer results when they belong to the current frame."""
+
+        if payload.get("frame_timestamp") != frame_timestamp:
+            return False
+        phase = payload["phase_space_density"]
+        self.__dict__["best_values"] = dict(payload["fit"]["best_values"])
+        self.__dict__["atom_number"] = payload["atom_number"]
+        self.__dict__["centroid"] = tuple(payload["centroid_px"])
+        self.__dict__["peak"] = tuple(payload["peak_px"])
+        self.__dict__["phase_space_density"] = (
+            phase["peak_density_atoms_per_m3"],
+            phase["thermal_de_broglie_wavelength_m"],
+            phase["phase_space_density"],
+        )
+        return True
+
     @functools.cached_property
     def physical_scale(self):
         """Pixel to real-space size in m."""
