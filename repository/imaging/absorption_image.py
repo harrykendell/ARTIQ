@@ -1,3 +1,4 @@
+import json
 import logging
 from time import time
 
@@ -347,13 +348,6 @@ class AbsorptionImageExpFrag(ExpFragment):
             if interactive.retry == "Abort":
                 raise RuntimeError("Scan aborted after a failed point")
 
-        # This indicates a valid image for the website
-        self.set_dataset(
-            "Images.absorption.timestamp",
-            time(),
-            broadcast=True,
-        )
-
         self.atom_number.push(self.absimg.atom_number)
         self.info.push(self.absimg.all_info())
         self.sigmax.push(self.absimg.sigmax)
@@ -382,6 +376,23 @@ class AbsorptionImageExpFrag(ExpFragment):
                 -np.log(self.absimg.atom_number / N_ref)
                 + exponent * (np.log(sigma_x / sigma_0_x) + np.log(sigma_y / sigma_0_y))
             )
+
+        frame_timestamp = time()
+        self.set_dataset(
+            "Images.absorption.analysis",
+            json.dumps(
+                self.absimg.analysis_payload(frame_timestamp=frame_timestamp),
+                separators=(",", ":"),
+            ),
+            broadcast=True,
+        )
+        # This is deliberately last: consumers treat it as the signal that the
+        # raw frames, settings, and matching producer analysis are complete.
+        self.set_dataset(
+            "Images.absorption.timestamp",
+            frame_timestamp,
+            broadcast=True,
+        )
 
     def get_default_analyses(self):
         return [

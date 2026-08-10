@@ -78,6 +78,7 @@ class AbsImageSettings:
 
 
 class AbsImage:
+    analysis_schema = "absorption-image-analysis/v1"
     nm = 1e-9
     um = 1e-6
 
@@ -143,6 +144,58 @@ class AbsImage:
             "sigmax_mm": {self.best_values["sx"] * self.physical_scale * 1e3},
             "sigmay_mm": {self.best_values["sy"] * self.physical_scale * 1e3},
         """
+
+    def analysis_payload(self, *, frame_timestamp):
+        """Return the fitted image analysis as a primitive dataset payload.
+
+        ``Images.absorption.timestamp`` remains the frame-complete signal.  The
+        matching timestamp in this payload lets other consumers reuse this fit
+        without accidentally pairing it with an older set of camera frames.
+        """
+
+        def finite_number(value):
+            try:
+                number = float(value)
+            except (TypeError, ValueError):
+                return None
+            return number if math.isfinite(number) else None
+
+        def point(value):
+            try:
+                return [finite_number(item) for item in value[:3]]
+            except (TypeError, IndexError):
+                return None
+
+        fit = self.fit
+        best_values = {
+            name: finite_number(self.best_values.get(name))
+            for name in ("A", "x0", "y0", "sx", "sy", "theta", "z0")
+        }
+        fit_details = {
+            "model": "gaussian_2D",
+            "best_values": best_values,
+            "success": bool(getattr(fit, "success", False)),
+            "message": str(getattr(fit, "message", "")),
+        }
+        fit_details["rsquared"] = finite_number(getattr(fit, "rsquared", None))
+
+        peak_density, wavelength, density = self.phase_space_density
+        return {
+            "schema": self.analysis_schema,
+            "processor": "repository.imaging.processor.AbsImage",
+            "frame_timestamp": finite_number(frame_timestamp),
+            "source_shape": [int(self.height), int(self.width)],
+            "fit": fit_details,
+            "atom_number": finite_number(self.atom_number),
+            "centroid_px": point(self.centroid),
+            "peak_px": point(self.peak),
+            "phase_space_density": {
+                "peak_density_atoms_per_m3": finite_number(peak_density),
+                "thermal_de_broglie_wavelength_m": finite_number(wavelength),
+                "phase_space_density": finite_number(density),
+            },
+            "physical_scale_m_per_px": finite_number(self.physical_scale),
+        }
 
     @functools.cached_property
     def physical_scale(self):
@@ -341,6 +394,7 @@ class AbsImage:
         """Returns the y0 of the fitted gaussian in pixels."""
         return self.best_values["y0"]
 
+    @functools.cached_property
     def _fit_initial_values(self):
         """Estimate cloud geometry without assuming a zero OD background."""
         od = self.optical_density
@@ -414,7 +468,7 @@ class AbsImage:
     @functools.cached_property
     def fit_sampling_step(self):
         """Adaptive two-axis downsampling used by the Gaussian fit."""
-        initial = self._fit_initial_values()
+        initial = self._fit_initial_values
         configured = max(1, int(self.settings.fit_downsample))
 
         # Keep roughly six samples across the smaller 2-sigma diameter.
@@ -429,7 +483,7 @@ class AbsImage:
         """Fit a robust Gaussian-plus-offset model within the reference beam."""
         y_mg, x_mg = self.xy
         od = self.optical_density
-        initial = self._fit_initial_values()
+        initial = self._fit_initial_values
         model = Model(ravel(gaussian_2D), independent_vars=["x", "y"])
 
         model.set_param_hint("A", value=initial["A"], min=0)
