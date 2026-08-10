@@ -52,7 +52,7 @@ def make_benchmark_scan_exp(
                             "type": "list",
                             "range": {
                                 "values": list(tof_times),
-                                "randomise_order": False,
+                                "randomise_order": True,
                             },
                             **default_axis,
                         }
