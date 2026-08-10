@@ -324,12 +324,6 @@ class AbsorptionImageExpFrag(ExpFragment):
             broadcast=True,
         )
 
-        self.set_dataset(
-            "Images.absorption.timestamp",
-            time(),
-            broadcast=True,
-        )
-
         self.absimg = AbsImage(
             data=images[0],
             ref=images[1],
@@ -352,6 +346,13 @@ class AbsorptionImageExpFrag(ExpFragment):
                 raise RestartKernelTransitoryError("No atoms detected; retrying")
             if interactive.retry == "Abort":
                 raise RuntimeError("Scan aborted after a failed point")
+
+        # This indicates a valid image for the website
+        self.set_dataset(
+            "Images.absorption.timestamp",
+            time(),
+            broadcast=True,
+        )
 
         self.atom_number.push(self.absimg.atom_number)
         self.info.push(self.absimg.all_info())
