@@ -13,9 +13,6 @@ MOT_TOF_TIMES = tuple(value * ms for value in range(1, 7))
 CMOT_TOF_TIMES = tuple(value * ms for value in range(5, 23, 2))
 PGC_TOF_TIMES = tuple(value * ms for value in range(5, 31, 3))
 ODT_TOF_TIMES = tuple(value * ms for value in range(1, 31, 3))
-print(
-    f"MOT: {len(MOT_TOF_TIMES)}, CMOT: {len(CMOT_TOF_TIMES)}, PGC: {len(PGC_TOF_TIMES)}, ODT {len(ODT_TOF_TIMES)}"
-)
 
 TOF_LOADING_TIME = 10 * s
 
