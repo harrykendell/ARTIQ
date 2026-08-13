@@ -181,6 +181,8 @@ class AbsorptionImageExpFrag(ExpFragment):
         self.custom_objective: FloatChannel = self.setattr_result("custom_objective")
 
         self.peak_od: FloatChannel = self.setattr_result("peak_od")
+        # Used to link points to images on the website
+        self.image_timestamp: FloatChannel = self.setattr_result("image_timestamp")
 
     @host_only
     def prepare(self) -> None:
@@ -378,6 +380,7 @@ class AbsorptionImageExpFrag(ExpFragment):
             )
 
         frame_timestamp = time()
+        self.image_timestamp.push(frame_timestamp)
         self.set_dataset(
             "Images.absorption.analysis",
             json.dumps(
