@@ -33,5 +33,6 @@ class VDrivenSupply(DEVICE):
     max_output: float = inf
     disabled: bool = False
     default_output: float = 0.0
+    default_enabled: bool = False
 
     unit: str = "A"

@@ -64,6 +64,10 @@ class SupplySwitch(QWidget):
             "background-color: #5db75d" if self.state else "background-color: #b75d5d"
         )
 
+    def set_state(self, enabled: bool) -> None:
+        self.state = bool(enabled)
+        self._refresh()
+
     def toggle(self):
         self.state = bool(self.set_enabled(not self.state))
         self._refresh()
@@ -78,10 +82,12 @@ class SingleVDrivenSupply(QWidget):
         self,
         manager: VDrivenSupplyManager,
         supply: VDrivenSupply,
+        bridge,
     ):
         super().__init__()
         self.manager = manager
         self.supply = supply
+        self.bridge = bridge
         self.scale = unit_scale(supply.unit)
         self._updating_controls = False
 
@@ -96,7 +102,9 @@ class SingleVDrivenSupply(QWidget):
         top = QHBoxLayout()
         self.enable_switch = SupplySwitch(
             manager.get_enabled(supply.name),
-            lambda enabled: manager.set_enabled(supply.name, enabled),
+            lambda enabled: bridge.change_control(
+                f"supply.{supply.name}.enabled", enabled
+            ),
         )
         top.addWidget(self.enable_switch)
         top.addStretch()
@@ -174,10 +182,14 @@ class SingleVDrivenSupply(QWidget):
     def set_displayed_output(self, displayed_value: float) -> float:
         displayed_value = min(max(float(displayed_value), self.minimum), self.maximum)
         output = from_display_units(displayed_value, self.supply.unit)
-        output = self.manager.set_output(self.supply.name, output)
+        output = self.bridge.change_control(f"supply.{self.supply.name}.value", output)
         displayed_output = to_display_units(output, self.supply.unit)
         self._set_controls(displayed_output)
         return displayed_output
+
+    def refresh(self) -> None:
+        self.enable_switch.set_state(self.manager.get_enabled(self.supply.name))
+        self._set_controls(self.displayed_output())
 
     def get_widget(self):
         return self.groupbox
@@ -186,16 +198,22 @@ class SingleVDrivenSupply(QWidget):
 class VDrivenSuppliesGUI(QWidget):
     """Display every VDrivenSupply configured for the selected Fastino."""
 
-    def __init__(self, manager: VDrivenSupplyManager, rows_per_column: int = 3):
+    def __init__(
+        self,
+        manager: VDrivenSupplyManager,
+        bridge,
+        rows_per_column: int = 3,
+    ):
         super().__init__()
         self.manager = manager
+        self.bridge = bridge
         self.setWindowTitle("Voltage-driven supplies")
 
         layout = QVBoxLayout()
         self.setLayout(layout)
 
         self.channels = [
-            SingleVDrivenSupply(manager, supply) for supply in manager.supplies
+            SingleVDrivenSupply(manager, supply, bridge) for supply in manager.supplies
         ]
 
         grid = QGridLayout()
@@ -206,3 +224,8 @@ class VDrivenSuppliesGUI(QWidget):
                 index // rows_per_column,
             )
         layout.addLayout(grid)
+        self.bridge.state_changed.connect(self.refresh)
+
+    def refresh(self, _state=None) -> None:
+        for channel in self.channels:
+            channel.refresh()

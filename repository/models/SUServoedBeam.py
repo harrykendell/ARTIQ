@@ -42,7 +42,12 @@ class SUServoedBeam(DEVICE):
     # else the experiment has permission to misbehave
     setpoint: float = 0.0
     servo_enabled: bool = False
+    output_enabled: bool = False
     initial_amplitude: float = 1.0
+    gain: int = 0
+    p: float = -0.5
+    i: float = -200000.0
+    gl: float = -200.0
     # The zero point of the photodiode, in volts - added to the setpoint
     photodiode_offset: float = 0.0
     # A linear calibration of V to mW

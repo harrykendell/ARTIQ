@@ -1,5 +1,5 @@
 from artiq.language.units import A, MHz, V, dB, ms
-from repository.models import Eom, SUServoedBeam, VDrivenSupply
+from repository.models import Eom, Shutter, SUServoedBeam, VDrivenSupply
 from repository.models.Device import device_arrays
 
 EOMS = [
@@ -80,6 +80,14 @@ THORLABS_SHUTTER_DELAY = 35.0 * ms
 EBAY_SHUTTER_DELAY = 25.0 * ms
 # the switch on time is actually quick fast. The limit is the dislike of short pulses
 
+SHUTTERS = [
+    Shutter(name="2DMOT", ttl="shutter_2DMOT", delay=THORLABS_SHUTTER_DELAY),
+    Shutter(name="3DMOT", ttl="shutter_3DMOT", delay=THORLABS_SHUTTER_DELAY),
+    Shutter(name="IMG", ttl="shutter_IMG", delay=EBAY_SHUTTER_DELAY),
+    Shutter(name="LATTICE", ttl="shutter_LATTICE", delay=THORLABS_SHUTTER_DELAY),
+]
+SHUTTERS = {shutter.name: shutter for shutter in SHUTTERS}
+
 SUSERVOED_BEAMS = [
     SUServoedBeam(
         name="Locking",
@@ -106,7 +114,7 @@ SUSERVOED_BEAMS = [
         attenuation=18.0 * dB,
         # shutter_device="shutter_IMG",
         # shutter_delay=EBAY_SHUTTER_DELAY,
-        setpoint=0.1 * V,
+        setpoint=0.2 * V,
         # servo_enabled=True,
         # calib_gain=36.64e-3,
         # calib_offset=-0.87e-3,
@@ -159,6 +167,7 @@ SUSERVOED_BEAMS = {beam.name: beam for beam in SUSERVOED_BEAMS}
 # map from class to dict for initializing devices
 device_arrays.update({
     Eom: EOMS,
+    Shutter: SHUTTERS,
     VDrivenSupply: VDRIVEN_SUPPLIES,
     SUServoedBeam: SUSERVOED_BEAMS,
     # Add other classes as needed

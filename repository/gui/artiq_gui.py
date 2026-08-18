@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import sys
 
@@ -21,12 +22,15 @@ from PyQt5.QtWidgets import (
 
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 from managers.boosterTelemetry import BoosterTelemetry
-from managers.FastinoManager import (
-    FastinoManager,
-    VDrivenSupplyManager,
-)
+from managers.FastinoManager import VDrivenSupplyManager
 from managers.MirnyManager import MirnyManager
 from VDrivenSupplyGUI import VDrivenSuppliesGUI
+from control_bridge import GuiControlAdapter, GuiControlBridge
+from device_inventory import (
+    configured_in_channel_order,
+    logical_channel,
+    physical_channel_aliases,
+)
 
 # disable formatting
 # flake8: noqa
@@ -34,8 +38,13 @@ from managers.SUServoManager import SUServoManager
 
 from artiq.coredevice.core import Core
 from artiq.experiment import EnvExperiment, kernel, rpc
-from artiq.language import StringValue, BooleanValue, ms
-from repository.models.devices import VDRIVEN_SUPPLIES
+from artiq.language import StringValue, BooleanValue, MHz, ms
+from repository.models.devices import (
+    EOMS,
+    SHUTTERS,
+    SUSERVOED_BEAMS,
+    VDRIVEN_SUPPLIES,
+)
 
 
 class Switch(QWidget):
@@ -67,10 +76,16 @@ class Switch(QWidget):
     def switch_state(self):
         """Toggles the state of this button"""
         self.button.setChecked(False)  # we dont want the button to stay held down
-        self.turn[self.state]()  # Swap state
-        self.state = not self.state
+        previous = self.state
+        canonical = self.turn[previous]()
+        # Bridge callbacks return the manager state after reading it back.  Keep
+        # supporting older callbacks which only performed the action.
+        self.set_state(not previous if canonical is None else canonical)
 
-        self.button.setText(self.text[self.state])  # Change text and color
+    def set_state(self, state):
+        self.state = bool(state)
+        self.button.setChecked(False)
+        self.button.setText(self.text[self.state])
         self.button.setStyleSheet(self.color[self.state])
 
 
@@ -85,12 +100,22 @@ class SignalDoubleSpinBox(QDoubleSpinBox):
 
 
 class DDSControl(QWidget):
-    def __init__(self, manager, ch=0, minimum=0.0, maximum=400.0):
+    def __init__(
+        self,
+        manager,
+        set_frequency,
+        set_attenuation,
+        ch=0,
+        minimum=0.0,
+        maximum=400.0,
+    ):
         super().__init__()
         self.min = minimum
         self.max = maximum
         self.manager = manager
         self.ch = ch
+        self.set_frequency = set_frequency
+        self.set_attenuation = set_attenuation
 
         # Main layout for this widget
         layout = QVBoxLayout()
@@ -112,23 +137,23 @@ class DDSControl(QWidget):
         self.text.setAlignment(Qt.AlignCenter)
         self.text.editingFinished.connect(lambda: self.setfreq(self.text.text()))
 
-        att_input = SignalDoubleSpinBox()
-        att_input.setRange(0.0, 31.5)
-        att_input.setSingleStep(0.5)
-        att_input.setDecimals(1)
-        att_input.setValue(self.manager.atts[ch])
-        att_input.setSuffix(" dB")
-        att_input.editingFinished.connect(
-            lambda: self.manager.set_att(ch, att_input.value())
+        self.att_input = SignalDoubleSpinBox()
+        self.att_input.setRange(0.0, 31.5)
+        self.att_input.setSingleStep(0.5)
+        self.att_input.setDecimals(1)
+        self.att_input.setValue(self.manager.atts[ch])
+        self.att_input.setSuffix(" dB")
+        self.att_input.editingFinished.connect(
+            lambda: self.set_attenuation(self.att_input.value())
         )
-        att_input.stepChanged.connect(
-            lambda: self.manager.set_att(ch, att_input.value())
+        self.att_input.stepChanged.connect(
+            lambda: self.set_attenuation(self.att_input.value())
         )
 
         inputline = QHBoxLayout()
         inputline.addWidget(self.text)
         inputline.addStretch()
-        inputline.addWidget(att_input)
+        inputline.addWidget(self.att_input)
         layout.addLayout(inputline)
 
         # Slider and min/max labels
@@ -161,9 +186,22 @@ class DDSControl(QWidget):
 
         val = min(max(val, self.min), self.max)
         self.text.setText(str(val))
+        self.slider.blockSignals(True)
         self.slider.setValue(int(val))
+        self.slider.blockSignals(False)
 
-        self.manager.set_freq(self.ch, val)
+        self.set_frequency(val)
+
+    def refresh(self):
+        frequency = float(self.manager.freqs[self.ch])
+        attenuation = float(self.manager.atts[self.ch])
+        self.text.setText(str(round(frequency, 3)))
+        self.slider.blockSignals(True)
+        self.slider.setValue(int(frequency))
+        self.slider.blockSignals(False)
+        self.att_input.blockSignals(True)
+        self.att_input.setValue(attenuation)
+        self.att_input.blockSignals(False)
 
 
 class BoosterControl(QWidget):
@@ -223,11 +261,14 @@ class BoosterControl(QWidget):
 
 
 class PIDControl(QWidget):
-    def __init__(self, manager, ch=0):
+    def __init__(self, manager, set_offset, set_y, set_iir, ch=0):
         super().__init__()
         self.manager: SUServoManager = manager
         self.en_out = self.manager.en_outs[ch]
         self.ch = ch
+        self.set_offset = set_offset
+        self.set_y = set_y
+        self.set_iir = set_iir
 
         layout = QVBoxLayout()
 
@@ -237,7 +278,7 @@ class PIDControl(QWidget):
         self.setpoint.setText(str(self.manager.offsets[ch]))
         self.setpoint.setValidator(QDoubleValidator(-10.00, 10.00, 10))
         self.setpoint.editingFinished.connect(
-            lambda: self.manager.set_offset(ch, float(self.setpoint.text()))
+            lambda: self.set_offset(float(self.setpoint.text()))
         )
         top.addWidget(self.setpoint)
 
@@ -298,29 +339,36 @@ class PIDControl(QWidget):
 
         amp_vbox.addWidget(amp_label)
         amp_vbox.addStretch()
-        amp_input = SignalDoubleSpinBox()
-        amp_input.setRange(0.0, 1.0)
-        amp_input.setSingleStep(0.1)
-        amp_input.setDecimals(1)
-        amp_input.setValue(self.manager.ys[ch])
-        amp_input.editingFinished.connect(
-            lambda: self.manager.set_y(ch, amp_input.value())
+        self.amp_input = SignalDoubleSpinBox()
+        self.amp_input.setRange(0.0, 1.0)
+        self.amp_input.setSingleStep(0.1)
+        self.amp_input.setDecimals(1)
+        self.amp_input.setValue(self.manager.ys[ch])
+        self.amp_input.editingFinished.connect(
+            lambda: self.set_y(self.amp_input.value())
         )
-        amp_input.stepChanged.connect(lambda: self.manager.set_y(ch, amp_input.value()))
-        amp_vbox.addWidget(amp_input)
+        self.amp_input.stepChanged.connect(lambda: self.set_y(self.amp_input.value()))
+        amp_vbox.addWidget(self.amp_input)
         bottom.addLayout(amp_vbox)
 
         layout.addLayout(bottom)
         self.setLayout(layout)
 
     def set(self):
-        self.manager.set_iir(
-            self.ch,
-            self.ch,
+        self.set_iir(
             float(self.P.text()),
             float(self.I.text()),
             float(self.Gl.text()),
         )
+
+    def refresh(self):
+        self.setpoint.setText(str(self.manager.offsets[self.ch]))
+        self.P.setText(str(self.manager.Ps[self.ch]))
+        self.I.setText(str(self.manager.Is[self.ch]))
+        self.Gl.setText(str(self.manager.Gls[self.ch]))
+        self.amp_input.blockSignals(True)
+        self.amp_input.setValue(float(self.manager.ys[self.ch]))
+        self.amp_input.blockSignals(False)
 
 
 class SamplerControl(QWidget):
@@ -341,11 +389,13 @@ class SamplerControl(QWidget):
 class SingleChannelSUServo(QWidget):
     """Class to control a single given SUServo channel"""
 
-    def __init__(self, manager, boostermanager, channel=0):
+    def __init__(self, manager, bridge, boostermanager, beam, channel=0):
         # manager : SUServoManager
         QWidget.__init__(self)
         self.manager = manager
         self.channel = channel
+        self.beam = beam
+        self.bridge = bridge
 
         self.groupbox = QGroupBox()
 
@@ -358,14 +408,22 @@ class SingleChannelSUServo(QWidget):
         top = QHBoxLayout()
         self.dds_button = Switch(
             default=self.manager.en_outs[channel],
-            turn_on=lambda: self.manager.enable(channel),
-            turn_off=lambda: self.manager.disable(channel),
+            turn_on=lambda: self.bridge.change_control(
+                f"beam.{beam.name}.output_enabled", True
+            ),
+            turn_off=lambda: self.bridge.change_control(
+                f"beam.{beam.name}.output_enabled", False
+            ),
         )
         top.addWidget(self.dds_button)
         self.pid_button = Switch(
             default=self.manager.en_iirs[channel],
-            turn_on=lambda: self.manager.enable_iir(channel),
-            turn_off=lambda: self.manager.disable_iir(channel),
+            turn_on=lambda: self.bridge.change_control(
+                f"beam.{beam.name}.iir_enabled", True
+            ),
+            turn_off=lambda: self.bridge.change_control(
+                f"beam.{beam.name}.iir_enabled", False
+            ),
             on_text="PID",
             off_text="PID",
         )
@@ -375,8 +433,7 @@ class SingleChannelSUServo(QWidget):
         top.addStretch()
 
         # Channel name
-        channelsMap = ["LOCK", "MOT", "IMG", "PUMP", "852 X", "852 Y", "CDT 1", "CDT 2"]
-        name = QLabel(f"Ch {channel} - ({channelsMap[channel]})")
+        name = QLabel(beam.name)
         name.setStyleSheet("font: bold 12pt")
         top.addWidget(name)
 
@@ -386,12 +443,30 @@ class SingleChannelSUServo(QWidget):
         self.tabs = QTabWidget()
 
         # DDS
-        freq = DDSControl(self.manager, ch=channel, minimum=0.0, maximum=400.0)
-        self.tabs.addTab(freq, "DDS")
+        self.dds = DDSControl(
+            self.manager,
+            lambda value: (
+                self.bridge.change_control(f"beam.{beam.name}.frequency", value * MHz)
+                / MHz
+            ),
+            lambda value: self.bridge.change_control(
+                f"beam.{beam.name}.attenuation", value
+            ),
+            ch=channel,
+            minimum=0.0,
+            maximum=400.0,
+        )
+        self.tabs.addTab(self.dds, "DDS")
 
         # PID
-        pid = PIDControl(self.manager, ch=channel)
-        self.tabs.addTab(pid, "PID")
+        self.pid = PIDControl(
+            self.manager,
+            lambda value: self.bridge.change_control(f"beam.{beam.name}.offset", value),
+            lambda value: self.bridge.change_control(f"beam.{beam.name}.y", value),
+            lambda p, i, gl: self.bridge.set_beam_iir(beam.name, p, i, gl),
+            ch=channel,
+        )
+        self.tabs.addTab(self.pid, "PID")
 
         # Booster
         self.booster = BoosterControl(boostermanager, self.set_tab, ch=channel)
@@ -401,6 +476,12 @@ class SingleChannelSUServo(QWidget):
 
     def set_tab(self, index):
         self.tabs.setCurrentIndex(index)
+
+    def refresh(self):
+        self.dds_button.set_state(self.manager.en_outs[self.channel])
+        self.pid_button.set_state(self.manager.en_iirs[self.channel])
+        self.dds.refresh()
+        self.pid.refresh()
 
     def get_widget(self):
         """Return the widgets to the main app"""
@@ -413,11 +494,13 @@ class SingleChannelMirny(QWidget):
     freq/att/on off control much like the SUServo DDS panel
     """
 
-    def __init__(self, manager, channel=0):
+    def __init__(self, manager, bridge, eom, channel=0):
         # manager : MirnyManager
         QWidget.__init__(self)
         self.manager = manager
         self.channel = channel
+        self.eom = eom
+        self.bridge = bridge
 
         self.groupbox = QGroupBox()
 
@@ -430,8 +513,12 @@ class SingleChannelMirny(QWidget):
         top = QHBoxLayout()
         self.dds_button = Switch(
             default=self.manager.en_outs[channel],
-            turn_on=lambda: self.manager.enable(channel),
-            turn_off=lambda: self.manager.disable(channel),
+            turn_on=lambda: self.bridge.change_control(
+                f"eom.{eom.name}.output_enabled", True
+            ),
+            turn_off=lambda: self.bridge.change_control(
+                f"eom.{eom.name}.output_enabled", False
+            ),
             on_text="Mirny",
             off_text="Mirny",
         )
@@ -439,8 +526,12 @@ class SingleChannelMirny(QWidget):
 
         self.almazny_button = Switch(
             default=self.manager.en_almazny[channel],
-            turn_on=lambda: self.manager.enable_almazny(channel),
-            turn_off=lambda: self.manager.disable_almazny(channel),
+            turn_on=lambda: self.bridge.change_control(
+                f"eom.{eom.name}.almazny_enabled", True
+            ),
+            turn_off=lambda: self.bridge.change_control(
+                f"eom.{eom.name}.almazny_enabled", False
+            ),
             on_text="Almazny",
             off_text="Almazny",
         )
@@ -449,17 +540,29 @@ class SingleChannelMirny(QWidget):
         top.addStretch()
 
         # Channel name
-        name = QLabel(["Ch 0 - (EOM)", "Ch 1", "Ch 2", "Ch 3"][channel])
+        name = QLabel(eom.name)
         name.setStyleSheet("font: bold 12pt")
         top.addWidget(name)
 
         vbox.addLayout(top)
 
         # DDS
-        freq = DDSControl(self.manager, ch=channel, minimum=53.125, maximum=6800.0)
+        self.dds = DDSControl(
+            self.manager,
+            lambda value: (
+                self.bridge.change_control(f"eom.{eom.name}.frequency", value * MHz)
+                / MHz
+            ),
+            lambda value: self.bridge.change_control(
+                f"eom.{eom.name}.attenuation", value
+            ),
+            ch=channel,
+            minimum=53.125,
+            maximum=6800.0,
+        )
         # tabs.addTab(freq, "DDS")
 
-        vbox.addWidget(freq)
+        vbox.addWidget(self.dds)
 
         # note that almazny is double the frequency of mirny
         # center label
@@ -474,16 +577,23 @@ class SingleChannelMirny(QWidget):
         """Return the widgets to the main app"""
         return self.groupbox
 
+    def refresh(self):
+        self.dds_button.set_state(self.manager.en_outs[self.channel])
+        self.almazny_button.set_state(self.manager.en_almazny[self.channel])
+        self.dds.refresh()
+
 
 class SUServoGUI(QWidget):
-    def __init__(self, manager):
+    def __init__(self, manager, bridge):
         super().__init__()
         self.manager = manager
+        self.bridge = bridge
         self.setGeometry(self.x(), self.y(), self.minimumWidth(), self.minimumHeight())
         self.booster = BoosterTelemetry(self.update_booster)
         self.booster.set_telem_period(1)
         self.ch = [
-            SingleChannelSUServo(self.manager, self.booster, i) for i in range(8)
+            SingleChannelSUServo(self.manager, self.bridge, self.booster, beam, i)
+            for i, beam in enumerate(self.manager.beams)
         ]
 
         self.setWindowTitle("SUServo GUI")
@@ -493,13 +603,12 @@ class SUServoGUI(QWidget):
         # Artiq status {{{
         hbox = QHBoxLayout()
         hbox.addStretch()
-        hbox.addWidget(
-            Switch(
-                self.manager.enabled,
-                self.manager.enable_servo,
-                self.manager.disable_servo,
-            )
+        self.servo_button = Switch(
+            self.manager.enabled,
+            lambda: self.bridge.change_control("suservo.enabled", True),
+            lambda: self.bridge.change_control("suservo.enabled", False),
         )
+        hbox.addWidget(self.servo_button)
         self.label = QLabel("SUServo")  # Bold large text
         self.label.setStyleSheet("font: bold 14pt")
         hbox.addWidget(self.label)
@@ -508,32 +617,39 @@ class SUServoGUI(QWidget):
         shutterlabel = QLabel("Shutters")
         shutterlabel.setStyleSheet("font: bold 14pt")
         hbox.addWidget(shutterlabel)
-        for ch, name in enumerate(["2DMOT", "3DMOT", "IMG", "LATTICE"]):
-            self.shutter_button = Switch(
+        self.shutter_buttons = []
+        for ch, shutter in enumerate(self.manager.shutter_infos):
+            shutter_button = Switch(
                 default=self.manager.en_shutters[ch],
-                turn_on=lambda channel=ch: self.manager.open_shutter(channel),
-                turn_off=lambda channel=ch: self.manager.close_shutter(channel),
-                on_text=name,
-                off_text=name,
+                turn_on=lambda name=shutter.name: self.bridge.change_control(
+                    f"shutter.{name}.open", True
+                ),
+                turn_off=lambda name=shutter.name: self.bridge.change_control(
+                    f"shutter.{name}.open", False
+                ),
+                on_text=shutter.name,
+                off_text=shutter.name,
             )
-            hbox.addWidget(self.shutter_button)
+            self.shutter_buttons.append(shutter_button)
+            hbox.addWidget(shutter_button)
         layout.addLayout(hbox)
         # }}}
 
         # Create channels controls
         chans = QGridLayout()
-        for i in range(8):
-            chans.addWidget(self.ch[i].get_widget(), i % 4, i // 4)
+        for i, channel in enumerate(self.ch):
+            chans.addWidget(channel.get_widget(), i % 4, i // 4)
         layout.addLayout(chans)
 
         # capture the keyboard numbers to enable/disable channels
         self.installEventFilter(self)
+        self.bridge.state_changed.connect(self.refresh)
 
     def eventFilter(self, obj, event):
         if (
             event.type() == event.KeyPress
             and event.key() >= Qt.Key_0
-            and event.key() <= Qt.Key_7
+            and event.key() < Qt.Key_0 + len(self.ch)
         ):
             # just click the button for the channel to avoid implementing any logic here
             if QApplication.keyboardModifiers() == Qt.ControlModifier:
@@ -546,12 +662,23 @@ class SUServoGUI(QWidget):
     def update_booster(self, ch, data):
         self.ch[ch].booster.update(json.loads(data))
 
+    def refresh(self, _state=None):
+        self.servo_button.set_state(self.manager.enabled)
+        for channel in self.ch:
+            channel.refresh()
+        for index, button in enumerate(self.shutter_buttons):
+            button.set_state(self.manager.en_shutters[index])
+
 
 class MirnyGUI(QWidget):
-    def __init__(self, manager):
+    def __init__(self, manager, bridge):
         super().__init__()
         self.manager = manager
-        self.ch = [SingleChannelMirny(self.manager, i) for i in range(4)]
+        self.bridge = bridge
+        self.ch = [
+            SingleChannelMirny(self.manager, self.bridge, eom, channel)
+            for eom, channel in zip(self.manager.eoms, self.manager.eom_channels)
+        ]
 
         self.setWindowTitle("Mirny GUI")
         layout = QVBoxLayout()
@@ -559,18 +686,23 @@ class MirnyGUI(QWidget):
 
         # create channels controls
         chans = QGridLayout()
-        for i in range(1):
-            chans.addWidget(self.ch[i].get_widget(), i, 0)
+        for i, channel in enumerate(self.ch):
+            chans.addWidget(channel.get_widget(), i, 0)
         layout.addLayout(chans)
 
         # capture the keyboard numbers to enable/disable channels
         self.installEventFilter(self)
+        self.bridge.state_changed.connect(self.refresh)
+
+    def refresh(self, _state=None):
+        for channel in self.ch:
+            channel.refresh()
 
     def eventFilter(self, obj, event):
         if (
             event.type() == event.KeyPress
             and event.key() >= Qt.Key_0
-            and event.key() <= Qt.Key_3
+            and event.key() < Qt.Key_0 + len(self.ch)
         ):
             # just click the button for the channel to avoid implementing any logic here
             if QApplication.keyboardModifiers() == Qt.ControlModifier:
@@ -579,170 +711,6 @@ class MirnyGUI(QWidget):
                 self.ch[event.key() - Qt.Key_0].dds_button.switch_state()
             return 1
         return super().eventFilter(obj, event)
-
-
-class SingleChannelFastino(QWidget):
-    def __init__(
-        self,
-        manager: FastinoManager,
-        ch=0,
-        name="Ch",
-        getter=None,
-        setter=None,
-        min=None,
-        max=None,
-    ):
-        super().__init__()
-        self.manager = manager
-        self.ch = ch
-
-        self.getter = getter if getter is not None else self.manager.get_voltage
-        self.setter = setter if setter is not None else self.manager.set_voltage
-
-        self.MIN = min if min is not None else self.manager.MIN
-        self.MAX = max if max is not None else self.manager.MAX
-
-        self.enabled = self.getter(self.ch) != 0.0
-
-        self.groupbox = QGroupBox()
-
-        vbox = QVBoxLayout()
-        self.groupbox.setLayout(vbox)
-
-        # labels
-        labelline = QHBoxLayout()
-
-        self.button = Switch(
-            default=self.enabled,
-            turn_on=self.switch_on,
-            turn_off=self.switch_off,
-            on_text="ON",
-            off_text="OFF",
-        )
-        labelline.addWidget(self.button)
-
-        labelline.addStretch()
-        # Channel name
-        self.name = QLabel(name)
-        self.name.setStyleSheet("font: bold 12pt")
-        labelline.addWidget(self.name)
-        vbox.addLayout(labelline)
-
-        # text inputs
-        self.text = QLineEdit()
-        self.text.setText(str(round(self.getter(self.ch), 3)))
-        self.text.setValidator(QDoubleValidator())
-        self.text.setAlignment(Qt.AlignCenter)
-        self.text.editingFinished.connect(lambda: self.set(self.text.text()))
-
-        inputline = QHBoxLayout()
-        inputline.addWidget(self.text)
-        vbox.addLayout(inputline)
-
-        # Slider and min/max labels
-        min_label = QLabel(f"{round(self.MIN)} <b>{self.manager.unit}</b>")
-        max_label = QLabel(f"{round(self.MAX)} <b>{self.manager.unit}</b>")
-        self.slider = QSlider(Qt.Horizontal)
-        self.slider.setSingleStep(10)
-        self.slider.setRange(int(self.MIN * 1000), int(self.MAX * 1000))
-        self.slider.setValue(int(self.getter(ch) * 1000))
-        self.slider.valueChanged.connect(lambda x: self.set(x / 1000))
-
-        sliderline = QHBoxLayout()
-        sliderline.addWidget(min_label)
-        sliderline.addWidget(self.slider)
-        sliderline.addWidget(max_label)
-
-        vbox.addLayout(sliderline)
-
-    def set(self, val, force=False):
-        # check its a valid number - if not the text edit went wrong
-        try:
-            val = float(val)
-        except ValueError:
-            self.text.setText(str(self.slider.value() / 1000))
-            return
-
-        # guard against recursion already at the correct voltage
-        if val == round(self.getter(self.ch), 3) and not force:
-            return
-
-        val = min(max(val, self.MIN), self.MAX)
-        self.text.setText(str(val))
-        self.slider.setValue(int(val * 1000))
-
-        if self.enabled:
-            self.setter(self.ch, float(val))
-
-    def switch_on(self):
-        self.enabled = True
-        self.set(self.text.text())
-        return
-
-    def switch_off(self):
-        self.enabled = False
-        self.setter(self.ch, 0.0)
-        return
-
-    def get_widget(self):
-        """Return the widgets to the main app"""
-        return self.groupbox
-
-
-class FastinoGUI(QWidget):
-    def __init__(self, manager):
-        super().__init__()
-        self.manager = manager
-
-        self.setWindowTitle("Fastino GUI")
-        layout = QVBoxLayout()
-        self.setLayout(layout)
-
-        # Create control for 8 DACs
-        chans = QGridLayout()
-        self.ch = [
-            SingleChannelFastino(
-                self.manager,
-                i,
-                f"Ch {i}",
-            )
-            for i in range(8)
-        ]
-
-        chans = QGridLayout()
-        for i in range(8):
-            chans.addWidget(self.ch[i].get_widget(), i % 4, i // 4)
-        layout.addLayout(chans)
-
-
-class DeltaElektronikaGUI(QWidget):
-    def __init__(self, manager):
-        super().__init__()
-        self.manager = manager
-
-        self.setWindowTitle("Delta Elektronika GUI")
-        layout = QVBoxLayout()
-        self.setLayout(layout)
-
-        # Create control for 8 DACs
-        chans = QGridLayout()
-        self.ch = [
-            SingleChannelFastino(
-                self.manager,
-                i,
-                ["Ch 0 (X1)", "Ch 1 (X2)", "Ch 2 (Y)", "Ch 3 (Z)"][i],
-                getter=self.manager.get_current,
-                setter=self.manager.set_current,
-                min=0.0,
-                max=2.0,
-            )
-            for i in range(4)
-        ]
-
-        chans = QGridLayout()
-        for i in range(4):
-            chans.addWidget(self.ch[i].get_widget(), i % 2, i // 2)
-        layout.addLayout(chans)
 
 
 class ArtiqGUIExperiment(EnvExperiment):
@@ -766,17 +734,26 @@ class ArtiqGUIExperiment(EnvExperiment):
         )
 
         self.suservo = self.get_device("suservo")
-        self.suservo_chs = [self.get_device(f"suservo_ch{i}") for i in range(8)]
-        self.shutters = [
-            self.get_device("shutter_2DMOT"),
-            self.get_device("shutter_3DMOT"),
-            self.get_device("shutter_IMG"),
-            self.get_device("shutter_LATTICE"),
+        self.suservo_beams = configured_in_channel_order(
+            SUSERVOED_BEAMS.values(), "suservo_device", "suservo_ch"
+        )
+        self.suservo_chs = [
+            self.get_device(beam.suservo_device) for beam in self.suservo_beams
         ]
+        self.shutter_infos = list(SHUTTERS.values())
+        self.shutters = [self.get_device(shutter.ttl) for shutter in self.shutter_infos]
         self.suservoManager: SUServoManager
 
-        self.mirny_chs = [self.get_device(f"mirny_ch{i}") for i in range(4)]
-        self.almazny = [self.get_device(f"almazny_ch{i}") for i in range(4)]
+        self.eoms = configured_in_channel_order(EOMS.values(), "mirny_ch", "mirny_ch")
+        self.eom_channels = [
+            logical_channel(eom.mirny_ch, "mirny_ch") for eom in self.eoms
+        ]
+        self.mirny_chs = [
+            self.get_device(name) for name in physical_channel_aliases("mirny_ch")
+        ]
+        self.almazny = [
+            self.get_device(name) for name in physical_channel_aliases("almazny_ch")
+        ]
         self.mirnyManager: MirnyManager
 
         self.fastino = self.get_device("fastino")
@@ -791,11 +768,24 @@ class ArtiqGUIExperiment(EnvExperiment):
 
         # SUServo
         self.suservoManager = SUServoManager(
-            self, self.core, self.suservo, self.suservo_chs, self.shutters
+            self,
+            self.core,
+            self.suservo,
+            self.suservo_chs,
+            self.shutters,
+            self.suservo_beams,
+            self.shutter_infos,
         )
 
         # Mirny
-        self.mirnyManager = MirnyManager(self, self.core, self.mirny_chs, self.almazny)
+        self.mirnyManager = MirnyManager(
+            self,
+            self.core,
+            self.mirny_chs,
+            self.almazny,
+            self.eoms,
+            self.eom_channels,
+        )
 
         # Voltage-driven supplies. devices.py is the source of truth for names,
         # channels, gains, limits, units and disabled state.
@@ -814,16 +804,34 @@ class ArtiqGUIExperiment(EnvExperiment):
         app.setStyle("Fusion")
         app.setApplicationName("ARTIQ GUI")
 
-        suservoGUI = SUServoGUI(self.suservoManager)
+        bridge = GuiControlBridge(
+            self.suservoManager,
+            self.mirnyManager,
+            self.vdrivenSupplyManager,
+        )
+
+        suservoGUI = SUServoGUI(self.suservoManager, bridge)
         suservoGUI.show()
 
-        mirnyGUI = MirnyGUI(self.mirnyManager)
+        mirnyGUI = MirnyGUI(self.mirnyManager, bridge)
         mirnyGUI.show()
 
-        vdrivenGUI = VDrivenSuppliesGUI(self.vdrivenSupplyManager)
+        vdrivenGUI = VDrivenSuppliesGUI(self.vdrivenSupplyManager, bridge)
         vdrivenGUI.show()
 
-        app.exec_()
+        adapter = GuiControlAdapter(bridge)
+        try:
+            adapter.start()
+        except OSError:
+            logging.getLogger(__name__).exception(
+                "Could not start the loopback GUI control adapter"
+            )
+        else:
+            app.aboutToQuit.connect(adapter.stop)
+        try:
+            app.exec_()
+        finally:
+            adapter.stop()
 
     @rpc
     def find_working_display(self):

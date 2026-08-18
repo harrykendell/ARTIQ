@@ -143,8 +143,8 @@ class VDrivenSupplyManager:
 
     The authoritative runtime state is stored only in the per-supply datasets::
 
-        <fastino>.vdriven.<name>.output
-        <fastino>.vdriven.<name>.enabled
+        <fastino>.<name>.output
+        <fastino>.<name>.enabled
 
     ``output`` is stored in ARTIQ base units and tagged with the unit from
     ``devices.py``. For example, ``100 * MHz`` is stored as ``100e6`` while the
@@ -201,8 +201,6 @@ class VDrivenSupplyManager:
             output_path = self._output_dataset(supply.name)
             enabled_path = self._enabled_dataset(supply.name)
 
-            # The migration has already populated these datasets. Defaults are
-            # retained for newly added supplies or a freshly created dataset DB.
             output = float(
                 experiment.get_dataset(
                     output_path,
@@ -211,12 +209,10 @@ class VDrivenSupplyManager:
             )
             output = self.clamp_output(supply.name, output)
 
-            # VDrivenSupply currently has no default_enabled field. Missing
-            # enable datasets therefore default safely to off.
             enabled = bool(
                 experiment.get_dataset(
                     enabled_path,
-                    default=False,
+                    default=bool(supply.default_enabled),
                 )
             )
             enabled = enabled and not supply.disabled
@@ -229,10 +225,10 @@ class VDrivenSupplyManager:
         self.restore_all()
 
     def _output_dataset(self, supply_name: str) -> str:
-        return f"{self.name}.vdriven.{supply_name}.output"
+        return f"{self.name}.{supply_name}.output"
 
     def _enabled_dataset(self, supply_name: str) -> str:
-        return f"{self.name}.vdriven.{supply_name}.enabled"
+        return f"{self.name}.{supply_name}.enabled"
 
     def _persist_output(self, supply: VDrivenSupply, output: float) -> None:
         self.experiment.set_dataset(
@@ -318,10 +314,6 @@ class VDrivenSupplyManager:
             )
         self._set_leds_hardware(self._led_mask())
 
-    def set_all(self) -> None:
-        """Compatibility alias that restores configured VDrivenSupplies."""
-        self.restore_all()
-
     def turn_off(self) -> None:
         """Disable every configured supply while retaining all setpoints."""
         for supply in self.supplies:
@@ -332,11 +324,7 @@ class VDrivenSupplyManager:
     def _led_mask(self) -> int:
         mask = 0
         for supply in self.supplies:
-            if (
-                supply.ch < 8
-                and self.enabled[supply.name]
-                and not supply.disabled
-            ):
+            if supply.ch < 8 and self.enabled[supply.name] and not supply.disabled:
                 mask |= 1 << supply.ch
         return mask
 

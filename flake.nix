@@ -118,6 +118,7 @@
       oitg = mkPyprojectPackage {
         name = "oitg";
         src = src-oitg;
+        nativeBuildInputs = [py.hatchling];
         propagatedBuildInputs = [
           py.h5py
           py.scipy
@@ -170,6 +171,8 @@
         ps.toptica-lasersdk
         ps.boto3
         ps.brotli
+        ps.websockets
+        ps.pytest
         ps.pyvisa
         ps.pyqt5_sip
         ps.pyqt5
@@ -185,6 +188,7 @@
         name = "artiq-base-env";
         paths = [
           pythonEnv
+          pkgs.nodejs
           pkgs.libusb1
           pkgs.stdenv.cc.cc.lib
           aqmain.openocd-bscanspi  # needed if and only if flashing boards
