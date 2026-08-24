@@ -171,7 +171,6 @@ dataset_db.mdb-lock
 dataset_db.mdb
 results
 artiq.log.*
-flake.lock
 src/
 crate config/bu2402001_*
 *.npy
