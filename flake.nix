@@ -17,6 +17,31 @@
       pkgs = artiq.inputs.nixpkgs.legacyPackages.x86_64-linux;
       py = pkgs.python3Packages;
       aqmain = artiq.packages.x86_64-linux;
+      # Use one modern qasync throughout the environment.
+      qasync = py.buildPythonPackage rec {
+        pname = "qasync";
+        version = "0.28.0";
+        format = "wheel";
+
+        src = py.fetchPypi {
+          inherit pname version format;
+          python = "py3";
+          dist = "py3";
+          sha256 = "sha256-Ifq6jQR8cXAIN49awp6ljDKoEoUoYp5K/VfFm3aNug8=";
+        };
+
+        doCheck = false;
+      };
+
+      # ARTIQ 8 pins qasync 0.24.1 internally. Replace that dependency with
+      # the qasync 0.28 package above.
+      artiq-pkg = aqmain.artiq.overridePythonAttrs (old: {
+        propagatedBuildInputs =
+          builtins.filter
+            (dep: (dep.pname or "") != "qasync")
+            old.propagatedBuildInputs
+          ++ [ qasync ];
+      });
       sipyco = artiq.inputs.sipyco.packages.x86_64-linux.sipyco;
       artiq-comtools = artiq.inputs.artiq-comtools;
 
@@ -122,6 +147,7 @@
         propagatedBuildInputs = [
           py.h5py
           py.scipy
+          py.influxdb
           py.statsmodels
           py.poetry-core
           py.poetry-dynamic-versioning
@@ -133,22 +159,20 @@
         name = "ndscan";
         src = src-ndscan;
         nativeBuildInputs = [py.hatchling];
+
         propagatedBuildInputs = [
-          aqmain.artiq
+          artiq-pkg
           oitg
           py.pyqt6
           py.pyqtgraph
           py.torch
           py.gpytorch
           py.botorch
-          aqmain.qasync
+          qasync
         ];
-        dontWrapQtApps = true; # Pulled in via the artiq package; we don't care.
-        # patch out numpy dependecy as its incomaptible with the artiq numpy
-        postPatch = ''
-          ${stripNumpy}
-          sed -i -e 's/"qasync>=0.27.1"/"qasync>=0.24.0"/' pyproject.toml
-        '';
+
+        dontWrapQtApps = true;
+        postPatch = stripNumpy;
       };
 
       qtPluginPath = pkgs.lib.concatStringsSep ":" [
@@ -157,7 +181,7 @@
       ];
 
       pythonEnv = pkgs.python3.withPackages (ps: [
-        aqmain.artiq
+        artiq-pkg
         ps.sip
         ps.pandas
         ps.numpy
