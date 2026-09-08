@@ -21,9 +21,9 @@ from ndscan.experiment.parameters import FloatParamHandle
 logger = logging.getLogger(__name__)
 logging.getLogger("pco").setLevel(logging.WARNING)
 
-dimple_pixel_scan = 10
+
 MOT_SIZE = 300
-MOT_X = 680
+MOT_X = 750
 MOT_Y = 550
 
 
@@ -47,10 +47,10 @@ class ROI(Enum):
         MOT_X + MOT_SIZE,
         MOT_Y + MOT_SIZE,
     )
-    ODT_Reservoir_pixelfly = (650, 470, 750, 550)
+    ODT_Reservoir_pixelfly = (520, 480, 900, 540)
     # ODT_Reservoir_pixelfly = (500, 430, 989, 550)
     # ODT_Reservoir_pixelfly = (400, 300, 989, 700) refrence saved for future use for the moving stage flexiboity in axial direction
-    ODT_Dimple_pixelfly = (1, 550 - dimple_pixel_scan, 1260, 650 - dimple_pixel_scan)
+    ODT_Dimple_pixelfly = (560, 480, 910, 540)
 
     FULL_EDGE = (1, 1, 2000, 2000)
     # MOT_EDGE = edge_roi_correct(MOT_pixelfly)

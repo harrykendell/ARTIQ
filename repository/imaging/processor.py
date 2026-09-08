@@ -67,6 +67,9 @@ class AbsImageSettings:
     # beam-aware fit while remaining compatible with older serialized settings.
     beam_threshold: float = 0.05
     image_smoothing_sigma: float = 1.0
+    fit_tilt: bool = False
+    show_principal_axes: bool = False
+    weak_cloud_peak_od_threshold: float = 0.1
 
     # need this to be pyon serializable for dataset storage
     def to_dataset(self):
@@ -355,7 +358,9 @@ class AbsImage:
         integration_mask = self.sigma_mask & self.beam_mask
         optical_density = self.cloud_optical_density[integration_mask]
 
-        if optical_density.size == 0 or np.max(optical_density) < 0.1:
+        if optical_density.size == 0:
+            return -np.inf
+        if np.max(optical_density) < self.settings.weak_cloud_peak_od_threshold:
             return -np.inf
 
         # Divided by 1.5-sigma area for a 2D Gaussian to get the total number of atoms
@@ -426,6 +431,7 @@ class AbsImage:
                 "y0": self.height / 2,
                 "sx": max(self.width / 8, 1),
                 "sy": max(self.height / 8, 1),
+                "theta": 0.0,
                 "z0": 0.0,
             }
 
@@ -462,13 +468,34 @@ class AbsImage:
                 "y0": self.height / 2,
                 "sx": max(self.width / 8, 1),
                 "sy": max(self.height / 8, 1),
+                "theta": 0.0,
                 "z0": z0,
             }
 
         x0 = float(np.sum(x * weights) / total)
         y0 = float(np.sum(y * weights) / total)
-        sx = float(np.sqrt(np.sum(np.square(x - x0) * weights) / total))
-        sy = float(np.sqrt(np.sum(np.square(y - y0) * weights) / total))
+        covariance = np.array(
+            [
+                [
+                    np.sum(np.square(x - x0) * weights) / total,
+                    np.sum((x - x0) * (y - y0) * weights) / total,
+                ],
+                [
+                    np.sum((x - x0) * (y - y0) * weights) / total,
+                    np.sum(np.square(y - y0) * weights) / total,
+                ],
+            ]
+        )
+        eigenvalues, eigenvectors = np.linalg.eigh(covariance)
+        major_axis = int(np.argmax(eigenvalues))
+        major_vector = eigenvectors[:, major_axis]
+        sx = float(np.sqrt(max(eigenvalues[major_axis], 1.0)))
+        sy = float(np.sqrt(max(eigenvalues[1 - major_axis], 1.0)))
+        theta = float(np.arctan2(-major_vector[1], major_vector[0]))
+        if theta <= -np.pi / 2:
+            theta += np.pi
+        elif theta > np.pi / 2:
+            theta -= np.pi
         amplitude = (
             float(np.nanmax(initial_image[candidate])) if np.any(candidate) else peak
         )
@@ -479,6 +506,7 @@ class AbsImage:
             "y0": y0,
             "sx": sx,
             "sy": sy,
+            "theta": theta,
             "z0": z0,
         }
 
@@ -519,19 +547,21 @@ class AbsImage:
         model.set_param_hint(
             "sx",
             value=initial["sx"],
+            min=0.25,
             max=self.width,
         )
         model.set_param_hint(
             "sy",
             value=initial["sy"],
+            min=0.25,
             max=self.height,
         )
         model.set_param_hint(
             "theta",
-            value=0,
+            value=initial["theta"] if self.settings.fit_tilt else 0.0,
             min=-np.pi / 2,
             max=np.pi / 2,
-            vary=False,
+            vary=self.settings.fit_tilt,
         )
         model.set_param_hint(
             "z0",
@@ -642,10 +672,17 @@ class AbsImage:
         """Evaluate only the Gaussian cloud component."""
         return self.eval(x=x, y=y) - float(self.best_values.get("z0", 0.0))
 
-    def plot(self, fig=None):
+    def plot(self, fig=None, *, show_principal_axes=None):
         """
-        Plots raw images, optical density, best fit, and fit stats using a compact layout.
+        Plot raw images, optical density, best fit, and fit statistics.
+
+        When ``show_principal_axes`` is true, draw the fitted major and minor
+        axes through the cloud centre. Each half-axis is two fitted standard
+        deviations long.
         """
+        if show_principal_axes is None:
+            show_principal_axes = self.settings.show_principal_axes
+
         if fig is None:
             fig = plt.figure(figsize=(8, 8))
 
@@ -791,6 +828,30 @@ class AbsImage:
         od_ax.scatter(*fit_center_mm, color="green", s=25)
         od_ax.scatter(*centroid_mm, color="orange", s=25)
         od_ax.scatter(*peak_mm, color="blue", s=25)
+        if show_principal_axes:
+            theta = self.best_values["theta"]
+            major_dx = 2 * self.best_values["sx"] * np.cos(theta) * scale_mm
+            major_dy = -2 * self.best_values["sx"] * np.sin(theta) * scale_mm
+            minor_dx = 2 * self.best_values["sy"] * np.sin(theta) * scale_mm
+            minor_dy = 2 * self.best_values["sy"] * np.cos(theta) * scale_mm
+
+            od_ax.plot(
+                [fit_center_mm[0] - major_dx, fit_center_mm[0] + major_dx],
+                [fit_center_mm[1] - major_dy, fit_center_mm[1] + major_dy],
+                color="white",
+                linewidth=0.6,
+                alpha=0.45,
+                zorder=6,
+            )
+            od_ax.plot(
+                [fit_center_mm[0] - minor_dx, fit_center_mm[0] + minor_dx],
+                [fit_center_mm[1] - minor_dy, fit_center_mm[1] + minor_dy],
+                color="white",
+                linewidth=0.5,
+                linestyle="--",
+                alpha=0.45,
+                zorder=6,
+            )
         od_ax.xaxis.set_major_formatter(formatter)
         od_ax.yaxis.set_major_formatter(formatter)
         od_ax.set_xlim(extent[0], extent[1])
@@ -880,6 +941,20 @@ class AbsImage:
                 ("blue", "Peak"),
             ]
         ]
+        if show_principal_axes:
+            legend_elements.extend(
+                [
+                    Line2D([0], [0], color="white", lw=1.5, label="Major axis (2σ)"),
+                    Line2D(
+                        [0],
+                        [0],
+                        color="white",
+                        lw=1,
+                        linestyle="--",
+                        label="Minor axis (2σ)",
+                    ),
+                ]
+            )
 
         od_ax.legend(
             handles=legend_elements,
@@ -906,12 +981,18 @@ class AbsImage:
             rf"Peak OD: $\mathbf{{{self.peak[2]:.2f}}}$",
             rf"Centroid (mm): ($\mathbf{{{centroid_mm[0]:.2f}}}$, $\mathbf{{{centroid_mm[1]:.2f}}}$)",
             rf"Peak center (mm): ($\mathbf{{{peak_mm[0]:.2f}}}$, $\mathbf{{{peak_mm[1]:.2f}}}$)",
-            rf"$\sigma_x$ (mm): $\mathbf{{{self.best_values['sx'] * scale_mm:.2f}}}$",
-            rf"$\sigma_y$ (mm): $\mathbf{{{self.best_values['sy'] * scale_mm:.2f}}}$",
+            rf"Major-axis $\sigma$ (mm): $\mathbf{{{self.best_values['sx'] * scale_mm:.2f}}}$",
+            rf"Minor-axis $\sigma$ (mm): $\mathbf{{{self.best_values['sy'] * scale_mm:.2f}}}$",
+            rf"Tilt angle (deg): $\mathbf{{{np.degrees(self.best_values['theta']):.1f}}}$",
             rf"Phase-space density: $\mathbf{{{self.phase_space_density[2]:.2e}}}$",
             rf"$\lambda_{{\mathrm{{dB}}}}$ (m): $\mathbf{{{self.phase_space_density[1]:.2e}}}$",
             rf"Peak density (atoms/cm$^3$): $\mathbf{{{self.phase_space_density[0] * 1e-6:.2e}}}$",
         ))
+        # peak_pixel_text = "\n".join((
+        #     "Peak pixel",
+        #     f"Fit view (x, y): ({self.peak[1]}, {self.peak[0]})",
+        #     f"ROI-local source (x, y): ({self.height - 1 - self.peak[0]}, {self.peak[1]})",
+        # ))
         od_ax.text(
             1.1,
             0.5,
@@ -921,6 +1002,15 @@ class AbsImage:
             verticalalignment="center",
             bbox=dict(boxstyle="round,pad=0.5", facecolor="wheat", alpha=0.5),
         )
+        # od_ax.text(
+        #     0.02,
+        #     0.98,
+        #     peak_pixel_text,
+        #     transform=od_ax.transAxes,
+        #     fontsize=8,
+        #     verticalalignment="top",
+        #     bbox=dict(boxstyle="round,pad=0.4", facecolor="white", alpha=0.75),
+        # )
 
         plt.tight_layout()
 

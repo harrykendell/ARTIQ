@@ -30,13 +30,15 @@ class TuneSUServoExpFrag(ExpFragment):
         suservo_channels = [
             k for k in SUServoedBeam.keys() if SUServoedBeam[k].setpoint != 0.0
         ]
-        default: SUServoedBeam = SUServoedBeam[suservo_channels[0]]
 
         if not suservo_channels:
             raise ValueError("No suservo channels found in device_db")
+
+        default: SUServoedBeam = SUServoedBeam[suservo_channels[0]]
+
         self.setattr_argument(
             "channel",
-            EnumerationValue(suservo_channels, default=default.name),
+            EnumerationValue(suservo_channels, default=suservo_channels[0]),
         )
         self.channel: str
         if self.channel is None:

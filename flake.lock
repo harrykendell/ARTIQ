@@ -369,16 +369,15 @@
     "src-ndscan": {
       "flake": false,
       "locked": {
-        "lastModified": 1787586254,
-        "narHash": "sha256-Ex+7ozQ7o60BlcpXp5Zgt4ruwskz0i9n/orMaFA3eYQ=",
+        "lastModified": 1787662082,
+        "narHash": "sha256-QUn+PFR7GOArtC8Na/jBElKdTUWnK+QCIOyfl3ws1zM=",
         "owner": "harrykendell",
         "repo": "ndscan",
-        "rev": "c4dee0d8af31cf38ced3f266d207263af5233679",
+        "rev": "742b042d6f8233f8aea40ad50e11d30b93a3f568",
         "type": "github"
       },
       "original": {
         "owner": "harrykendell",
-        "ref": "upstream-rebase",
         "repo": "ndscan",
         "type": "github"
       }

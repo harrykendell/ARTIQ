@@ -562,7 +562,14 @@ class Ramp(Fragment):
                         self.supplies_setters_params[i][0].set_outputs([
                             supply_values[i]
                         ])
-                        supply_values[i] += supply_steps[i]
+                        supply_values[i] = self._next_value(
+                            supply_values[i],
+                            supply_steps[i],
+                            self.supplies_setters_params[i][1].get(),
+                            self.supplies_setters_params[i][2].get(),
+                            i_step,
+                            num_points,
+                        )
 
                 delay_mu(14 * 7 * 4)  # Frame time for the fastino
 
@@ -574,8 +581,22 @@ class Ramp(Fragment):
                             suservo_freq_values[i],
                             -1.0 * suservo_setpoint_values[i] / 10.0,
                         )
-                        suservo_freq_values[i] += suservo_freq_steps[i]
-                        suservo_setpoint_values[i] += suservo_setpoint_steps[i]
+                        suservo_freq_values[i] = self._next_value(
+                            suservo_freq_values[i],
+                            suservo_freq_steps[i],
+                            self.suservo_setters_params[i][1].get(),
+                            self.suservo_setters_params[i][2].get(),
+                            i_step,
+                            num_points,
+                        )
+                        suservo_setpoint_values[i] = self._next_value(
+                            suservo_setpoint_values[i],
+                            suservo_setpoint_steps[i],
+                            self.suservo_setters_params[i][3].get(),
+                            self.suservo_setters_params[i][4].get(),
+                            i_step,
+                            num_points,
+                        )
 
                         delay_mu(t_one_rtio_cycle_mu)
 
@@ -583,14 +604,28 @@ class Ramp(Fragment):
                 if self.eoms_used:
                     for i in range(len(self.eoms)):
                         self.eoms_setters_params[i][0].set_att(eom_att_values[i])
-                        eom_att_values[i] += eom_att_steps[i]
+                        eom_att_values[i] = self._next_value(
+                            eom_att_values[i],
+                            eom_att_steps[i],
+                            self.eoms_setters_params[i][3].get(),
+                            self.eoms_setters_params[i][4].get(),
+                            i_step,
+                            num_points,
+                        )
                         delay_mu(t_one_rtio_cycle_mu)
                         # freq for mirny is very slow so only set 1/10 of the time
                         if self.do_eom_detuning:
                             # We cannot set att. while the PLL is relocking
                             self.eoms_setters_params[i][0].set_freq(eom_freq_values[i])
                             delay(400 * us)  # Nominal relock time
-                        eom_freq_values[i] += eom_freq_steps[i]
+                        eom_freq_values[i] = self._next_value(
+                            eom_freq_values[i],
+                            eom_freq_steps[i],
+                            self.eoms_setters_params[i][1].get(),
+                            self.eoms_setters_params[i][2].get(),
+                            i_step,
+                            num_points,
+                        )
 
                 t_total_used_mu = now_mu() - t_start_sequence_mu
                 if t_total_used_mu >= time_step_mu * (1 + i_step):
@@ -614,6 +649,19 @@ class Ramp(Fragment):
 
         if self.debug_enabled:
             logger.info('Saving dma trace as "%s"', self.fqn)
+
+    @portable
+    def _next_value(
+        self,
+        value: TFloat,
+        step: TFloat,
+        start: TFloat,
+        end: TFloat,
+        i_step: TInt32,
+        num_points: TInt32,
+    ) -> TFloat:
+        # Default behavior: linear ramp.
+        return value + step
 
     @portable
     def _calc_step_size(self, start: TFloat, end: TFloat, num_points: TInt32) -> TFloat:  # noqa
@@ -666,3 +714,76 @@ class Ramp(Fragment):
         # Ensure that the timeline points to the end of the phase, not just the
         # final RTIO point
         at_mu(t_end_mu)
+
+
+class LogRamp(Ramp):
+    """
+    Logarithmic/geometric ramp with adjustable curvature.
+
+    log_exponent = 1.0 gives equal ratios between successive points.
+    log_exponent > 1.0 keeps the value closer to the start for longer and
+    makes the change stronger near the end.
+
+    Log ramps require start and end values with the same non-zero sign. If the
+    requested ramp crosses through zero, this falls back to the linear ramp.
+    """
+
+    log_exponent = 1.0
+
+    @portable
+    def _log_value_at_fraction(
+        self,
+        start: TFloat,
+        end: TFloat,
+        fraction: TFloat,
+    ) -> TFloat:
+        if fraction <= 0.0:
+            return start
+        if fraction >= 1.0:
+            return end
+
+        shaped_fraction = fraction**self.log_exponent
+        if start > 0.0 and end > 0.0:
+            return start * ((end / start) ** shaped_fraction)
+        if start < 0.0 and end < 0.0:
+            return -1.0 * (
+                (-1.0 * start)
+                * (((-1.0 * end) / (-1.0 * start)) ** shaped_fraction)
+            )
+
+        return start + (end - start) * fraction
+
+    @portable
+    def _next_value(
+        self,
+        value: TFloat,
+        step: TFloat,
+        start: TFloat,
+        end: TFloat,
+        i_step: TInt32,
+        num_points: TInt32,
+    ) -> TFloat:
+        if num_points <= 1:
+            return end
+
+        # The current point is written before _next_value() is called. Add only
+        # the difference to preserve fixed offsets, e.g. carrier + detuning.
+        current_fraction = float(i_step) / float(num_points - 1)
+        next_fraction = float(i_step + 1) / float(num_points - 1)
+
+        if next_fraction >= 1.0:
+            return value + end - self._log_value_at_fraction(
+                start,
+                end,
+                current_fraction,
+            )
+
+        return value + self._log_value_at_fraction(
+            start,
+            end,
+            next_fraction,
+        ) - self._log_value_at_fraction(
+            start,
+            end,
+            current_fraction,
+        )

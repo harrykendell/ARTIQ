@@ -8,7 +8,7 @@ from artiq.coredevice.dma import CoreDMA
 from artiq.coredevice.suservo import SUServo
 from artiq.coredevice.ttl import TTLInOut
 from artiq.experiment import EnumerationValue, kernel, rpc
-from artiq.language import delay, ms, now_mu, parallel, s, sequential, us
+from artiq.language import delay, ms, now_mu, parallel, s, sequential, us, dB
 from artiq.language.core import host_only
 
 # from repository.models.device_db import server_addr
@@ -142,6 +142,22 @@ class AbsorptionImageExpFrag(ExpFragment):
             default=False,
         )
 
+        self.sideband_imaging: BoolParamHandle = self.setattr_param(
+            "Sideband_imaging",
+            BoolParam,
+            "if we want to put sideband on imaging",
+            default=False,
+        )
+
+        # This function will switch off the repump /eom for given duration this will not switch on EOM again, this will #advance timeline after pgc by repump duration
+
+        self.Pump_to_F1ground: BoolParamHandle = self.setattr_param(
+            "Pump_f1",
+            BoolParam,
+            "if we want to pump atom into F=1 ground state manifold",
+            default=False,
+        )
+
         self.do_evaporation1: BoolParamHandle = self.setattr_param(
             "do_evaporation1",
             BoolParam,
@@ -161,6 +177,27 @@ class AbsorptionImageExpFrag(ExpFragment):
             default=100.0 * ms,
             min=0.0 * ms,
             unit="ms",
+        )
+
+        # Use 0 if not pumping into F=1
+        self.repump_duration: FloatParamHandle = self.setattr_param(
+            "Repump_disable_duration",
+            FloatParam,
+            "Repump switch off duration after PGC for Pump F=1",
+            default=0 * us,
+            min=0.0 * us,
+            max=2000 * us,
+            unit="us",
+        )
+
+        self.depump_duration: FloatParamHandle = self.setattr_param(
+            "depump_enable_duration",
+            FloatParam,
+            "depump switch on duration after pumping to F=1",
+            default=0 * us,
+            min=0.0 * us,
+            max=2000 * us,
+            unit="us",
         )
 
         self.atom_number: FloatChannel = self.setattr_result("atom_number")
@@ -234,10 +271,23 @@ class AbsorptionImageExpFrag(ExpFragment):
             if self.do_pgc.get():
                 self.mot.pgc()
 
+        # # self.mot.Disable_EOM()
+        if self.Pump_to_F1ground.get():
+            self.mot.Disable_EOM()
+            delay(self.repump_duration.get())
+        else:
+            pass
+
+        # self.mot.Enable_EOM()
+        # delay(300 * us)
+
         self.mot.drop(
             evaporation_active=self.do_evaporation1.get() or self.do_evaporation2.get(),
             odt_active=self.odt_active.get(),
+            sideband=self.sideband_imaging.get(),
         )
+        # self.mot.Disable_EOM()
+        # self.mot.Enable_EOM()
 
         # if odt is active turn on odt beams
         if self.odt_active.get():
@@ -319,6 +369,9 @@ class AbsorptionImageExpFrag(ExpFragment):
         settings = AbsImageSettings(
             magnification=self.magnification.get(),
             time_of_flight=self.expansion_time.get(),
+            fit_tilt=True,
+            show_principal_axes=True,
+            weak_cloud_peak_od_threshold=0.01,  # default is 0.1
         )  # Set default magnification
 
         self.set_dataset(
@@ -335,20 +388,20 @@ class AbsorptionImageExpFrag(ExpFragment):
         )
 
         # If the image seems invalid dont log it
-        if self.absimg.atom_number < 0.0 or self.absimg.fit.summary()["rsquared"] < 0.7:
-            logger.error("No atoms detected - Fix and retry from Interactive Args")
-            with self.interactive(title="Zero atoms detected; retry?") as interactive:
-                interactive.setattr_argument(
-                    "retry",
-                    EnumerationValue(
-                        ["Retry", "Use point", "Abort"], "Retry", quickstyle=True
-                    ),
-                    tooltip="Check the laser is locked then confirm to retry the point",
-                )
-            if interactive.retry == "Retry":
-                raise RestartKernelTransitoryError("No atoms detected; retrying")
-            if interactive.retry == "Abort":
-                raise RuntimeError("Scan aborted after a failed point")
+        # if self.absimg.atom_number < 0.0 or self.absimg.fit.summary()["rsquared"] < 0.7:
+        #     logger.error("No atoms detected - Fix and retry from Interactive Args")
+        #     with self.interactive(title="Zero atoms detected; retry?") as interactive:
+        #         interactive.setattr_argument(
+        #             "retry",
+        #             EnumerationValue(
+        #                 ["Retry", "Use point", "Abort"], "Retry", quickstyle=True
+        #             ),
+        #             tooltip="Check the laser is locked then confirm to retry the point",
+        #         )
+        #     if interactive.retry == "Retry":
+        #         raise RestartKernelTransitoryError("No atoms detected; retrying")
+        #     if interactive.retry == "Abort":
+        #         raise RuntimeError("Scan aborted after a failed point")
 
         self.atom_number.push(self.absimg.atom_number)
         self.info.push(self.absimg.all_info())
@@ -362,9 +415,9 @@ class AbsorptionImageExpFrag(ExpFragment):
         self.peak_od.push(self.absimg.peak_od)
 
         # Reference values for normalization
-        N_ref = 1.11e8  # current atom number
-        sigma_0_x = 1.7  # σₓ (mm)
-        sigma_0_y = 1.14  # σᵧ (mm)
+        N_ref = 1.0e8  #  atom number
+        sigma_0_x = 2.0  # σₓ (mm)
+        sigma_0_y = 1.9  # σᵧ (mm)
         sigma_x = self.absimg.sigmax * self.absimg.physical_scale * 1e3
         sigma_y = self.absimg.sigmay * self.absimg.physical_scale * 1e3
         exponent = 2.0  # Exponent for the size terms
