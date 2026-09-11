@@ -41,7 +41,7 @@ SETTLE_TIME = {
 DETUNING = {"CMOT": 8 * Γ_Rb, "PGC": 16 * Γ_Rb}  # This is beyond the normal 2Γ
 BIASES_MOT = {"X1": 0.00045 * A, "X2": 0.0 * A, "Y": 0.00032 * A, "Z": 0.045 * A}
 BIASES_CMOT = {"X1": 0.00045 * A, "X2": 0.0 * A, "Y": 0.00032 * A, "Z": 0.045 * A}
-BIASES_PGC = {"X1": 0.0003 * A, "X2": 0.0 * A, "Y": 0.00032 * A, "Z": 0.035 * A}
+BIASES_PGC = {"X1": 0.0003 * A, "X2": 0.0 * A, "Y": 0.00032 * A, "Z": 0.04 * A}
 COMPRESSED_GRADIENTS = {"X1": 0 * A, "X2": 1.98 * A}
 REPUMP_ATTENUATION = {"CMOT": 0.6196 * dB, "PGC": 0.05 * dB}
 POWER_3D_MOT = {"MOT_loading": 3.5 * V, "CMOT": 3.5 * V, "PGC": 2.0 * V}
@@ -767,7 +767,6 @@ class MOT(Fragment):
             )
             self.eom.set_freq(self.eom.config.frequency + self.PGC_detuning.get())
             self.pgc_ramp.do()
-
         delay(self.PGC_settle_time.get())
 
     @kernel
@@ -862,10 +861,11 @@ class MOT(Fragment):
         #     30 * dB
         # )  # set repump to high attenuation so that we don't pump into F=2, imaging will be only F=2 to F'=3
         # For imaging we need to be back on resonance, only relock if we did cmot or pgc
-        if not sideband:
-            self.Disable_EOM()
+        if sideband:
+            self.Enable_EOM()
         else:
-            pass
+            self.Disable_EOM()
+
         self.relock_mot()
 
     @kernel
@@ -910,3 +910,11 @@ class MOT(Fragment):
             frequency=frequency_mhz * MHz,
             offset=-1.0 * mot_beam_info.setpoint / 10.0,
         )
+
+    @kernel
+    def turn_on_mot(self):
+        self.mot_beam.on()
+
+    @kernel
+    def turn_off_mot(self):
+        self.mot_beam.off()

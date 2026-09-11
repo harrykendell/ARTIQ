@@ -257,7 +257,7 @@ class AbsorptionImageExpFrag(ExpFragment):
         #     # self.mot_voltages_temp[i] = self.suservo.get_adc(0)
         #     delay(self.mot.loading_time.get() / 10.0)
         # self.mot_voltages.push(self.mot_voltages_temp)
-
+    
         delay(self.mot.loading_time.get())
 
         if self.do_cmot.get():
@@ -278,9 +278,6 @@ class AbsorptionImageExpFrag(ExpFragment):
         else:
             pass
 
-        # self.mot.Enable_EOM()
-        # delay(300 * us)
-
         self.mot.drop(
             evaporation_active=self.do_evaporation1.get() or self.do_evaporation2.get(),
             odt_active=self.odt_active.get(),
@@ -292,6 +289,10 @@ class AbsorptionImageExpFrag(ExpFragment):
         # if odt is active turn on odt beams
         if self.odt_active.get():
             delay(self.odt_hold_time.get())
+            # self.mot.mot_beam.on(ignore_shutters=True)
+            # delay(5 * us)
+            # self.mot.mot_beam.off(ignore_shutters=True)
+            # delay(1 * ms)
             if not (self.do_evaporation1.get() or self.do_evaporation2.get()):
                 self.mot.odt_dimple.off()
                 self.mot.odt_reservoir.off()
@@ -305,6 +306,11 @@ class AbsorptionImageExpFrag(ExpFragment):
                 self.mot.evaporation2()
 
         delay(self.expansion_time.get())
+        # self.mot.turn_on_mot()
+        # delay(100 * us)
+        # self.mot.turn_off_mot()
+        # delay(100 * us)
+        # self.mot.Disable_EOM()
 
         # THE 3 IMAGES FOR ABSORPTION IMAGING
 
@@ -365,13 +371,18 @@ class AbsorptionImageExpFrag(ExpFragment):
             self.expansion_time.get(),
             broadcast=True,
         )
+        # setting thresold for OD
+        if self.odt_active:
+            OD_thresold = 0.01
+        else:
+            OD_thresold = 0.1
 
         settings = AbsImageSettings(
             magnification=self.magnification.get(),
             time_of_flight=self.expansion_time.get(),
-            fit_tilt=True,
-            show_principal_axes=True,
-            weak_cloud_peak_od_threshold=0.01,  # default is 0.1
+            fit_tilt=self.odt_active.get(),
+            show_principal_axes=self.odt_active.get(),
+            weak_cloud_peak_od_threshold=OD_thresold,  # default is 0.1
         )  # Set default magnification
 
         self.set_dataset(

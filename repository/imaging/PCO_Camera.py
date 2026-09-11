@@ -50,7 +50,7 @@ class ROI(Enum):
     ODT_Reservoir_pixelfly = (520, 480, 900, 540)
     # ODT_Reservoir_pixelfly = (500, 430, 989, 550)
     # ODT_Reservoir_pixelfly = (400, 300, 989, 700) refrence saved for future use for the moving stage flexiboity in axial direction
-    ODT_Dimple_pixelfly = (560, 480, 910, 540)
+    ODT_Dimple_pixelfly = (500, 480, 950, 550)
 
     FULL_EDGE = (1, 1, 2000, 2000)
     # MOT_EDGE = edge_roi_correct(MOT_pixelfly)

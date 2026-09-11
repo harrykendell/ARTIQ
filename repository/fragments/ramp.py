@@ -747,8 +747,7 @@ class LogRamp(Ramp):
             return start * ((end / start) ** shaped_fraction)
         if start < 0.0 and end < 0.0:
             return -1.0 * (
-                (-1.0 * start)
-                * (((-1.0 * end) / (-1.0 * start)) ** shaped_fraction)
+                (-1.0 * start) * (((-1.0 * end) / (-1.0 * start)) ** shaped_fraction)
             )
 
         return start + (end - start) * fraction
@@ -772,18 +771,26 @@ class LogRamp(Ramp):
         next_fraction = float(i_step + 1) / float(num_points - 1)
 
         if next_fraction >= 1.0:
-            return value + end - self._log_value_at_fraction(
+            return (
+                value
+                + end
+                - self._log_value_at_fraction(
+                    start,
+                    end,
+                    current_fraction,
+                )
+            )
+
+        return (
+            value
+            + self._log_value_at_fraction(
+                start,
+                end,
+                next_fraction,
+            )
+            - self._log_value_at_fraction(
                 start,
                 end,
                 current_fraction,
             )
-
-        return value + self._log_value_at_fraction(
-            start,
-            end,
-            next_fraction,
-        ) - self._log_value_at_fraction(
-            start,
-            end,
-            current_fraction,
         )
