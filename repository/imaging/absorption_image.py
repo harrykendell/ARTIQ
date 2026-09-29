@@ -251,13 +251,19 @@ class AbsorptionImageExpFrag(ExpFragment):
         # self.mot.set_dimple_trap_power(self.mot.power_dimple.get())
         # self.mot.set_reservoir_trap_power(self.mot.power_reservoir.get())
 
+        # self.mot.seperate_repump.on()
         self.mot.load(wait_for_load=False)
-        # Eventualy try stabilising atom number noise by triggering off the mot photodiode while loading (suservo_ch0 adc)
-        # for i in range(10):
+        # # Eventualy try stabilising atom number noise by triggering off the mot photodiode while loading (suservo_ch0 adc)
+        # for i in range(1000):
         #     # self.mot_voltages_temp[i] = self.suservo.get_adc(0)
-        #     delay(self.mot.loading_time.get() / 10.0)
-        # self.mot_voltages.push(self.mot_voltages_temp)
-    
+        #     # print("load time", f"{i}s")
+        #     # print(i)
+        #     if i == 999:
+        #         self.mot.Disable_EOM()
+        #         # pass
+        #     delay(self.mot.loading_time.get() / 1000.0)
+        # # self.mot_voltages.push(self.mot_voltages_temp)
+
         delay(self.mot.loading_time.get())
 
         if self.do_cmot.get():
@@ -274,6 +280,7 @@ class AbsorptionImageExpFrag(ExpFragment):
         # # self.mot.Disable_EOM()
         if self.Pump_to_F1ground.get():
             self.mot.Disable_EOM()
+            # self.mot.seperate_repump.on()
             delay(self.repump_duration.get())
         else:
             pass
@@ -305,6 +312,9 @@ class AbsorptionImageExpFrag(ExpFragment):
             if self.do_evaporation2.get():
                 self.mot.evaporation2()
 
+        # delay(2 * ms)
+        # self.mot.seperate_repump.off()
+        # self.mot.seperate_repump.off()
         delay(self.expansion_time.get())
         # self.mot.turn_on_mot()
         # delay(100 * us)
@@ -320,6 +330,13 @@ class AbsorptionImageExpFrag(ExpFragment):
         #     self.mot.clear_background_atoms_around_odt()
 
         # TOF IMAGE
+        if self.Pump_to_F1ground.get():
+            self.mot.seperate_repump.on()
+            delay(self.depump_duration.get())
+            self.mot.seperate_repump.off()
+        else:
+            pass
+
         self.pco_camera.capture_image()
         self.img_beam.on()
         delay(self.exposure_time.get())

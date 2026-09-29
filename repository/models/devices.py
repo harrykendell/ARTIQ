@@ -122,8 +122,12 @@ SUSERVOED_BEAMS = [
     SUServoedBeam(
         name="PUMP",
         suservo_device="suservo_aom_PUMP",
-        frequency=205 * MHz,
+        frequency=192 * MHz,
         attenuation=18 * dB,
+        setpoint=1.0 * V,
+        servo_enabled=True,
+        calib_gain=222e-3,
+        calib_offset=-15e-3,
     ),
     SUServoedBeam(
         name="LATX",

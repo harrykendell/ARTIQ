@@ -109,7 +109,7 @@
       # PCO camera
       pco = py.buildPythonPackage rec {
         pname = "pco";
-        version = "2.3.0";
+        version = "2.6.0";
         doCheck = false;
         format = "wheel";
         src = py.fetchPypi {
@@ -117,7 +117,7 @@
           python = "py3"; # they only release for py3 not py2.py3
           dist = "py3"; # they only release for py3 not py2.py3
           platform = "manylinux2014_x86_64";
-          sha256 = "3mFhw1spvuo2+GDyv09NASetnFa3MLRh2OwJTHy3X0M=";
+          sha256 = "624c4fc97a85c73e3cc4017b3f2a3d868d340ba560cd761fe6a6854cc948ce3c";
         };
       };
       

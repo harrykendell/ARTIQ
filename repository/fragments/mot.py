@@ -125,6 +125,12 @@ class MOT(Fragment):
             beam_infos=SUServoedBeam["LATX", "LATY"],
         )
 
+        self.seperate_repump: ControlBeamsWithoutCoolingAOM = self.setattr_fragment(
+            "seperate_repump",
+            ControlBeamsWithoutCoolingAOM,
+            beam_infos=[SUServoedBeam["PUMP"]],
+        )
+
         # EOM
         self.eom: EomFrag = self.setattr_fragment(
             "eom",
@@ -418,6 +424,15 @@ class MOT(Fragment):
             FloatParam,
             "Detuning of the PGC ramp",
             default=DETUNING["PGC"],
+            unit="Γ",
+            scale=Γ_Rb,
+        )
+
+        self.PGC_repump_detuning: FloatParamHandle = self.setattr_param(
+            "PGC_repump_detuning",
+            FloatParam,
+            "Detuning of the PGC Repump beam",
+            default=0,
             unit="Γ",
             scale=Γ_Rb,
         )
@@ -719,7 +734,7 @@ class MOT(Fragment):
 
         if evaporation_active or odt_active:
             self.odt_dimple.on()
-            # self.odt_reservoir.on()
+            self.odt_reservoir.on()
 
             # self.set_dimple_trap_power(power_dimple)
             # self.set_reservoir_trap_power(power_reservoir)
@@ -765,7 +780,11 @@ class MOT(Fragment):
             self.eom.set_att(
                 self.eom.config.attenuation + self.PGC_repump_attenuation.get()
             )
-            self.eom.set_freq(self.eom.config.frequency + self.PGC_detuning.get())
+            self.eom.set_freq(
+                self.eom.config.frequency
+                + self.PGC_detuning.get()
+                + self.PGC_repump_detuning.get()
+            )
             self.pgc_ramp.do()
         delay(self.PGC_settle_time.get())
 
