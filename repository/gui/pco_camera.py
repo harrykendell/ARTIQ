@@ -177,7 +177,7 @@ class CameraWidget(QWidget):
         if settings["recorder type"] == 0x0003:
             if status["dwProcImgCount"] == 0:
                 return
-        img, meta = self.cam.image(roi=self.roi_combo.currentData())
+        img, meta = self.cam.image(crop=self.roi_combo.currentData())
         self.im.setImage(
             img,
             autoHistogramRange=self.first,
