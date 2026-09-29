@@ -250,7 +250,7 @@ class PcoCamera(Fragment):
         else:
             return None
         logger.info("All images counted")
-        self.images, _ = self.cam.images(roi=roi.value)
+        self.images, _ = self.cam.images(crop=roi.value)
         logger.info("Images retrieved")
         self.images = self.rotate_and_flip(self.images).astype(np.float64)
 
