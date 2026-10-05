@@ -93,10 +93,10 @@ class AbsorptionView(QtWidgets.QWidget):
                 for param_name, param_value in self.absimg.fit.best_values.items():
                     f.write(f"\t{param_name}: {param_value:.6f}\n")
                 f.write(f"Expansion time: {self.expansion_time} ms\n")
-                f.write(f"Wavelength: {self.absimg.wavelength} nm\n")
-                f.write(f"Detuning: {self.absimg.detuning} MHz\n")
-                f.write(f"Linewidth: {self.absimg.linewidth} MHz\n")
-                f.write(f"Pixel size: {self.absimg.pixel_size} mm\n")
+                f.write(f"Wavelength: {self.absimg.settings.wavelength} nm\n")
+                f.write(f"Detuning: {self.absimg.settings.detuning} MHz\n")
+                f.write(f"Linewidth: {self.absimg.settings.linewidth} MHz\n")
+                f.write(f"Pixel size: {self.absimg.settings.pixel_size} mm\n")
                 f.write(f"Magnification: {self.absimg.magnification}\n")
 
             # set button to 'Saved'

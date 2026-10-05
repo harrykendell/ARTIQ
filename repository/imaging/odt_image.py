@@ -140,7 +140,7 @@ class ODTAbsorptionImageExpFrag(ExpFragment):
     @rpc(flags={"async"})
     def update_images(self):
         images = self.pco_camera.retrieve_images(
-            roi=self.pco_camera.FULL_ROI, timeout=10 * s
+            crop=self.pco_camera.FULL_ROI, timeout=10 * s
         )
         if images is None:
             raise RuntimeError("Failed to retrieve images from camera")

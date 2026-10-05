@@ -50,6 +50,9 @@ class AbsorptionImageExpFrag(ExpFragment):
         self.core_dma: CoreDMA
 
         self.setattr_device("ccb")
+        self.setattr_device(
+            "scheduler"
+        )  # to publish into the ndscan dataset we need rid from the scheduler
 
         self.setattr_fragment(
             "pco_camera",
@@ -158,6 +161,13 @@ class AbsorptionImageExpFrag(ExpFragment):
             default=False,
         )
 
+        self.repump_to_F2: BoolParamHandle = self.setattr_param(
+            "Pump_f2",
+            BoolParam,
+            "Repump to F=2 before imaging",
+            default=False,
+        )
+
         self.do_evaporation1: BoolParamHandle = self.setattr_param(
             "do_evaporation1",
             BoolParam,
@@ -184,17 +194,17 @@ class AbsorptionImageExpFrag(ExpFragment):
             "Repump_disable_duration",
             FloatParam,
             "Repump switch off duration after PGC for Pump F=1",
-            default=0 * us,
+            default=1000 * us,
             min=0.0 * us,
             max=2000 * us,
             unit="us",
         )
 
         self.depump_duration: FloatParamHandle = self.setattr_param(
-            "depump_enable_duration",
+            "Repump_enable_duration_before_imaging",
             FloatParam,
-            "depump switch on duration after pumping to F=1",
-            default=0 * us,
+            "repump switch on duration after pumping to F=1",
+            default=300 * us,
             min=0.0 * us,
             max=2000 * us,
             unit="us",
@@ -208,7 +218,6 @@ class AbsorptionImageExpFrag(ExpFragment):
         self.phase_space_density: FloatChannel = self.setattr_result(
             "phase_space_density"
         )
-        self.info: OpaqueChannel = self.setattr_result("info", OpaqueChannel)
         self.gaussian_fit_centre_x: FloatChannel = self.setattr_result(
             "gaussian_fit_centre_x"
         )
@@ -220,6 +229,20 @@ class AbsorptionImageExpFrag(ExpFragment):
         self.peak_od: FloatChannel = self.setattr_result("peak_od")
         # Used to link points to images on the website
         self.image_timestamp: FloatChannel = self.setattr_result("image_timestamp")
+        # self.raw_tof: OpaqueChannel = self.setattr_result(
+        #     "raw_tof",
+        #     OpaqueChannel,
+        # )
+
+        # self.raw_ref: OpaqueChannel = self.setattr_result(
+        #     "raw_ref",
+        #     OpaqueChannel,
+        # )
+
+        # self.raw_bg: OpaqueChannel = self.setattr_result(
+        #     "raw_bg",
+        #     OpaqueChannel,
+        # )
 
     @host_only
     def prepare(self) -> None:
@@ -315,7 +338,13 @@ class AbsorptionImageExpFrag(ExpFragment):
         # delay(2 * ms)
         # self.mot.seperate_repump.off()
         # self.mot.seperate_repump.off()
-        delay(self.expansion_time.get())
+
+        # compensate fo the repump time later if we are repumping
+        if self.repump_to_F2.get():
+            delay(self.expansion_time.get() - self.depump_duration.get())
+        else:
+            delay(self.expansion_time.get())
+
         # self.mot.turn_on_mot()
         # delay(100 * us)
         # self.mot.turn_off_mot()
@@ -330,7 +359,7 @@ class AbsorptionImageExpFrag(ExpFragment):
         #     self.mot.clear_background_atoms_around_odt()
 
         # TOF IMAGE
-        if self.Pump_to_F1ground.get():
+        if self.repump_to_F2.get():
             self.mot.seperate_repump.on()
             delay(self.depump_duration.get())
             self.mot.seperate_repump.off()
@@ -415,6 +444,13 @@ class AbsorptionImageExpFrag(ExpFragment):
             settings=settings,
         )
 
+        # self.raw_tof.push(images[0])
+        # self.raw_ref.push(images[1])
+        # self.raw_bg.push(images[2])
+
+        # raw_images = np.asarray(images, dtype=np.uint16)
+        # self.raw_images.push(raw_images)
+
         # If the image seems invalid dont log it
         # if self.absimg.atom_number < 0.0 or self.absimg.fit.summary()["rsquared"] < 0.7:
         #     logger.error("No atoms detected - Fix and retry from Interactive Args")
@@ -432,7 +468,6 @@ class AbsorptionImageExpFrag(ExpFragment):
         #         raise RuntimeError("Scan aborted after a failed point")
 
         self.atom_number.push(self.absimg.atom_number)
-        self.info.push(self.absimg.all_info())
         self.sigmax.push(self.absimg.sigmax)
         self.sigmay.push(self.absimg.sigmay)
         self.sigmax_mm.push(self.absimg.sigmax * self.absimg.physical_scale * 1e3)
@@ -444,16 +479,23 @@ class AbsorptionImageExpFrag(ExpFragment):
 
         # Reference values for normalization
         N_ref = 1.0e8  #  atom number
-        sigma_0_x = 2.0  # σₓ (mm)
-        sigma_0_y = 1.9  # σᵧ (mm)
+        sigma_0_x = 2.8  # σₓ (mm)
+        sigma_0_y = 2.5  # σᵧ (mm)
         sigma_x = self.absimg.sigmax * self.absimg.physical_scale * 1e3
         sigma_y = self.absimg.sigmay * self.absimg.physical_scale * 1e3
         exponent = 2.0  # Exponent for the size terms
 
-        # Custom objective 2 :
-        if self.absimg.atom_number <= 0:
-            # Push a large value to penalize zero atom number
-            self.custom_objective.push(1)
+        # obtain the fit quality from the Abs Image
+        r_squared = self.absimg.fit.summary()["rsquared"]
+
+        # Check the fit quality
+        fit_failed = (
+            self.absimg.atom_number <= 0 or r_squared < 0.9  # filter bad shots
+        )
+        # Custom objective  :
+        if fit_failed:
+            # Push a large value penalty
+            self.custom_objective.push(5)
         else:
             self.custom_objective.push(
                 -np.log(self.absimg.atom_number / N_ref)
@@ -470,6 +512,11 @@ class AbsorptionImageExpFrag(ExpFragment):
             ),
             broadcast=True,
         )
+        self.set_dataset(
+            f"ndscan.rid_{self.scheduler.rid}.metadata.absorption_info",
+            self.absimg.settings.to_dataset(),
+            broadcast=True,
+        )  # publish settings globally not per point in a scan
         # This is deliberately last: consumers treat it as the signal that the
         # raw frames, settings, and matching producer analysis are complete.
         self.set_dataset(

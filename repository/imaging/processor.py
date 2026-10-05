@@ -474,18 +474,16 @@ class AbsImage:
 
         x0 = float(np.sum(x * weights) / total)
         y0 = float(np.sum(y * weights) / total)
-        covariance = np.array(
+        covariance = np.array([
             [
-                [
-                    np.sum(np.square(x - x0) * weights) / total,
-                    np.sum((x - x0) * (y - y0) * weights) / total,
-                ],
-                [
-                    np.sum((x - x0) * (y - y0) * weights) / total,
-                    np.sum(np.square(y - y0) * weights) / total,
-                ],
-            ]
-        )
+                np.sum(np.square(x - x0) * weights) / total,
+                np.sum((x - x0) * (y - y0) * weights) / total,
+            ],
+            [
+                np.sum((x - x0) * (y - y0) * weights) / total,
+                np.sum(np.square(y - y0) * weights) / total,
+            ],
+        ])
         eigenvalues, eigenvectors = np.linalg.eigh(covariance)
         major_axis = int(np.argmax(eigenvalues))
         major_vector = eigenvectors[:, major_axis]
@@ -623,7 +621,8 @@ class AbsImage:
 
         sigma_x = self.fit.best_values["sx"] * self.physical_scale
         sigma_y = self.fit.best_values["sy"] * self.physical_scale
-        sigma_z = self.fit.best_values["sx"] * self.physical_scale
+
+        sigma_z = np.sqrt(sigma_x**2 + sigma_y**2)  # rough estimate of z size
 
         # Volume of the cloud assuming Gaussian distribution, 3D
         # V = (2π)^(3/2) σx σy σz
@@ -942,19 +941,17 @@ class AbsImage:
             ]
         ]
         if show_principal_axes:
-            legend_elements.extend(
-                [
-                    Line2D([0], [0], color="white", lw=1.5, label="Major axis (2σ)"),
-                    Line2D(
-                        [0],
-                        [0],
-                        color="white",
-                        lw=1,
-                        linestyle="--",
-                        label="Minor axis (2σ)",
-                    ),
-                ]
-            )
+            legend_elements.extend([
+                Line2D([0], [0], color="white", lw=1.5, label="Major axis (2σ)"),
+                Line2D(
+                    [0],
+                    [0],
+                    color="white",
+                    lw=1,
+                    linestyle="--",
+                    label="Minor axis (2σ)",
+                ),
+            ])
 
         od_ax.legend(
             handles=legend_elements,

@@ -47,10 +47,10 @@ class ROI(Enum):
         MOT_X + MOT_SIZE,
         MOT_Y + MOT_SIZE,
     )
-    ODT_Reservoir_pixelfly = (520, 480, 900, 540)
+    ODT_Reservoir_pixelfly = (460, 300, 950, 600)
     # ODT_Reservoir_pixelfly = (500, 430, 989, 550)
     # ODT_Reservoir_pixelfly = (400, 300, 989, 700) refrence saved for future use for the moving stage flexiboity in axial direction
-    ODT_Dimple_pixelfly = (500, 480, 950, 550)
+    ODT_Dimple_pixelfly = (460, 400, 950, 500)
 
     FULL_EDGE = (1, 1, 2000, 2000)
     # MOT_EDGE = edge_roi_correct(MOT_pixelfly)
@@ -70,7 +70,7 @@ class camera_name(Enum):
 
 class BUSY_TIME(Enum):
     PCO_edge = 35 * ms
-    PCO_pixelfly = 150 * ms
+    PCO_pixelfly = 80 * ms
 
 
 class PcoCamera(Fragment):
@@ -137,10 +137,16 @@ class PcoCamera(Fragment):
             raise ValueError(f"Unknown camera selected: {self.camera_used.get()}")
         self.cam.default_configuration()
 
+        # find the fastest pixel rate
+        max_pixel_rate = max([
+            int(value) for value in self.cam.sdk.get_camera_description()["pixel rate"]
+        ])
+
         self.cam.configuration = {
             "timestamp": "binary",
             "trigger": "external exposure start & software trigger",
             "exposure time": expsoure_time,
+            "pixel rate": max_pixel_rate,
         }
 
         self.cam.auto_exposure_off()
