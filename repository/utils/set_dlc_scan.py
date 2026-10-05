@@ -11,7 +11,7 @@ from ndscan.experiment.parameters import BoolParamHandle
 from ndscan.experiment.entry_point import make_fragment_scan_exp
 from repository.models.devices import VDrivenSupply
 
-remote = Client("137.222.69.28", 3272, "TopticaDLCPro", timeout=1)
+# remote = Client("137.222.69.28", 3272, "TopticaDLCPro", timeout=1)
 
 
 class SetDLC_Scan(ExpFragment):
