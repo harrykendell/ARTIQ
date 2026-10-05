@@ -47,7 +47,7 @@ class ROI(Enum):
         MOT_X + MOT_SIZE,
         MOT_Y + MOT_SIZE,
     )
-    ODT_Reservoir_pixelfly = (460, 300, 950, 600)
+    ODT_Reservoir_pixelfly = (460, 330, 950, 600)
     # ODT_Reservoir_pixelfly = (500, 430, 989, 550)
     # ODT_Reservoir_pixelfly = (400, 300, 989, 700) refrence saved for future use for the moving stage flexiboity in axial direction
     ODT_Dimple_pixelfly = (460, 400, 950, 500)

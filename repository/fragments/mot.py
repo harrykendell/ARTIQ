@@ -207,7 +207,7 @@ class MOT(Fragment):
             default=BIASES_MOT["Z"],
             unit="A",
             min=0.0 * A,
-            max=0.1 * A,
+            max=0.5 * A,
         )
         self.MOT_Y_current: FloatParamHandle = self.setattr_param(
             "MOT_Y_current",
@@ -216,7 +216,7 @@ class MOT(Fragment):
             default=BIASES_MOT["Y"],
             unit="A",
             min=0.0 * A,
-            max=0.1 * A,
+            max=0.5 * A,
         )
 
         self.MOT_X_current: FloatParamHandle = self.setattr_param(
@@ -226,7 +226,7 @@ class MOT(Fragment):
             default=BIASES_MOT["X1"],
             unit="A",
             min=0.0 * A,
-            max=0.1 * A,
+            max=0.5 * A,
         )
 
         self.CMOT_Z_current: FloatParamHandle = self.setattr_param(
@@ -236,7 +236,7 @@ class MOT(Fragment):
             default=BIASES_CMOT["Z"],
             unit="A",
             min=0.0 * A,
-            max=0.1 * A,
+            max=0.5 * A,
         )
         self.CMOT_Y_current: FloatParamHandle = self.setattr_param(
             "CMOT_Y_current",
@@ -245,7 +245,7 @@ class MOT(Fragment):
             default=BIASES_CMOT["Y"],
             unit="A",
             min=0.0 * A,
-            max=0.1 * A,
+            max=0.5 * A,
         )
 
         self.CMOT_X_current: FloatParamHandle = self.setattr_param(
@@ -255,7 +255,7 @@ class MOT(Fragment):
             default=BIASES_CMOT["X1"],
             unit="A",
             min=0.0 * A,
-            max=0.1 * A,
+            max=0.5 * A,
         )
 
         self.PGC_Z_current: FloatParamHandle = self.setattr_param(
@@ -265,7 +265,7 @@ class MOT(Fragment):
             default=BIASES_PGC["Z"],
             unit="A",
             min=0.0 * A,
-            max=0.1 * A,
+            max=0.5 * A,
         )
         self.PGC_Y_current: FloatParamHandle = self.setattr_param(
             "PGC_Y_current",
@@ -274,7 +274,7 @@ class MOT(Fragment):
             default=BIASES_PGC["Y"],
             unit="A",
             min=0.0 * A,
-            max=0.1 * A,
+            max=0.5 * A,
         )
 
         self.PGC_X_current: FloatParamHandle = self.setattr_param(
@@ -284,7 +284,7 @@ class MOT(Fragment):
             default=BIASES_PGC["X1"],
             unit="A",
             min=0.0 * A,
-            max=0.1 * A,
+            max=0.5 * A,
         )
 
         self.power_dimple: FloatParamHandle = self.setattr_param(
@@ -370,6 +370,7 @@ class MOT(Fragment):
             default=REPUMP_ATTENUATION["CMOT"],
             unit="dB",
             min=0 * dB,
+            max=14.0 * dB,
         )
 
         class CMOT_Ramp(Ramp):
@@ -443,7 +444,7 @@ class MOT(Fragment):
             "Attenuation of the PGC Repump beam",
             default=REPUMP_ATTENUATION["PGC"],
             unit="dB",
-            min=0.0 * dB,
+            min=0 * dB,
             max=14.0 * dB,
         )
 
@@ -503,9 +504,9 @@ class MOT(Fragment):
 
             duration_default = DURATION["EVAPORATION1"]
 
-            suservos = [SUServoedBeam["CDT2"], SUServoedBeam["CDT1"]]
-            suservo_setpoint_start = [4.0 * V, 2.5 * V]
-            suservo_setpoint_end = [0.01 * V, 0.01 * V]
+            suservos = [SUServoedBeam["CDT2"]]
+            suservo_setpoint_start = [4.0 * V]
+            suservo_setpoint_end = [0.01 * V]
 
         self.evaporation_ramp1: Evaporation_RAMP1 = self.setattr_fragment(
             "evaporation_ramp1",
