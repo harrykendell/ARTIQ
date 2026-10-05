@@ -10,8 +10,8 @@ from repository.imaging.absorption_image import AbsorptionImageExpFrag
 logger = logging.getLogger(__name__)
 
 MOT_TOF_TIMES = tuple(value * ms for value in range(1, 7))
-CMOT_TOF_TIMES = tuple(value * ms for value in range(5, 23, 2))
-PGC_TOF_TIMES = tuple(value * ms for value in range(5, 31, 3))
+CMOT_TOF_TIMES = tuple(value * ms for value in range(2, 23, 2))
+PGC_TOF_TIMES = tuple(value * ms for value in range(5, 33, 3))
 ODT_TOF_TIMES = tuple(value * ms for value in range(1, 31, 3))
 
 TOF_LOADING_TIME = 10 * s
