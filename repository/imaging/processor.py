@@ -5,8 +5,6 @@ import warnings
 import numpy as np
 import scipy.constants as const
 from lmfit import Model
-from matplotlib.gridspec import GridSpec
-from matplotlib.ticker import FuncFormatter
 from scipy.ndimage import gaussian_filter, label
 from dataclasses import dataclass
 from artiq.language.units import MHz
@@ -679,6 +677,8 @@ class AbsImage:
         deviations long.
         """
         import matplotlib.pyplot as plt
+        from matplotlib.gridspec import GridSpec
+        from matplotlib.ticker import FuncFormatter
 
         if show_principal_axes is None:
             show_principal_axes = self.settings.show_principal_axes
