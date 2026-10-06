@@ -18,7 +18,12 @@ from repository.fragments.default_beam_setter import (
 from repository.fragments.eom_setter import EomFrag
 from repository.fragments.ramp import Ramp, LogRamp
 from repository.fragments.supply_setter import SetSupplies
-from repository.models.devices import Eom, SUServoedBeam, VDrivenSupply
+from repository.models.devices import (
+    Eom,
+    SUServoedBeam,
+    VDrivenSupply,
+    THORLABS_SHUTTER_DELAY,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -589,7 +594,9 @@ class MOT(Fragment):
         # Lasers set to defaults and turned off
         self.beam_resetter.turn_on_all(light_enabled=False)
         self.core.break_realtime()
-        delay(100 * ms)  # we're hitting RTIO Underflows here?
+        delay(
+            THORLABS_SHUTTER_DELAY
+        )  # we're hitting RTIO Underflows without this because beams.on() queues events in the past
         self.lattice_beams.on()
         # EOM set to defaults
         self.eom.set_to_defaults()
