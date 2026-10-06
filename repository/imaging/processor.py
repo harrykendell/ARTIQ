@@ -4,7 +4,6 @@ import math
 import warnings
 import numpy as np
 import scipy.constants as const
-import matplotlib.pyplot as plt
 from lmfit import Model
 from matplotlib.gridspec import GridSpec
 from matplotlib.ticker import FuncFormatter
@@ -679,6 +678,8 @@ class AbsImage:
         axes through the cloud centre. Each half-axis is two fitted standard
         deviations long.
         """
+        import matplotlib.pyplot as plt
+
         if show_principal_axes is None:
             show_principal_axes = self.settings.show_principal_axes
 
