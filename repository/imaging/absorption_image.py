@@ -391,7 +391,7 @@ class AbsorptionImageExpFrag(ExpFragment):
 
         # leave the MOT to reload
         self.mot.init()
-        self.mot.load(wait_for_load=False)
+        self.mot.load(clearout=False, wait_for_load=False)
 
         self.core.wait_until_mu(now_mu())
         self.update_images()
@@ -478,8 +478,8 @@ class AbsorptionImageExpFrag(ExpFragment):
         self.peak_od.push(self.absimg.peak_od)
 
         # Reference values for normalization
-        N_ref = 1.0e8  #  atom number
-        sigma_0_x = 2.8  # σₓ (mm)
+        N_ref = 2.0e8  #  atom number
+        sigma_0_x = 2.5  # σₓ (mm)
         sigma_0_y = 2.5  # σᵧ (mm)
         sigma_x = self.absimg.sigmax * self.absimg.physical_scale * 1e3
         sigma_y = self.absimg.sigmay * self.absimg.physical_scale * 1e3
