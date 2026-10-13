@@ -1,3 +1,4 @@
+import ctypes
 import logging
 import time
 from enum import Enum
@@ -152,6 +153,21 @@ class PcoCamera(Fragment):
         self.cam.auto_exposure_off()
         if self.camera_used.get() == camera_name.EDGE:
             self.cam.sdk.set_roi(*self.roi.get().value)
+
+        # LED control is available in the native SDK, but not wrapped by pco-python.
+        try:
+            if self.cam.sdk.get_camera_description()["dwGeneralCapsDESC1"] & 0x00400000:
+                set_led = self.cam.sdk.SC2_Cam.PCO_SetHWLEDSignal
+                set_led.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
+                set_led.restype = ctypes.c_int
+                error = set_led(self.cam.sdk.camera_handle, 0)
+                if error:
+                    logger.warning(
+                        "Could not disable PCO LEDs: %s",
+                        self.cam.sdk.get_error_text(error),
+                    )
+        except Exception as exc:
+            logger.warning("Could not disable PCO LEDs: %s", exc)
 
         logger.info("ROI requested %s", self.roi.get().value)
 
