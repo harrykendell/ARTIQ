@@ -44,10 +44,22 @@ SETTLE_TIME = {
     "EVAPORATION2": 0 * ms,
 }
 DETUNING = {"CMOT": 8 * Γ_Rb, "PGC": 16 * Γ_Rb}  # This is beyond the normal 2Γ
-BIASES_MOT = {"X1": 0.00045 * A, "X2": 0.0 * A, "Y": 0.00032 * A, "Z": 0.045 * A}
-BIASES_CMOT = {"X1": 0.00045 * A, "X2": 0.0 * A, "Y": 0.00032 * A, "Z": 0.045 * A}
-BIASES_PGC = {"X1": 0.0003 * A, "X2": 0.0 * A, "Y": 0.00032 * A, "Z": 0.04 * A}
-COMPRESSED_GRADIENTS = {"X1": 0 * A, "X2": 1.98 * A}
+BIASES_MOT = {
+    "X_Bias": 0.00045 * A,
+    "Y_Bias": 0.00032 * A,
+    "Z_Bias": 0.045 * A,
+}
+BIASES_CMOT = {
+    "X_Bias": 0.00045 * A,
+    "Y_Bias": 0.00032 * A,
+    "Z_Bias": 0.045 * A,
+}
+BIASES_PGC = {
+    "X_Bias": 0.0003 * A,
+    "Y_Bias": 0.00032 * A,
+    "Z_Bias": 0.04 * A,
+}
+COMPRESSED_GRADIENT = {"X": 1.98 * A}
 REPUMP_ATTENUATION = {"CMOT": 0.6196 * dB, "PGC": 0.05 * dB}
 POWER_3D_MOT = {"MOT_loading": 3.5 * V, "CMOT": 3.5 * V, "PGC": 2.0 * V}
 
@@ -83,10 +95,10 @@ class MOT(Fragment):
             make_set_beams_to_default(
                 suservo_beam_infos=SUServoedBeam[
                     "MOT",
-                    "IMG",
-                    # "PUMP",
-                    "LATX",
-                    "LATY",
+                    "Imaging",
+                    # "Pumping",
+                    "Lattice_X",
+                    "Lattice_Y",
                     "CDT1",
                     "CDT2",
                 ],
@@ -98,10 +110,10 @@ class MOT(Fragment):
             ControlBeamsWithoutCoolingAOM,
             beam_infos=SUServoedBeam[
                 "MOT",
-                "IMG",
-                # "PUMP",
-                # "LATX",
-                # "LATY",
+                "Imaging",
+                # "Pumping",
+                # "Lattice_X",
+                # "Lattice_Y",
                 "CDT1",
                 "CDT2",
             ],
@@ -127,27 +139,27 @@ class MOT(Fragment):
         self.lattice_beams: ControlBeamsWithoutCoolingAOM = self.setattr_fragment(
             "lattice_beams",
             ControlBeamsWithoutCoolingAOM,
-            beam_infos=SUServoedBeam["LATX", "LATY"],
+            beam_infos=SUServoedBeam["Lattice_X", "Lattice_Y"],
         )
 
         self.seperate_repump: ControlBeamsWithoutCoolingAOM = self.setattr_fragment(
             "seperate_repump",
             ControlBeamsWithoutCoolingAOM,
-            beam_infos=[SUServoedBeam["PUMP"]],
+            beam_infos=[SUServoedBeam["Pumping"]],
         )
 
         # EOM
         self.eom: EomFrag = self.setattr_fragment(
             "eom",
             EomFrag,
-            Eom["repump"],
+            Eom["Repumping"],
             init=False,
         )
         self.MOT_EOM_frequency: FloatParamHandle = self.setattr_param(
             "MOT_EOM_frequency",
             FloatParam,
             "Repump EOM frequency at the start of each MOT load",
-            default=Eom["repump"].frequency,
+            default=Eom["Repumping"].frequency,
             unit="MHz",
             min=6300 * MHz,
             max=6800 * MHz,
@@ -167,40 +179,40 @@ class MOT(Fragment):
         self.coils: SetSupplies = self.setattr_fragment(
             "coils",
             SetSupplies,
-            VDrivenSupply["X1", "X2", "Y", "Z"],
+            VDrivenSupply["X_Bias", "X", "Y_Bias", "Z_Bias"],
             init=False,
         )
         self.y_coil: SetSupplies = self.setattr_fragment(
             "y_coil",
             SetSupplies,
-            VDrivenSupply["Y"],
+            VDrivenSupply["Y_Bias"],
             init=False,
         )
         self.z_coil: SetSupplies = self.setattr_fragment(
             "z_coil",
             SetSupplies,
-            VDrivenSupply["Z"],
+            VDrivenSupply["Z_Bias"],
             init=False,
         )
 
         self.x_coil: SetSupplies = self.setattr_fragment(
             "x_coil",
             SetSupplies,
-            VDrivenSupply["X1"],
+            VDrivenSupply["X_Bias"],
             init=False,
         )
 
         self.x_gradient_coil: SetSupplies = self.setattr_fragment(
             "x_gradient_coil",
             SetSupplies,
-            VDrivenSupply["X2"],
+            VDrivenSupply["X"],
             init=False,
         )
 
-        self.push_780: SetSupplies = self.setattr_fragment(
-            "push_780",
+        self.detune_780: SetSupplies = self.setattr_fragment(
+            "Detuning_780",
             SetSupplies,
-            VDrivenSupply["push_780"],
+            VDrivenSupply["Detuning_780"],
             init=False,
         )
 
@@ -209,7 +221,7 @@ class MOT(Fragment):
             "MOT_Z_current",
             FloatParam,
             "Bias current for the Z coil during MOT",
-            default=BIASES_MOT["Z"],
+            default=BIASES_MOT["Z_Bias"],
             unit="A",
             min=0.0 * A,
             max=0.5 * A,
@@ -218,7 +230,7 @@ class MOT(Fragment):
             "MOT_Y_current",
             FloatParam,
             "Bias current for the Y coil during MOT",
-            default=BIASES_MOT["Y"],
+            default=BIASES_MOT["Y_Bias"],
             unit="A",
             min=0.0 * A,
             max=0.5 * A,
@@ -228,7 +240,7 @@ class MOT(Fragment):
             "MOT_X_current",
             FloatParam,
             "Bias current for the X coil during MOT",
-            default=BIASES_MOT["X1"],
+            default=BIASES_MOT["X_Bias"],
             unit="A",
             min=0.0 * A,
             max=0.5 * A,
@@ -238,7 +250,7 @@ class MOT(Fragment):
             "CMOT_Z_current",
             FloatParam,
             "Bias current for the Z coil during CMOT",
-            default=BIASES_CMOT["Z"],
+            default=BIASES_CMOT["Z_Bias"],
             unit="A",
             min=0.0 * A,
             max=0.5 * A,
@@ -247,7 +259,7 @@ class MOT(Fragment):
             "CMOT_Y_current",
             FloatParam,
             "Bias current for the Y coil during CMOT",
-            default=BIASES_CMOT["Y"],
+            default=BIASES_CMOT["Y_Bias"],
             unit="A",
             min=0.0 * A,
             max=0.5 * A,
@@ -257,7 +269,7 @@ class MOT(Fragment):
             "CMOT_X_current",
             FloatParam,
             "Bias current for the X coil during CMOT",
-            default=BIASES_CMOT["X1"],
+            default=BIASES_CMOT["X_Bias"],
             unit="A",
             min=0.0 * A,
             max=0.5 * A,
@@ -267,7 +279,7 @@ class MOT(Fragment):
             "PGC_Z_current",
             FloatParam,
             "Bias current for the Z coil during PGC",
-            default=BIASES_PGC["Z"],
+            default=BIASES_PGC["Z_Bias"],
             unit="A",
             min=0.0 * A,
             max=0.5 * A,
@@ -276,7 +288,7 @@ class MOT(Fragment):
             "PGC_Y_current",
             FloatParam,
             "Bias current for the Y coil during PGC",
-            default=BIASES_PGC["Y"],
+            default=BIASES_PGC["Y_Bias"],
             unit="A",
             min=0.0 * A,
             max=0.5 * A,
@@ -286,7 +298,7 @@ class MOT(Fragment):
             "PGC_X_current",
             FloatParam,
             "Bias current for the X coil during PGC",
-            default=BIASES_PGC["X1"],
+            default=BIASES_PGC["X_Bias"],
             unit="A",
             min=0.0 * A,
             max=0.5 * A,
@@ -388,9 +400,9 @@ class MOT(Fragment):
             """
 
             duration_default = DURATION["CMOT"]
-            supplies = VDrivenSupply["X2", "push_780"]
+            supplies = VDrivenSupply["X", "Detuning_780"]
             supplies_end = [
-                COMPRESSED_GRADIENTS["X2"],
+                COMPRESSED_GRADIENT["X"],
                 self.CMOT_detuning,
             ]
             suservos = [
@@ -463,9 +475,9 @@ class MOT(Fragment):
 
             duration_default = DURATION["PGC"]
 
-            supplies = VDrivenSupply["push_780",]
-            supplies_start = [self.CMOT_detuning]
-            supplies_end = [self.PGC_detuning]
+            supplies = VDrivenSupply["X", "Detuning_780"]
+            supplies_start = [self.cmot_ramp, self.CMOT_detuning]
+            supplies_end = [0.0, self.PGC_detuning]
             suservos = [SUServoedBeam["MOT"]]
             suservo_setpoint_start = [self.cmot_ramp]
             suservo_setpoint_end = [POWER_3D_MOT["PGC"]]
@@ -675,7 +687,7 @@ class MOT(Fragment):
         delay(400 * us)
 
     @kernel
-    def load(self, clearout=True, clearout_time=1000 * ms, wait_for_load=True) -> None:
+    def load(self, clearout=True, clearout_time=100 * ms, wait_for_load=True) -> None:
         """
         Load the MOT by turning on the MOT beams, assumes we are starting from the reset state
 
@@ -683,6 +695,7 @@ class MOT(Fragment):
 
         **Timeline:** advances by approx `loading_time` seconds
         """
+        rtio_log("events", 0)
         self.set_starting_eom_frequency()
 
         self.all_beams.off()
@@ -729,13 +742,13 @@ class MOT(Fragment):
 
         **Timeline:** advances by `self.CMOT_duration` + `self.CMOT_settle_time`
         """
+        rtio_log("events", 1)
         # Unlock the MOT
         TOPTICA_HOLD_JITTER = (
             150 * us
         )  # The Toptica PID only runs at 30kHz so give it time to hold
         delay(-TOPTICA_HOLD_JITTER)
         self.unlock_mot()
-        delay(TOPTICA_HOLD_JITTER)
 
         # 2d shutter off to prevent push beam inteference
         self.shutter_2d.off()
@@ -744,13 +757,10 @@ class MOT(Fragment):
             self.odt_dimple.on()
             self.odt_reservoir.on()
 
-            # self.set_dimple_trap_power(power_dimple)
-            # self.set_reservoir_trap_power(power_reservoir)
-        else:
-            pass
-
         # if we are doing evaporation then only turn on the dimple and reservoir in cmot step
-        # self.shutter_2d.off()
+        # self.set_dimple_trap_power(power_dimple)
+        # self.set_reservoir_trap_power(power_reservoir)
+
         # set CMOT bias coils
         self.z_coil.set_outputs([self.CMOT_Z_current.get()])
         self.y_coil.set_outputs([self.CMOT_Y_current.get()])
@@ -767,8 +777,7 @@ class MOT(Fragment):
             )
             self.cmot_ramp.do()
             delay(self.cmot_ramp.duration.get())
-        delay(100 * us)
-        self.x_gradient_coil.set_outputs([0 * A])
+
         delay(self.CMOT_settle_time.get())
 
     @kernel
@@ -778,6 +787,7 @@ class MOT(Fragment):
 
         **Timeline:** advances by `self.PGC_duration` + `self.PGC_settle_time`
         """
+        rtio_log("events", 2)
         # Do the ramp - MOT freq, coil to biases
         # We must do these fastino writes in advance to avoid colliding with the ramp
         self.x_coil.set_outputs([self.PGC_X_current.get()])
@@ -860,7 +870,7 @@ class MOT(Fragment):
 
         However it writes the ramp and TTL into the future by `relock_duration`
         """
-        self.push_780.set_to_defaults()
+        self.detune_780.set_to_defaults()
         delay(self.relock_duration.get())
         self.unlock_ttl.off()
         delay(-self.relock_duration.get())

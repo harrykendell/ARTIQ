@@ -4,7 +4,7 @@ from repository.models.Device import device_arrays
 
 EOMS = [
     Eom(
-        name="repump",
+        name="Repumping",
         frequency=6580.0 * MHz,
         attenuation=17 * dB,
         mirny_ch="mirny_eom_repump",
@@ -16,16 +16,8 @@ EOMS = [
 EOMS = {eom.name: eom for eom in EOMS}
 
 VDRIVEN_SUPPLIES = [
-    VDrivenSupply(
-        name="X1",
-        fastino="fastino",
-        ch=0,
-        gain=2.0 * A / V,
-        max_output=1.0 * A,
-        default_output=0.0 * A,
-    ),
-    VDrivenSupply(
-        name="X2",
+    VDrivenSupply(  # Main Gradient Coils
+        name="X",
         fastino="fastino",
         ch=1,
         gain=2.0 * A / V,
@@ -33,7 +25,15 @@ VDRIVEN_SUPPLIES = [
         default_output=1.0 * A,
     ),
     VDrivenSupply(
-        name="Y",
+        name="X_Bias",
+        fastino="fastino",
+        ch=0,
+        gain=2.0 * A / V,
+        max_output=1.0 * A,
+        default_output=0.0 * A,
+    ),
+    VDrivenSupply(
+        name="Y_Bias",
         fastino="fastino",
         ch=2,
         gain=0.5 * A / V,
@@ -41,7 +41,7 @@ VDRIVEN_SUPPLIES = [
         default_output=0.0 * A,
     ),
     VDrivenSupply(
-        name="Z",
+        name="Z_Bias",
         fastino="fastino",
         ch=3,
         gain=2.0 * A / V,
@@ -49,7 +49,7 @@ VDRIVEN_SUPPLIES = [
         default_output=0.0 * A,
     ),
     VDrivenSupply(
-        name="push_780",
+        name="Detuning_780",
         fastino="fastino",
         ch=4,
         gain=222 * MHz / V,
@@ -61,7 +61,7 @@ VDRIVEN_SUPPLIES = [
         unit="MHz",
     ),
     VDrivenSupply(
-        name="push_852",
+        name="Detuning_852",
         fastino="fastino",
         ch=5,
         gain=83 * MHz / V,
@@ -81,10 +81,10 @@ EBAY_SHUTTER_DELAY = 25.0 * ms
 # the switch on time is actually quick fast. The limit is the dislike of short pulses
 
 SHUTTERS = [
-    Shutter(name="2DMOT", ttl="shutter_2DMOT", delay=THORLABS_SHUTTER_DELAY),
-    Shutter(name="3DMOT", ttl="shutter_3DMOT", delay=THORLABS_SHUTTER_DELAY),
-    Shutter(name="IMG", ttl="shutter_IMG", delay=EBAY_SHUTTER_DELAY),
-    Shutter(name="LATTICE", ttl="shutter_LATTICE", delay=THORLABS_SHUTTER_DELAY),
+    Shutter(name="2D MOT", ttl="shutter_2DMOT", delay=THORLABS_SHUTTER_DELAY),
+    Shutter(name="3D MOT", ttl="shutter_3DMOT", delay=THORLABS_SHUTTER_DELAY),
+    Shutter(name="Imaging", ttl="shutter_IMG", delay=EBAY_SHUTTER_DELAY),
+    Shutter(name="Lattice", ttl="shutter_LATTICE", delay=THORLABS_SHUTTER_DELAY),
 ]
 SHUTTERS = {shutter.name: shutter for shutter in SHUTTERS}
 
@@ -108,7 +108,7 @@ SUSERVOED_BEAMS = [
         calib_offset=0.037,
     ),
     SUServoedBeam(
-        name="IMG",
+        name="Imaging",
         suservo_device="suservo_aom_IMG",
         frequency=198.0 * MHz,
         attenuation=18.0 * dB,
@@ -121,7 +121,7 @@ SUSERVOED_BEAMS = [
         initial_amplitude=0.55,
     ),
     SUServoedBeam(
-        name="PUMP",
+        name="Pumping",
         suservo_device="suservo_aom_PUMP",
         frequency=192 * MHz,
         attenuation=18 * dB,
@@ -131,13 +131,13 @@ SUSERVOED_BEAMS = [
         calib_offset=-15e-3,
     ),
     SUServoedBeam(
-        name="LATX",
+        name="Lattice_X",
         suservo_device="suservo_aom_LATX",
         frequency=197.95 * MHz,
         attenuation=17.0 * dB,
     ),
     SUServoedBeam(
-        name="LATY",
+        name="Lattice_Y",
         suservo_device="suservo_aom_LATY",
         frequency=200.0 * MHz,
         attenuation=18.5 * dB,

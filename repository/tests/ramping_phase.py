@@ -23,7 +23,7 @@ class RampPhase(ExpFragment):
         class Ramp1(Ramp):
             duration_default = 10 * ms
 
-            supplies = VDrivenSupply["X1", "X2", "Y"]
+            supplies = VDrivenSupply["X_Bias", "X", "Y_Bias"]
             supplies_end = [1.5, 0.0, default]
 
         self.ramp1: Ramp1 = self.setattr_fragment("ramp", Ramp1)
@@ -31,7 +31,7 @@ class RampPhase(ExpFragment):
         class Ramp2(Ramp):
             duration_default = 10 * ms
 
-            supplies = VDrivenSupply["X1", "X2", "Y"]
+            supplies = VDrivenSupply["X_Bias", "X", "Y_Bias"]
             supplies_start = [self.ramp1, default, 2.0]
             supplies_end = [default, self.ramp1, 1.0]
 

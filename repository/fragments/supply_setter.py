@@ -22,7 +22,7 @@ class SetSupplies(Fragment):
         self.setattr_fragment(
             "coil_setter",
             SetSupplies,
-            [VDrivenSupply["X1"]],
+            [VDrivenSupply["X_Bias"]],
             init=False,
         )
     """
@@ -143,9 +143,9 @@ class SetSupplies(Fragment):
         """
         Set the outputs to the default values defined in the configs
         """
-        self.set_outputs(
-            [0.0 if dev.disabled else dev.default_output for dev in self.configs]
-        )
+        self.set_outputs([
+            0.0 if dev.disabled else dev.default_output for dev in self.configs
+        ])
 
     @kernel
     def turn_off(self):

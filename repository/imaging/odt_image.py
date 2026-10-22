@@ -31,7 +31,7 @@ class ODTAbsorptionImageExpFrag(ExpFragment):
         self.setattr_fragment(
             "coil_setter",
             SetSupplies,
-            VDrivenSupply["X1", "X2"],
+            VDrivenSupply["X_Bias", "X"],
             init=False,
         )
         self.coil_setter: SetSupplies
@@ -46,7 +46,7 @@ class ODTAbsorptionImageExpFrag(ExpFragment):
         self.setattr_fragment(
             "img_beam_setter",
             ControlBeamsWithoutCoolingAOM,
-            beam_infos=[SUServoedBeam["IMG"]],
+            beam_infos=[SUServoedBeam["Imaging"]],
         )
         self.img_beam_setter: ControlBeamsWithoutCoolingAOM
 

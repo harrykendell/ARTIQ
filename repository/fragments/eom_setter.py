@@ -21,7 +21,7 @@ class EomFrag(Fragment):
         self.setattr_fragment(
             "eom_setter",
             EomFrag,
-            Eom["repump"],
+            Eom["Repumping"],
             init=False,
         )
     """

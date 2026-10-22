@@ -50,7 +50,7 @@ class AbsorptionImageExpFrag(ExpFragment):
         self.mot: MOT = self.setattr_fragment("MOT", MOT, manual_init=False)
 
         self.img_beam: ControlBeamsWithoutCoolingAOM = self.setattr_fragment(
-            "img_beam", ControlBeamsWithoutCoolingAOM, [SUServoedBeam["IMG"]]
+            "img_beam", ControlBeamsWithoutCoolingAOM, [SUServoedBeam["Imaging"]]
         )
 
         self.setattr_device("moving_stage_ttl")

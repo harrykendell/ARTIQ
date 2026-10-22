@@ -65,21 +65,21 @@ class Ramp(Fragment):
         class CMOT_Ramp(Ramp):
 
             duration_default = 50*ms
-            supplies = VDrivenSupply["X1", "X2", "push_780"]
+            supplies = VDrivenSupply["X_Bias", "X", "Detuning_780"]
             supplies_start = [
                 default,
                 OTHER_RAMP,
                 -DETUNING["CMOT"],
             ]
             supplies_end = [
-                VDrivenSupply["X1"].default_output * 1.5,
-                VDrivenSupply["X2"].default_output * 1.5,
+                VDrivenSupply["X_Bias"].default_output * 1.5,
+                VDrivenSupply["X"].default_output * 1.5,
                 DETUNING["CMOT"],
             ]
 
-            eoms = [Eom["repump"]]
+            eoms = [Eom["Repumping"]]
             eom_att_end = [
-                Eom["repump"].attenuation + 10*dB,
+                Eom["Repumping"].attenuation + 10*dB,
             ]
     """
 

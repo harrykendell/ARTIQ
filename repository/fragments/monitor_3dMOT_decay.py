@@ -40,7 +40,7 @@ class MOTPhotodiodeMeasurement(Fragment):
         self.setattr_fragment(
             "coil_setter",
             SetSupplies,
-            [VDrivenSupply["X1"]],
+            [VDrivenSupply["X_Bias"]],
             init=False,
         )
         self.coil_setter: SetSupplies
