@@ -31,6 +31,7 @@ logger = logging.getLogger(__name__)
 # rtio_log is an ARTIQ kernel-compiler builtin, not an importable Python symbol.
 # Keep this declaration invisible at runtime so the kernel resolves the builtin.
 if TYPE_CHECKING:
+
     def rtio_log(channel: str, *values: object) -> None: ...
 
 
