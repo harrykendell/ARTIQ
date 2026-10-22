@@ -1,4 +1,5 @@
 import logging
+from typing import TYPE_CHECKING
 
 from artiq.coredevice.core import Core
 from artiq.coredevice.ttl import TTLOut
@@ -26,6 +27,12 @@ from repository.models.devices import (
 )
 
 logger = logging.getLogger(__name__)
+
+# rtio_log is an ARTIQ kernel-compiler builtin, not an importable Python symbol.
+# Keep this declaration invisible at runtime so the kernel resolves the builtin.
+if TYPE_CHECKING:
+    def rtio_log(channel: str, *values: object) -> None: ...
+
 
 # Default constants - these can be overridden in the experiment
 Γ_Rb = 6.065 * MHz  # Natural linewidth of Rb-87
@@ -695,7 +702,6 @@ class MOT(Fragment):
 
         **Timeline:** advances by approx `loading_time` seconds
         """
-        rtio_log("events", 0)
         self.set_starting_eom_frequency()
 
         self.all_beams.off()
@@ -708,6 +714,9 @@ class MOT(Fragment):
         if clearout:
             self.clear_atoms(clearout_time=clearout_time)
 
+        # Mark optical loading, not the preceding EOM setup and atom clearout.
+        # The load may continue in the caller when wait_for_load is False.
+        rtio_log("stage", "load:start")
         self.mot_beam.on()
         # self.odt_reservoir.on()
 
@@ -742,7 +751,8 @@ class MOT(Fragment):
 
         **Timeline:** advances by `self.CMOT_duration` + `self.CMOT_settle_time`
         """
-        rtio_log("events", 1)
+        rtio_log("stage", "load:end")
+        rtio_log("stage", "compress:start")
         # Unlock the MOT
         TOPTICA_HOLD_JITTER = (
             150 * us
@@ -756,6 +766,8 @@ class MOT(Fragment):
         if evaporation_active or odt_active:
             self.odt_dimple.on()
             self.odt_reservoir.on()
+            # CDT overlaps the cooling and evaporation stages.
+            rtio_log("stage", "cdt:start")
 
         # if we are doing evaporation then only turn on the dimple and reservoir in cmot step
         # self.set_dimple_trap_power(power_dimple)
@@ -779,6 +791,7 @@ class MOT(Fragment):
             delay(self.cmot_ramp.duration.get())
 
         delay(self.CMOT_settle_time.get())
+        rtio_log("stage", "compress:end")
 
     @kernel
     def pgc(self) -> None:
@@ -787,7 +800,7 @@ class MOT(Fragment):
 
         **Timeline:** advances by `self.PGC_duration` + `self.PGC_settle_time`
         """
-        rtio_log("events", 2)
+        rtio_log("stage", "pgc:start")
         # Do the ramp - MOT freq, coil to biases
         # We must do these fastino writes in advance to avoid colliding with the ramp
         self.x_coil.set_outputs([self.PGC_X_current.get()])
@@ -805,6 +818,7 @@ class MOT(Fragment):
             )
             self.pgc_ramp.do()
         delay(self.PGC_settle_time.get())
+        rtio_log("stage", "pgc:end")
 
     @kernel
     def set_repump_attenuation(self, attenuation: float) -> None:
@@ -823,13 +837,15 @@ class MOT(Fragment):
 
         **Timeline:** advances by `self.evaporation.duration` + `self.evaporation.settle_time`
         """
+        rtio_log("stage", "evaporation:start")
         # self.x_gradient_coil.set_outputs([1.9*A])
         self.evaporation_ramp1.do()
         if single_step_evaporation:
-            self.odt_dimple.off()
-            self.odt_reservoir.off()
+            self.switch_off_cdt()
 
         delay(self.evaporation_settle_time1.get())
+        if single_step_evaporation:
+            rtio_log("stage", "evaporation:end")
 
     @kernel
     def evaporation2(self) -> None:
@@ -839,8 +855,25 @@ class MOT(Fragment):
         **Timeline:** advances by `self.evaporation.duration` + `self.evaporation.settle_time`
         """
         self.evaporation_ramp2.do()
+        self.switch_off_cdt()
+        rtio_log("stage", "evaporation:end")
+
+    @kernel
+    def switch_off_cdt(self) -> None:
+        """Turn off both CDT beams and close their independent RTIO stage."""
         self.odt_dimple.off()
         self.odt_reservoir.off()
+        rtio_log("stage", "cdt:end")
+
+    @kernel
+    def mark_imaging_start(self) -> None:
+        """Mark the start of absorption image acquisition."""
+        rtio_log("stage", "imaging:start")
+
+    @kernel
+    def mark_imaging_end(self) -> None:
+        """Mark the end of absorption image acquisition."""
+        rtio_log("stage", "imaging:end")
 
     @kernel
     def into_lattice(self) -> None:
@@ -884,6 +917,9 @@ class MOT(Fragment):
         Here we can trun on and off sideband by turing on and off sideband, if we want sideband in imaging or not
         """
 
+        # Close loading even if CMOT/PGC was skipped. An unmatched end marker
+        # is intentionally harmless when compression already closed loading.
+        rtio_log("stage", "load:end")
         # Turn off the coils
 
         self.coils.turn_off()

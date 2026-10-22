@@ -328,8 +328,7 @@ class AbsorptionImageExpFrag(ExpFragment):
             # self.mot.mot_beam.off(ignore_shutters=True)
             # delay(1 * ms)
             if not (self.do_evaporation1.get() or self.do_evaporation2.get()):
-                self.mot.odt_dimple.off()
-                self.mot.odt_reservoir.off()
+                self.mot.switch_off_cdt()
 
         # Evaporation and then switch off odt beams
         if self.do_evaporation1.get():
@@ -370,6 +369,7 @@ class AbsorptionImageExpFrag(ExpFragment):
         else:
             pass
 
+        self.mot.mark_imaging_start()
         self.pco_camera.capture_image()
         self.img_beam.on()
         delay(self.exposure_time.get())
@@ -392,6 +392,7 @@ class AbsorptionImageExpFrag(ExpFragment):
         # BG IMAGE
         self.pco_camera.capture_image()
         delay(self.camera_busy_time)
+        self.mot.mark_imaging_end()
 
         # leave the MOT to reload
         self.mot.init()
