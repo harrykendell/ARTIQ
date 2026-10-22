@@ -1,6 +1,8 @@
 import json
 import logging
 from time import time
+from scipy.constants import h as H_PLANCK, k as K_B
+
 
 import numpy as np
 from artiq.coredevice.core import Core
@@ -35,6 +37,8 @@ from repository.models.devices import SUServoedBeam
 logger = logging.getLogger(__name__)
 
 # from repository.Dipole_trap.moving_stage import MovingStage
+
+M_RB = 1.443160648e-25  # kg
 
 
 class AbsorptionImageExpFrag(ExpFragment):
@@ -391,7 +395,7 @@ class AbsorptionImageExpFrag(ExpFragment):
 
         # leave the MOT to reload
         self.mot.init()
-        self.mot.load(clearout=False, wait_for_load=False)
+        self.mot.load(clearout=True, wait_for_load=False)
 
         self.core.wait_until_mu(now_mu())
         self.update_images()
@@ -477,13 +481,7 @@ class AbsorptionImageExpFrag(ExpFragment):
         self.gaussian_fit_centre_y.push(self.absimg.y0)
         self.peak_od.push(self.absimg.peak_od)
 
-        # Reference values for normalization
-        N_ref = 2.0e8  #  atom number
-        sigma_0_x = 2.5  # σₓ (mm)
-        sigma_0_y = 2.5  # σᵧ (mm)
-        sigma_x = self.absimg.sigmax * self.absimg.physical_scale * 1e3
-        sigma_y = self.absimg.sigmay * self.absimg.physical_scale * 1e3
-        exponent = 2.0  # Exponent for the size terms
+        # Start of custom objective setion
 
         # obtain the fit quality from the Abs Image
         r_squared = self.absimg.fit.summary()["rsquared"]
@@ -492,15 +490,136 @@ class AbsorptionImageExpFrag(ExpFragment):
         fit_failed = (
             self.absimg.atom_number <= 0 or r_squared < 0.9  # filter bad shots
         )
-        # Custom objective  :
+        PENALTY = 5.0  # objective value for invalid shots
+
+        # Measured state variables
+        N = self.absimg.atom_number
+        sx_mm = self.absimg.sigmax * self.absimg.physical_scale * 1e3
+        sy_mm = self.absimg.sigmay * self.absimg.physical_scale * 1e3
+
+        # fixed reference values during expansion (based on benchmarks)
+        STAGE_REF = {
+            "cmot": {
+                "N": 3.0e8,
+                "x_mm": 2.0,
+                "y_mm": 2.0,
+            },
+            "pgc": {
+                "N": 2.0e8,
+                "x_mm": 2.5,
+                "y_mm": 2.5,
+            },
+        }
+
+        # In situ fixed reference values
+        STAGE_SITU_ = {
+            "cmot": {
+                "x_mm": 0.91,
+                "y_mm": 1.08,
+                "source": "parameter-scan thermometry, 2026-10-05",
+            },
+            "pgc": {
+                "x_mm": 0.91,
+                "y_mm": 1.07,
+                "source": "parameter-scan thermometry, 2026-10-06",
+            },
+        }
+
+        #     # last enabled stage
+        #     if self.do_pgc.get():
+        #         stage = "pgc"
+        #     elif self.do_cmot.get():
+        #         stage = "cmot"
+        #     else:
+        #         raise ValueError(
+        #             "Neither CMOT nor PGC enabled: no PSD reference for this sequence"
+        #         )
+
+        # Custom Objective 1 : negated log(pseduo PSD)
+        exponent = 2.0  # Exponent for the size terms
+
+        N_ref = 2.0e8
+        sx_ref = 2.5  # in mm
+        sy_ref = 2.5
+
         if fit_failed:
             # Push a large value penalty
-            self.custom_objective.push(5)
+            self.custom_objective.push(PENALTY)
         else:
             self.custom_objective.push(
                 -np.log(self.absimg.atom_number / N_ref)
-                + exponent * (np.log(sigma_x / sigma_0_x) + np.log(sigma_y / sigma_0_y))
+                + exponent * (np.log(sx_mm / sx_ref) + np.log(sy_mm / sy_ref))
             )
+
+        # def pseudo_psd_objective(N, STAGE_REF, exponent, stage):
+        #     """
+        #     Returns the negated log(pseduo PSD) for a single shot.
+        #     """
+        #     # initial cloud widths (in-situ) in x-y directions
+        #     sx_ref = STAGE_REF[stage]["x_mm"]
+        #     sy_ref = STAGE_REF[stage]["y_mm"]
+
+        #     return -np.log(N / STAGE_REF[stage]["N"]) + exponent * (
+        #         np.log(sx_mm / sx_ref) + np.log(sy_mm / sy_ref)
+        #     )
+
+        # if fit_failed:
+        #     # Push a large value penalty
+        #     self.custom_objective.push(5)
+        # else:
+        #     self.custom_objective.push(pseudo_psd_objective(N, STAGE_REF, exponent, stage))
+
+        # Custom Objective 2 : negated log(estimate PSD)
+
+        # PSD_REF = 1e-7  # reference PSD
+
+        # def estimate_psd_objective(N, STAGE_SITU, sx_mm, sy_mm, stage):
+        #     """
+        #      Computes for a single shot,
+        #           - the objective value (J)
+        #           - the average temperature estimate (T_avr)
+        #           - the computed PSD (psd) for one shot,
+        #      Otherwise returns (PSD_PENALTY, None, None) if invalid.
+        #     """
+
+        #     # initial x-y (in-situ) cloud widths (in m)
+        #     s0x = STAGE_SITU[stage]["x_mm"] * 1e-3
+        #     s0y = STAGE_SITU[stage]["y_mm"] * 1e-3
+
+        #     # imaging TOF
+        #     t = self.expansion_time * 1e-3  # s
+
+        #     # compute x-y temperatures
+        #     T_x = (M_RB / K_B) * ((sx_mm * 1e-3) ** 2 - s0x**2) / t**2
+        #     T_y = (M_RB / K_B) * ((sy_mm * 1e-3) ** 2 - s0y**2) / t**2
+
+        #     if not (T_x > 0 and T_y > 0 and N > 0):
+        #         return PENALTY, None, None
+
+        #     # find average temperature
+        #     T_avr = 0.5 * (T_x + T_y)
+
+        #     # compute PSD
+        #     n = N / ((2 * np.pi) ** 1.5 * s0x**2 * s0y)  # peak density, σ_z = σ_x
+
+        #     lam = H_PLANCK / np.sqrt(
+        #         2 * np.pi * M_RB * K_B * T_avr
+        #     )  # thermal de Broglie wavelength
+
+        #     psd = n * lam**3
+
+        #     return -np.log(psd / PSD_REF), T_avr, psd
+
+        # if fit_failed:
+        #     self.custom_objective.push(PENALTY)
+
+        # else:
+        #     J, self.T_avr, self.psd = estimate_psd_objective(
+        #         N, STAGE_SITU, sx_mm, sy_mm, stage
+        #     )
+        #     self.custom_objective.push(J)
+
+        # End of objective section
 
         frame_timestamp = time()
         self.image_timestamp.push(frame_timestamp)

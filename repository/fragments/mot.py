@@ -16,13 +16,13 @@ from repository.fragments.default_beam_setter import (
     make_set_beams_to_default,
 )
 from repository.fragments.eom_setter import EomFrag
-from repository.fragments.ramp import Ramp, LogRamp
+from repository.fragments.ramp import LogRamp, Ramp
 from repository.fragments.supply_setter import SetSupplies
 from repository.models.devices import (
+    THORLABS_SHUTTER_DELAY,
     Eom,
     SUServoedBeam,
     VDrivenSupply,
-    THORLABS_SHUTTER_DELAY,
 )
 
 logger = logging.getLogger(__name__)
