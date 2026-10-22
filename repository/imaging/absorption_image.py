@@ -1,6 +1,7 @@
 import json
 import logging
 from time import time
+from typing import TYPE_CHECKING
 from scipy.constants import h as H_PLANCK, k as K_B
 
 
@@ -35,6 +36,12 @@ from repository.imaging.processor import AbsImage, AbsImageSettings
 from repository.models.devices import SUServoedBeam
 
 logger = logging.getLogger(__name__)
+
+# The ARTIQ kernel compiler provides rtio_log as a builtin (not a Python import).
+if TYPE_CHECKING:
+
+    def rtio_log(channel: str, *values: object) -> None: ...
+
 
 # from repository.Dipole_trap.moving_stage import MovingStage
 
@@ -306,9 +313,11 @@ class AbsorptionImageExpFrag(ExpFragment):
 
         # # self.mot.Disable_EOM()
         if self.Pump_to_F1ground.get():
+            rtio_log("stage", "pump_f1:start")
             self.mot.Disable_EOM()
             # self.mot.seperate_repump.on()
             delay(self.repump_duration.get())
+            rtio_log("stage", "pump_f1:end")
         else:
             pass
 
@@ -328,7 +337,7 @@ class AbsorptionImageExpFrag(ExpFragment):
             # self.mot.mot_beam.off(ignore_shutters=True)
             # delay(1 * ms)
             if not (self.do_evaporation1.get() or self.do_evaporation2.get()):
-                self.mot.switch_off_cdt()
+                self.mot.release_cdt()
 
         # Evaporation and then switch off odt beams
         if self.do_evaporation1.get():
@@ -363,14 +372,20 @@ class AbsorptionImageExpFrag(ExpFragment):
 
         # TOF IMAGE
         if self.repump_to_F2.get():
+            rtio_log("stage", "repump:start")
             self.mot.seperate_repump.on()
             delay(self.depump_duration.get())
             self.mot.seperate_repump.off()
+            rtio_log("stage", "repump:end")
         else:
             pass
 
-        self.mot.mark_imaging_start()
+        rtio_log("stage", "atoms:start")
         self.pco_camera.capture_image()
+        # End ballistic expansion at the actual imaging-beam command,
+        # not at the camera trigger or the preceding MOT drop.
+        rtio_log("stage", "expansion:end")
+        self.mot.mark_imaging_start()
         self.img_beam.on()
         delay(self.exposure_time.get())
         self.img_beam.off()
@@ -381,17 +396,23 @@ class AbsorptionImageExpFrag(ExpFragment):
             with sequential:
                 delay(self.exposure_time.get())
                 self.mot.clear_atoms(50 * ms)
+        rtio_log("stage", "atoms:end")
 
         # REF IMAGE
+        rtio_log("stage", "reference:start")
         self.pco_camera.capture_image()
         self.img_beam.on()
         delay(self.exposure_time.get())
         self.img_beam.off()
         delay(self.camera_busy_time)
 
+        rtio_log("stage", "reference:end")
+
         # BG IMAGE
+        rtio_log("stage", "background:start")
         self.pco_camera.capture_image()
         delay(self.camera_busy_time)
+        rtio_log("stage", "background:end")
         self.mot.mark_imaging_end()
 
         # leave the MOT to reload

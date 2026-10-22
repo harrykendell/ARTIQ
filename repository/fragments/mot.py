@@ -667,9 +667,11 @@ class MOT(Fragment):
         **Timeline:** advances by approx `clearout_time` seconds
         """
 
+        rtio_log("stage", "clearout:start")
         self.y_coil.set_outputs([0.7 * A])
         delay(clearout_time)
         self.y_coil.set_to_defaults()
+        rtio_log("stage", "clearout:end")
 
     @kernel
     def clear_atoms(self, clearout_time=100 * ms) -> None:
@@ -680,9 +682,11 @@ class MOT(Fragment):
         """
 
         # self.odt_dimple.off()
+        rtio_log("stage", "clearout:start")
         self.y_coil.set_outputs([1.0 * A])
         delay(clearout_time)
         self.y_coil.set_to_defaults()
+        rtio_log("stage", "clearout:end")
 
     @kernel
     def set_starting_eom_frequency(self) -> None:
@@ -838,15 +842,16 @@ class MOT(Fragment):
 
         **Timeline:** advances by `self.evaporation.duration` + `self.evaporation.settle_time`
         """
+        rtio_log("stage", "hold:end")
         rtio_log("stage", "evaporation:start")
         # self.x_gradient_coil.set_outputs([1.9*A])
         self.evaporation_ramp1.do()
         if single_step_evaporation:
-            self.switch_off_cdt()
+            # The atoms are released at trap extinction, before the settle delay.
+            rtio_log("stage", "evaporation:end")
+            self.release_cdt()
 
         delay(self.evaporation_settle_time1.get())
-        if single_step_evaporation:
-            rtio_log("stage", "evaporation:end")
 
     @kernel
     def evaporation2(self) -> None:
@@ -856,8 +861,8 @@ class MOT(Fragment):
         **Timeline:** advances by `self.evaporation.duration` + `self.evaporation.settle_time`
         """
         self.evaporation_ramp2.do()
-        self.switch_off_cdt()
         rtio_log("stage", "evaporation:end")
+        self.release_cdt()
 
     @kernel
     def switch_off_cdt(self) -> None:
@@ -865,6 +870,17 @@ class MOT(Fragment):
         self.odt_dimple.off()
         self.odt_reservoir.off()
         rtio_log("stage", "cdt:end")
+
+    @kernel
+    def release_cdt(self) -> None:
+        """Release trapped atoms and mark the start of time of flight.
+
+        Keep this separate from switch_off_cdt(): switching off a beam does
+        not always imply that an absorption-imaging expansion is beginning.
+        """
+        self.switch_off_cdt()
+        rtio_log("stage", "hold:end")
+        rtio_log("stage", "expansion:start")
 
     @kernel
     def mark_imaging_start(self) -> None:
@@ -928,8 +944,12 @@ class MOT(Fragment):
 
         if evaporation_active or odt_active:
             self.mot_beam.off()
+            # The MOT is off but the CDT continues to hold the atoms.
+            rtio_log("stage", "hold:start")
         else:
             self.all_beams.off()
+            # In the absence of a trap, MOT extinction releases the atoms.
+            rtio_log("stage", "expansion:start")
 
         # self.set_repump_attenuation(
         #     30 * dB
