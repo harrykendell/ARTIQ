@@ -281,6 +281,10 @@ class AbsorptionImageExpFrag(ExpFragment):
         self.core.break_realtime()
         self.mot.calculate_dma_handles()
         self.core.break_realtime()
+        # An acquisition is one ndscan run_once(), including its final reload.
+        # Consecutive shot markers provide robust boundaries through repeats,
+        # interruptions, and multiple optimizer evaluations.
+        rtio_log("shot", "start")
 
         # self.mot.set_dimple_trap_power(self.mot.power_dimple.get())
         # self.mot.set_reservoir_trap_power(self.mot.power_reservoir.get())
@@ -418,6 +422,7 @@ class AbsorptionImageExpFrag(ExpFragment):
         # leave the MOT to reload
         self.mot.init()
         self.mot.load(clearout=True, wait_for_load=False)
+        rtio_log("shot", "end")
 
         self.core.wait_until_mu(now_mu())
         self.update_images()
