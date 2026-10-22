@@ -1,6 +1,10 @@
 import ctypes
 import logging
+import os
+import sys
+import tempfile
 import time
+from contextlib import contextmanager
 from enum import Enum
 
 import numpy as np
@@ -21,6 +25,40 @@ from ndscan.experiment.parameters import FloatParamHandle
 
 logger = logging.getLogger(__name__)
 logging.getLogger("pco").setLevel(logging.WARNING)
+
+
+@contextmanager
+def _suppress_optional_pco_driver_warning():
+    """Filter one native PCO SDK stdout warning during camera initialisation.
+
+    The bundled Camera Link HS/KAYA driver probes an optional library even for
+    USB cameras. Its C-level print bypasses Python's logging configuration.
+    Other SDK output and exceptions must remain visible.
+    """
+    sys.stdout.flush()
+    stdout_fd = sys.stdout.fileno()
+    original_fd = os.dup(stdout_fd)
+    try:
+        with tempfile.TemporaryFile() as captured:
+            os.dup2(captured.fileno(), stdout_fd)
+            try:
+                yield
+            finally:
+                try:
+                    ctypes.CDLL(None).fflush(None)
+                    sys.stdout.flush()
+                finally:
+                    os.dup2(original_fd, stdout_fd)
+
+                captured.seek(0)
+                for line in captured:
+                    if line.startswith(b"Loading libKYVPParametersHandler.so failed error "):
+                        continue
+                    remaining = memoryview(line)
+                    while remaining:
+                        remaining = remaining[os.write(original_fd, remaining):]
+    finally:
+        os.close(original_fd)
 
 
 MOT_SIZE = 300
@@ -123,12 +161,14 @@ class PcoCamera(Fragment):
         Setup the host-side camera controls
         """
         if self.camera_used.get() == camera_name.EDGE:
-            self.cam = pco.Camera(serial=61011464)
+            with _suppress_optional_pco_driver_warning():
+                self.cam = pco.Camera(serial=61011464)
             expsoure_time = self.exposure_time.get() + 50 * us
             self.trigger = self.trigger2
             self.trigger_delay = 120 * us
         elif self.camera_used.get() == camera_name.PIXELFLY:
-            self.cam = pco.Camera(serial=19701804)
+            with _suppress_optional_pco_driver_warning():
+                self.cam = pco.Camera(serial=19701804)
             expsoure_time = self.exposure_time.get()
             self.trigger = self.trigger1
             self.trigger_delay = (
