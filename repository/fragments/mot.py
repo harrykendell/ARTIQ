@@ -39,19 +39,19 @@ if TYPE_CHECKING:
 Γ_Rb = 6.065 * MHz  # Natural linewidth of Rb-87
 DURATION = {
     "LOADING": 30 * s,
-    "CMOT": 1.0 * ms,
-    "PGC": 1.0 * ms,
+    "CMOT": 0.85 * ms,
+    "PGC": 10.0 * ms,
     "EVAPORATION1": 50 * ms,
     "EVAPORATION2": 100 * ms,
 }
 SETTLE_TIME = {
-    "CMOT": 3.2 * ms,
-    "PGC": 3.1 * ms,
+    "CMOT": 6.94 * ms,
+    "PGC": 1.0 * ms,
     "ODT": 0 * ms,
     "EVAPORATION1": 0 * ms,
     "EVAPORATION2": 0 * ms,
 }
-DETUNING = {"CMOT": 8 * Γ_Rb, "PGC": 16 * Γ_Rb}  # This is beyond the normal 2Γ
+DETUNING = {"CMOT": 9.65 * Γ_Rb, "PGC": 16 * Γ_Rb}  # Red detuning in units of Γ_Rb
 
 # NB the LSB for the fastino is 0.305mA
 # The ES030-10 LSB for programming is 0.61mA
@@ -63,16 +63,19 @@ BIASES_MOT = {
 }
 BIASES_CMOT = {
     "X_Bias": 0.45 * mA,
-    "Y_Bias": 0.32 * mA,
-    "Z_Bias": 45 * mA,
+    "Y_Bias": 0.84 * mA,
+    "Z_Bias": 59.8 * mA,
 }
 BIASES_PGC = {
     "X_Bias": 0.3 * mA,
     "Y_Bias": 0.32 * mA,
-    "Z_Bias": 40 * mA,
+    "Z_Bias": 60 * mA,
 }
-COMPRESSED_GRADIENT = {"X": 1.98 * A}
-REPUMP_ATTENUATION = {"CMOT": 0.6196 * dB, "PGC": 0.05 * dB}
+# Working retained-atom/PGC baseline, RID33778. Higher 1.98 A CMOT lost atoms.
+# The 1.0 A endpoint intentionally does not compress relative to MOT loading;
+# a separate 0.6 -> 1.0 A loading-gradient test remains to be validated.
+COMPRESSED_GRADIENT = {"X": 1.0 * A}
+REPUMP_ATTENUATION = {"CMOT": 3.09 * dB, "PGC": 0.05 * dB}
 POWER_3D_MOT = {"MOT_loading": 3.5 * V, "CMOT": 3.5 * V, "PGC": 2.0 * V}
 
 
@@ -396,7 +399,7 @@ class MOT(Fragment):
             "CMOT_repump_detuning",
             FloatParam,
             "Detuning of the CMOT Repump beam",
-            default=0,
+            default=0.075 * Γ_Rb,
             unit="Γ",
             scale=Γ_Rb,
         )

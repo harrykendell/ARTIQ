@@ -175,3 +175,9 @@ src/
 crate config/bu2402001_*
 *.npy
 absorption_images
+
+# Local experiment campaigns and one-off analysis (not repository software).
+# Keep these on the lab/analysis machines but outside published Git history.
+/scripts/analyze_cooling_campaign_*.py
+/scripts/cooling_campaign_*.py
+/scripts/cmot_thorcam_monitor_*.py
