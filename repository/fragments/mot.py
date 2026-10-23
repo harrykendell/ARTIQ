@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 from artiq.coredevice.core import Core
 from artiq.coredevice.ttl import TTLOut
 from artiq.language import delay, kernel, parallel
-from artiq.language.units import A, MHz, V, dB, ms, s, us
+from artiq.language.units import A, MHz, V, dB, mA, ms, s, us
 from ndscan.experiment import Fragment
 from ndscan.experiment.parameters import (
     FloatParam,
@@ -52,20 +52,24 @@ SETTLE_TIME = {
     "EVAPORATION2": 0 * ms,
 }
 DETUNING = {"CMOT": 8 * Γ_Rb, "PGC": 16 * Γ_Rb}  # This is beyond the normal 2Γ
+
+# NB the LSB for the fastino is 0.305mA
+# The ES030-10 LSB for programming is 0.61mA
+CURRENT_LSB = 10 / 2**16 * A
 BIASES_MOT = {
-    "X_Bias": 0.00045 * A,
-    "Y_Bias": 0.00032 * A,
-    "Z_Bias": 0.045 * A,
+    "X_Bias": 0.45 * mA,
+    "Y_Bias": 0.32 * mA,
+    "Z_Bias": 45 * mA,
 }
 BIASES_CMOT = {
-    "X_Bias": 0.00045 * A,
-    "Y_Bias": 0.00032 * A,
-    "Z_Bias": 0.045 * A,
+    "X_Bias": 0.45 * mA,
+    "Y_Bias": 0.32 * mA,
+    "Z_Bias": 45 * mA,
 }
 BIASES_PGC = {
-    "X_Bias": 0.0003 * A,
-    "Y_Bias": 0.00032 * A,
-    "Z_Bias": 0.04 * A,
+    "X_Bias": 0.3 * mA,
+    "Y_Bias": 0.32 * mA,
+    "Z_Bias": 40 * mA,
 }
 COMPRESSED_GRADIENT = {"X": 1.98 * A}
 REPUMP_ATTENUATION = {"CMOT": 0.6196 * dB, "PGC": 0.05 * dB}
@@ -230,7 +234,8 @@ class MOT(Fragment):
             FloatParam,
             "Bias current for the Z coil during MOT",
             default=BIASES_MOT["Z_Bias"],
-            unit="A",
+            unit="mA",
+            step=CURRENT_LSB,
             min=0.0 * A,
             max=0.5 * A,
         )
@@ -239,7 +244,8 @@ class MOT(Fragment):
             FloatParam,
             "Bias current for the Y coil during MOT",
             default=BIASES_MOT["Y_Bias"],
-            unit="A",
+            unit="mA",
+            step=CURRENT_LSB,
             min=0.0 * A,
             max=0.5 * A,
         )
@@ -249,7 +255,8 @@ class MOT(Fragment):
             FloatParam,
             "Bias current for the X coil during MOT",
             default=BIASES_MOT["X_Bias"],
-            unit="A",
+            unit="mA",
+            step=CURRENT_LSB,
             min=0.0 * A,
             max=0.5 * A,
         )
@@ -259,7 +266,8 @@ class MOT(Fragment):
             FloatParam,
             "Bias current for the Z coil during CMOT",
             default=BIASES_CMOT["Z_Bias"],
-            unit="A",
+            unit="mA",
+            step=CURRENT_LSB,
             min=0.0 * A,
             max=0.5 * A,
         )
@@ -268,7 +276,8 @@ class MOT(Fragment):
             FloatParam,
             "Bias current for the Y coil during CMOT",
             default=BIASES_CMOT["Y_Bias"],
-            unit="A",
+            unit="mA",
+            step=CURRENT_LSB,
             min=0.0 * A,
             max=0.5 * A,
         )
@@ -278,7 +287,8 @@ class MOT(Fragment):
             FloatParam,
             "Bias current for the X coil during CMOT",
             default=BIASES_CMOT["X_Bias"],
-            unit="A",
+            unit="mA",
+            step=CURRENT_LSB,
             min=0.0 * A,
             max=0.5 * A,
         )
@@ -288,7 +298,8 @@ class MOT(Fragment):
             FloatParam,
             "Bias current for the Z coil during PGC",
             default=BIASES_PGC["Z_Bias"],
-            unit="A",
+            unit="mA",
+            step=CURRENT_LSB,
             min=0.0 * A,
             max=0.5 * A,
         )
@@ -297,7 +308,8 @@ class MOT(Fragment):
             FloatParam,
             "Bias current for the Y coil during PGC",
             default=BIASES_PGC["Y_Bias"],
-            unit="A",
+            unit="mA",
+            step=CURRENT_LSB,
             min=0.0 * A,
             max=0.5 * A,
         )
@@ -307,7 +319,8 @@ class MOT(Fragment):
             FloatParam,
             "Bias current for the X coil during PGC",
             default=BIASES_PGC["X_Bias"],
-            unit="A",
+            unit="mA",
+            step=CURRENT_LSB,
             min=0.0 * A,
             max=0.5 * A,
         )
