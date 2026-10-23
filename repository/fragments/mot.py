@@ -18,6 +18,7 @@ from repository.fragments.default_beam_setter import (
 )
 from repository.fragments.eom_setter import EomFrag
 from repository.fragments.ramp import LogRamp, Ramp
+from repository.fragments.ramp import default as ramp_default
 from repository.fragments.supply_setter import SetSupplies
 from repository.models.devices import (
     THORLABS_SHUTTER_DELAY,
@@ -99,6 +100,26 @@ class MOT(Fragment):
             default=DURATION["LOADING"],
             unit="s",
             min=0,
+        )
+        # Per-shot MOT controls. Neither modifies the device-level defaults;
+        # the CMOT ramp uses the same values as its physical starting state.
+        self.MOT_loading_gradient: FloatParamHandle = self.setattr_param(
+            "MOT_loading_gradient",
+            FloatParam,
+            "X-gradient current during MOT loading",
+            default=VDrivenSupply["X"].default_output,
+            unit="A",
+            min=0.6 * A,
+            max=1.0 * A,
+        )
+        self.MOT_loading_setpoint: FloatParamHandle = self.setattr_param(
+            "MOT_loading_setpoint",
+            FloatParam,
+            "MOT SUServo setpoint during MOT loading",
+            default=POWER_3D_MOT["MOT_loading"],
+            unit="V",
+            min=1.5 * V,
+            max=3.5 * V,
         )
 
         # Beam SHUTTERS
@@ -425,6 +446,8 @@ class MOT(Fragment):
 
             duration_default = DURATION["CMOT"]
             supplies = VDrivenSupply["X", "Detuning_780"]
+            # Start from the current actually applied during MOT loading.
+            supplies_start = [self.MOT_loading_gradient, ramp_default]
             supplies_end = [
                 COMPRESSED_GRADIENT["X"],
                 self.CMOT_detuning,
@@ -434,7 +457,7 @@ class MOT(Fragment):
                 SUServoedBeam["CDT2"],
                 SUServoedBeam["CDT1"],
             ]
-            suservo_setpoint_start = [POWER_3D_MOT["MOT_loading"], 0.0 * V, 0.0 * V]
+            suservo_setpoint_start = [self.MOT_loading_setpoint, 0.0 * V, 0.0 * V]
             suservo_setpoint_end = [POWER_3D_MOT["CMOT"], 0.0 * V, 0.0 * V]
 
         self.cmot_ramp: CMOT_Ramp = self.setattr_fragment(
@@ -734,6 +757,11 @@ class MOT(Fragment):
 
         if clearout:
             self.clear_atoms(clearout_time=clearout_time)
+
+        # Apply both loading parameters on every shot, including reloads.
+        # MOT.reset() restores the 1 A / 3.5 V device defaults beforehand.
+        self.x_gradient_coil.set_outputs([self.MOT_loading_gradient.get()])
+        self.mot_beam.set_setpoint_volts("MOT", self.MOT_loading_setpoint.get())
 
         # Mark optical loading, not the preceding EOM setup and atom clearout.
         # The load may continue in the caller when wait_for_load is False.
