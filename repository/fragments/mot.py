@@ -398,6 +398,15 @@ class MOT(Fragment):
             min=0.0 * ms,
             max=50.0 * ms,
         )
+        self.pre_cmot_cooling_setpoint: FloatParamHandle = self.setattr_param(
+            "pre_cmot_cooling_setpoint",
+            FloatParam,
+            "Optional MOT cooling SUServo setpoint during pre-CMOT relaxation",
+            default=POWER_3D_MOT["MOT_loading"],
+            unit="V",
+            min=1.5 * V,
+            max=3.5 * V,
+        )
 
         # Ramps
         self._build_cmot()
@@ -457,12 +466,20 @@ class MOT(Fragment):
         )
 
         class PreCMOTGradientRamp(Ramp):
-            """Change only the MOT gradient; keep MOT light, EOM and biases."""
+            """Ramp gradient and optional common MOT intensity without EOM changes.
+
+            Normal MOT illumination is retained by default; a nonzero hold
+            enables this ramp while the cooling laser stays locked at its
+            regular MOT frequency. A zero hold bypasses this ramp entirely.
+            """
 
             duration_default = 4.0 * ms
             supplies = [VDrivenSupply["X"]]
             supplies_start = [self.MOT_loading_gradient]
             supplies_end = [self.pre_cmot_gradient]
+            suservos = [SUServoedBeam["MOT"]]
+            suservo_setpoint_start = [self.MOT_loading_setpoint]
+            suservo_setpoint_end = [self.pre_cmot_cooling_setpoint]
 
         self.pre_cmot_gradient_ramp: PreCMOTGradientRamp = self.setattr_fragment(
             "pre_cmot_gradient_ramp", PreCMOTGradientRamp
@@ -514,6 +531,8 @@ class MOT(Fragment):
 
             supplies_start = [self.pre_cmot_gradient, ramp_default]
             supplies_end = [self.cmot_ramp.supplies_end_X, self.CMOT_detuning]
+            # Do not jump back to MOT loading power at the CMOT boundary.
+            suservo_setpoint_start = [self.pre_cmot_cooling_setpoint, 0.0 * V, 0.0 * V]
             suservo_setpoint_end = [
                 self.cmot_ramp.suservo_setpoint_end_MOT,
                 self.cmot_ramp.suservo_setpoint_end_CDT2,
