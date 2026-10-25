@@ -997,10 +997,29 @@ class MOT(Fragment):
         else:
             if self.PGC_duration.get() < 7.5 * ms or self.PGC_duration.get() > 8.5 * ms:
                 raise ValueError("Experimental repump timing requires 8 ms PGC")
-            with parallel:
-                self._pgc_repump_attenuation_timing()
-                self._pgc_repump_frequency_timing()
-                self.pgc_ramp.do()
+            # Schedule immediate SPI operations and the ramp DMA before
+            # backdated branches containing delayed EOM writes. This avoids
+            # unnecessarily scheduling earlier RTIO timestamps after longer
+            # on-core PLL operations.
+            mode = self.PGC_repump_timing_mode.get()
+            if mode < 2.5:
+                # Immediate attenuation; delayed frequency (modes 1/2).
+                with parallel:
+                    self._pgc_repump_attenuation_timing()
+                    self.pgc_ramp.do()
+                    self._pgc_repump_frequency_timing()
+            elif mode < 3.5:
+                # Immediate frequency; delayed attenuation (mode 3).
+                with parallel:
+                    self._pgc_repump_frequency_timing()
+                    self.pgc_ramp.do()
+                    self._pgc_repump_attenuation_timing()
+            else:
+                # Both EOM changes delayed (mode 4).
+                with parallel:
+                    self.pgc_ramp.do()
+                    self._pgc_repump_attenuation_timing()
+                    self._pgc_repump_frequency_timing()
         delay(self.PGC_settle_time.get())
         rtio_log("stage", "pgc:end")
 
