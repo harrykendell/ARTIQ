@@ -562,13 +562,15 @@ class Ramp(Fragment):
                         self.supplies_setters_params[i][0].set_outputs([
                             supply_values[i]
                         ])
-                        supply_values[i] = self._next_value(
+                        supply_values[i] = self._next_value_for_output(
                             supply_values[i],
                             supply_steps[i],
                             self.supplies_setters_params[i][1].get(),
                             self.supplies_setters_params[i][2].get(),
                             i_step,
                             num_points,
+                            0,  # Fastino supply
+                            i,
                         )
 
                 delay_mu(14 * 7 * 4)  # Frame time for the fastino
@@ -589,13 +591,15 @@ class Ramp(Fragment):
                             i_step,
                             num_points,
                         )
-                        suservo_setpoint_values[i] = self._next_value(
+                        suservo_setpoint_values[i] = self._next_value_for_output(
                             suservo_setpoint_values[i],
                             suservo_setpoint_steps[i],
                             self.suservo_setters_params[i][3].get(),
                             self.suservo_setters_params[i][4].get(),
                             i_step,
                             num_points,
+                            1,  # SUServo power setpoint
+                            i,
                         )
 
                         delay_mu(t_one_rtio_cycle_mu)
@@ -662,6 +666,25 @@ class Ramp(Fragment):
     ) -> TFloat:
         # Default behavior: linear ramp.
         return value + step
+
+    @portable
+    def _next_value_for_output(
+        self,
+        value: TFloat,
+        step: TFloat,
+        start: TFloat,
+        end: TFloat,
+        i_step: TInt32,
+        num_points: TInt32,
+        output_kind: TInt32,
+        output_index: TInt32,
+    ) -> TFloat:
+        """Optional output-specific shaping; other ramps remain unchanged.
+
+        Kind 0: supply (Fastino); kind 1: SUServo optical power setpoint.
+        Output identity is supplied explicitly to avoid guessing from units.
+        """
+        return self._next_value(value, step, start, end, i_step, num_points)
 
     @portable
     def _calc_step_size(self, start: TFloat, end: TFloat, num_points: TInt32) -> TFloat:  # noqa

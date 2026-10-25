@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING
 
 from artiq.coredevice.core import Core
 from artiq.coredevice.ttl import TTLOut
+from artiq.experiment import TFloat, TInt32, portable
 from artiq.language import delay, kernel, parallel
 from artiq.language.units import A, MHz, V, dB, mA, ms, s, us
 from ndscan.experiment import Fragment
@@ -567,13 +568,74 @@ class MOT(Fragment):
 
         class PGC_Ramp(Ramp):
             """
-            The transition from CMOT to PGC
-                - MOT beam further detuned
-                - Coils ramped back off
-                - Bias ramped on
+            The transition from CMOT to PGC.
+
+            Only the cooling detuning and cooling intensity can be shaped.
+            The magnetic X-gradient always follows the original linear 8 ms
+            trajectory; the EOM and bias steps are unchanged.
             """
 
             duration_default = DURATION["PGC"]
+
+            def build_fragment(self):
+                super().build_fragment()
+                self.optical_mode: FloatParamHandle = self.setattr_param(
+                    "optical_mode",
+                    FloatParam,
+                    "PGC cooling-light trajectory: 0=8ms linear, 1=6ms linear, "
+                    "2=8ms smoothstep, 3=6ms smoothstep (8ms PGC stage)",
+                    default=0.0,
+                    min=0.0,
+                    max=3.0,
+                )
+
+            @portable
+            def _next_value_for_output(
+                self,
+                value: TFloat,
+                step: TFloat,
+                start: TFloat,
+                end: TFloat,
+                i_step: TInt32,
+                num_points: TInt32,
+                output_kind: TInt32,
+                output_index: TInt32,
+            ) -> TFloat:
+                # 0: X gradient (linear); 1: detuning supply.
+                # SUServo power setpoint is output kind 1/index 0.
+                if output_kind == 0 and output_index != 1:
+                    return self._next_value(value, step, start, end, i_step, num_points)
+                if output_kind == 1 and output_index != 0:
+                    return self._next_value(value, step, start, end, i_step, num_points)
+
+                mode = self.optical_mode.get()
+                if mode < 0.5:
+                    # Preserve the exact original linear stepping arithmetic.
+                    return self._next_value(value, step, start, end, i_step, num_points)
+
+                if num_points <= 1:
+                    return end
+
+                # 6ms optical transition within an unchanged 8ms stage
+                # for modes 1 and 3; other modes have an 8ms transition.
+                finish = 1.0
+                if mode < 1.5 or mode > 2.5:
+                    finish = 0.75
+
+                current = float(i_step) / float(num_points - 1) / finish
+                following = float(i_step + 1) / float(num_points - 1) / finish
+                if current > 1.0:  # noqa: PLR1730 - keep ARTIQ kernel scalar logic
+                    current = 1.0
+                if following > 1.0:  # noqa: PLR1730 - keep ARTIQ kernel scalar logic
+                    following = 1.0
+
+                # Cubic smoothstep has zero optical slope at both endpoints.
+                if mode > 1.5:
+                    current = current * current * (3.0 - 2.0 * current)
+                    following = following * following * (3.0 - 2.0 * following)
+
+                # Preserve fixed carrier offsets: only add waveform increments.
+                return value + (end - start) * (following - current)
 
             supplies = VDrivenSupply["X", "Detuning_780"]
             supplies_start = [self.cmot_ramp, self.CMOT_detuning]
