@@ -570,10 +570,10 @@ class MOT(Fragment):
         self.PGC_repump_timing_mode: FloatParamHandle = self.setattr_param(
             "PGC_repump_timing_mode",
             FloatParam,
-            "PGC repump: 0 original; 1 freq 4ms; 2 freq 2-step; 3 att 4ms; 4 both 4ms",
+            "PGC repump: 0 original; 1 frequency after 4ms; 2 frequency and attenuation after 4ms",
             default=0.0,
             min=0.0,
-            max=4.0,
+            max=2.0,
         )
 
         class PGC_Ramp(Ramp):
@@ -930,41 +930,18 @@ class MOT(Fragment):
 
     @kernel
     def _pgc_repump_frequency_timing(self) -> None:
-        """Opt-in repump-frequency trajectory within the unchanged 8 ms PGC."""
-        mode = self.PGC_repump_timing_mode.get()
-        final_freq = (
+        """Set the final PGC repump frequency at 4 ms, not at the ramp start."""
+        delay(4 * ms)
+        self.eom.set_freq(
             self.eom.config.frequency
             + self.PGC_detuning.get()
             + self.PGC_repump_detuning.get()
         )
-        if mode < 1.5:
-            # Retain CMOT EOM frequency until 4 ms, then jump to final PGC.
-            delay(4 * ms)
-            self.eom.set_freq(final_freq)
-        elif mode < 2.5:
-            # Follow the optical ramp more closely with two PLL-safe updates.
-            # The PLL call advances the RTIO timeline by approximately 400 us;
-            # the final jump occurs at approximately 5.9 ms (< 8 ms).
-            delay(2 * ms)
-            self.eom.set_freq(
-                self.eom.config.frequency
-                + 0.5 * (self.CMOT_detuning.get() + self.PGC_detuning.get())
-                + 0.5
-                * (self.CMOT_repump_detuning.get() + self.PGC_repump_detuning.get())
-            )
-            delay(3.5 * ms)
-            self.eom.set_freq(final_freq)
-        elif mode < 3.5:
-            # Same frequency command time as historical PGC.
-            self.eom.set_freq(final_freq)
-        else:
-            delay(4 * ms)
-            self.eom.set_freq(final_freq)
 
     @kernel
     def _pgc_repump_attenuation_timing(self) -> None:
-        """Keep CMOT repump attenuation for 4 ms in modes 3 and 4."""
-        if self.PGC_repump_timing_mode.get() >= 2.5:
+        """In mode 2, retain CMOT attenuation for the first 4 ms."""
+        if self.PGC_repump_timing_mode.get() >= 1.5:
             delay(4 * ms)
         self.eom.set_att(
             self.eom.config.attenuation + self.PGC_repump_attenuation.get()
@@ -997,29 +974,13 @@ class MOT(Fragment):
         else:
             if self.PGC_duration.get() < 7.5 * ms or self.PGC_duration.get() > 8.5 * ms:
                 raise ValueError("Experimental repump timing requires 8 ms PGC")
-            # Schedule immediate SPI operations and the ramp DMA before
-            # backdated branches containing delayed EOM writes. This avoids
-            # unnecessarily scheduling earlier RTIO timestamps after longer
-            # on-core PLL operations.
-            mode = self.PGC_repump_timing_mode.get()
-            if mode < 2.5:
-                # Immediate attenuation; delayed frequency (modes 1/2).
-                with parallel:
-                    self._pgc_repump_attenuation_timing()
-                    self.pgc_ramp.do()
-                    self._pgc_repump_frequency_timing()
-            elif mode < 3.5:
-                # Immediate frequency; delayed attenuation (mode 3).
-                with parallel:
-                    self._pgc_repump_frequency_timing()
-                    self.pgc_ramp.do()
-                    self._pgc_repump_attenuation_timing()
-            else:
-                # Both EOM changes delayed (mode 4).
-                with parallel:
-                    self.pgc_ramp.do()
-                    self._pgc_repump_attenuation_timing()
-                    self._pgc_repump_frequency_timing()
+            # Opt-in conservative one-jump schedules: reproduce modes 1 and
+            # 4 from RID33952, excluding the multi-step and attenuation-only
+            # trajectories that suffered repeated SPI underflows.
+            with parallel:
+                self._pgc_repump_attenuation_timing()
+                self._pgc_repump_frequency_timing()
+                self.pgc_ramp.do()
         delay(self.PGC_settle_time.get())
         rtio_log("stage", "pgc:end")
 
