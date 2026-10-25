@@ -393,6 +393,8 @@ class AbsorptionImageExpFrag(ExpFragment):
         self.img_beam.on()
         delay(self.exposure_time.get())
         self.img_beam.off()
+        # Probe pulse finished: the atoms frame is distinct from clearout.
+        rtio_log("stage", "atoms:end")
 
         # wait for the img pulse to dissipate before flushing atoms beams
         with parallel:
@@ -400,7 +402,6 @@ class AbsorptionImageExpFrag(ExpFragment):
             with sequential:
                 delay(self.exposure_time.get())
                 self.mot.clear_atoms(50 * ms)
-        rtio_log("stage", "atoms:end")
 
         # REF IMAGE
         rtio_log("stage", "reference:start")
