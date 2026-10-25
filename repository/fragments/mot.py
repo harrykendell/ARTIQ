@@ -3,7 +3,8 @@ from typing import TYPE_CHECKING
 
 from artiq.coredevice.core import Core
 from artiq.coredevice.ttl import TTLOut
-from artiq.language import delay, kernel, parallel
+from artiq.language import delay, kernel, parallel, portable
+from artiq.language.types import TFloat, TInt32
 from artiq.language.units import A, MHz, V, dB, mA, ms, s, us
 from ndscan.experiment import Fragment
 from ndscan.experiment.parameters import (
@@ -525,10 +526,7 @@ class MOT(Fragment):
         )
 
     def _build_pgc(self):
-        """
-        This function generates the ramp from CMOT to PGC
-        It also creates parameters to expose to ndscan
-        """
+        """Build PGC controls and opt-in magnetic-transition trajectories."""
         self.PGC_settle_time: FloatParamHandle = self.setattr_param(
             "PGC_settle_time",
             FloatParam,
@@ -545,7 +543,6 @@ class MOT(Fragment):
             unit="Γ",
             scale=Γ_Rb,
         )
-
         self.PGC_repump_detuning: FloatParamHandle = self.setattr_param(
             "PGC_repump_detuning",
             FloatParam,
@@ -554,7 +551,6 @@ class MOT(Fragment):
             unit="Γ",
             scale=Γ_Rb,
         )
-
         self.PGC_repump_attenuation: FloatParamHandle = self.setattr_param(
             "PGC_repump_attenuation",
             FloatParam,
@@ -565,16 +561,33 @@ class MOT(Fragment):
             max=14.0 * dB,
         )
 
+        # Both experimental controls default to the original 8 ms PGC.
+        # The bias ramp is performed by one coordinated Fastino DMA trace,
+        # never by independent concurrent writes to the same device.
+        self.PGC_gradient_end_fraction: FloatParamHandle = self.setattr_param(
+            "PGC_gradient_end_fraction",
+            FloatParam,
+            "Fraction of PGC duration at which quadrupole gradient reaches zero",
+            default=1.0,
+            min=0.5,
+            max=1.0,
+            step=0.05,
+        )
+        self.PGC_bias_ramp_enabled: FloatParamHandle = self.setattr_param(
+            "PGC_bias_ramp_enabled",
+            FloatParam,
+            "PGC bias mode (0=early step, 1=linear ramp within PGC)",
+            default=0.0,
+            min=0.0,
+            max=1.0,
+            step=1.0,
+        )
+
         class PGC_Ramp(Ramp):
-            """
-            The transition from CMOT to PGC
-                - MOT beam further detuned
-                - Coils ramped back off
-                - Bias ramped on
-            """
+            """CMOT -> PGC optical ramp and independently shaped gradient."""
 
             duration_default = DURATION["PGC"]
-
+            gradient_end_fraction = self.PGC_gradient_end_fraction
             supplies = VDrivenSupply["X", "Detuning_780"]
             supplies_start = [self.cmot_ramp, self.CMOT_detuning]
             supplies_end = [0.0, self.PGC_detuning]
@@ -582,15 +595,63 @@ class MOT(Fragment):
             suservo_setpoint_start = [self.cmot_ramp]
             suservo_setpoint_end = [POWER_3D_MOT["PGC"]]
 
-        self.pgc_ramp: PGC_Ramp = self.setattr_fragment(
-            "pgc_ramp",
-            PGC_Ramp,
-        )
+            @portable
+            def _next_value(
+                self,
+                value: TFloat,
+                step: TFloat,
+                start: TFloat,
+                end: TFloat,
+                i_step: TInt32,
+                num_points: TInt32,
+            ) -> TFloat:
+                # All channels use the unchanged linear increment unless
+                # this is the first supply: the quadrupole-gradient current.
+                gradient_start = self.supplies_setters_params[0][1].get()
+                gradient_end = self.supplies_setters_params[0][2].get()
+                finish = self.gradient_end_fraction.get()
+                if finish < 1.0 and start == gradient_start and end == gradient_end:
+                    next_fraction = float(i_step + 1) / float(num_points - 1)
+                    if next_fraction >= finish:
+                        return end
+                    return start + (end - start) * next_fraction / finish
+                return value + step
+
+        self.pgc_ramp: PGC_Ramp = self.setattr_fragment("pgc_ramp", PGC_Ramp)
         self.PGC_duration: FloatParamHandle = self.setattr_param_rebind(
             "PGC_duration",
             self.pgc_ramp,
             "duration",
             description="Duration of the PGC ramp",
+        )
+
+        class PGC_RampWithBias(PGC_Ramp):
+            """Ramp all three bias currents in the same Fastino DMA trace."""
+
+            supplies = VDrivenSupply["X", "Detuning_780", "X_Bias", "Y_Bias", "Z_Bias"]
+            supplies_start = [
+                self.cmot_ramp,
+                self.CMOT_detuning,
+                self.CMOT_X_current,
+                self.CMOT_Y_current,
+                self.CMOT_Z_current,
+            ]
+            supplies_end = [
+                0.0,
+                self.PGC_detuning,
+                self.PGC_X_current,
+                self.PGC_Y_current,
+                self.PGC_Z_current,
+            ]
+
+        self.pgc_bias_ramp: PGC_RampWithBias = self.setattr_fragment(
+            "pgc_bias_ramp", PGC_RampWithBias
+        )
+        self.PGC_bias_ramp_duration: FloatParamHandle = self.setattr_param_rebind(
+            "PGC_bias_ramp_duration",
+            self.pgc_bias_ramp,
+            "duration",
+            description="Bias ramp duration; must match PGC_duration",
         )
 
     def build_evaporation1(self):
@@ -723,11 +784,7 @@ class MOT(Fragment):
 
     @kernel
     def calculate_dma_handles(self):
-        """
-        Precalculate the DMA handles for the ramps
-
-        No more DMA sequences may be recorded after this point
-        """
+        """Precalculate all ramp DMA handles; no later DMA recording."""
         if self.debug_mode:
             logger.warning(
                 "Calculating MOT ramp handles, "
@@ -738,10 +795,11 @@ class MOT(Fragment):
         self.pre_cmot_gradient_ramp.precalculate_dma_handle()
         self.relaxed_cmot_ramp.precalculate_dma_handle()
         self.pgc_ramp.precalculate_dma_handle()
+        self.pgc_bias_ramp.precalculate_dma_handle()
         self.evaporation_ramp1.precalculate_dma_handle()
         self.evaporation_ramp2.precalculate_dma_handle()
 
-        # safety check - EOMs take 400us to shift so we can't run faster than that
+        # Mirny EOM PLL relock takes approximately 400 us.
         if self.cmot_ramp.duration.get() < 400 * us:
             logger.warning(
                 "CMOT ramp is too fast, "
@@ -919,19 +977,24 @@ class MOT(Fragment):
 
     @kernel
     def pgc(self) -> None:
-        """
-        Cool further using Polarisation Gradient Cooling
+        """Run PGC with optionally coupled magnetic-bias and gradient ramps.
 
-        **Timeline:** advances by `self.PGC_duration` + `self.PGC_settle_time`
+        The original bias-step and linear-gradient path is the default.
+        Both variants keep the PGC optical ramp and total stage length fixed.
         """
         rtio_log("stage", "pgc:start")
-        # Do the ramp - MOT freq, coil to biases
-        # We must do these fastino writes in advance to avoid colliding with the ramp
-        self.x_coil.set_outputs([self.PGC_X_current.get()])
-        self.z_coil.set_outputs([self.PGC_Z_current.get()])
-        self.y_coil.set_outputs([self.PGC_Y_current.get()])
+        ramp_bias = self.PGC_bias_ramp_enabled.get() >= 0.5
+        if ramp_bias:
+            if self.pgc_bias_ramp.duration.get() != self.PGC_duration.get():
+                raise ValueError("PGC bias ramp and optical ramp durations differ")
+        else:
+            # Historical reference. Bias DACs step BEFORE the DMA ramp to
+            # avoid simultaneous writes to the shared Fastino.
+            self.x_coil.set_outputs([self.PGC_X_current.get()])
+            self.z_coil.set_outputs([self.PGC_Z_current.get()])
+            self.y_coil.set_outputs([self.PGC_Y_current.get()])
+
         with parallel:
-            # Fix EOM frequency
             self.eom.set_att(
                 self.eom.config.attenuation + self.PGC_repump_attenuation.get()
             )
@@ -940,7 +1003,10 @@ class MOT(Fragment):
                 + self.PGC_detuning.get()
                 + self.PGC_repump_detuning.get()
             )
-            self.pgc_ramp.do()
+            if ramp_bias:
+                self.pgc_bias_ramp.do()
+            else:
+                self.pgc_ramp.do()
         delay(self.PGC_settle_time.get())
         rtio_log("stage", "pgc:end")
 
