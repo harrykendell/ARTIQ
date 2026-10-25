@@ -378,6 +378,27 @@ class MOT(Fragment):
 
         self.unlock_ttl: TTLOut = self.get_device("780_unlock")
 
+        # Opt-in low-gradient MOT settling before the CMOT light changes.
+        # A zero hold bypasses this phase and retains the original CMOT ramp.
+        self.pre_cmot_gradient: FloatParamHandle = self.setattr_param(
+            "pre_cmot_gradient",
+            FloatParam,
+            "MOT field gradient during optional pre-CMOT settling",
+            default=1.0 * A,
+            unit="A",
+            min=0.6 * A,
+            max=1.0 * A,
+        )
+        self.pre_cmot_hold_time: FloatParamHandle = self.setattr_param(
+            "pre_cmot_hold_time",
+            FloatParam,
+            "Hold at reduced MOT gradient before changing CMOT light; zero disables",
+            default=0.0 * ms,
+            unit="ms",
+            min=0.0 * ms,
+            max=50.0 * ms,
+        )
+
         # Ramps
         self._build_cmot()
         self._build_pgc()
@@ -435,6 +456,18 @@ class MOT(Fragment):
             max=14.0 * dB,
         )
 
+        class PreCMOTGradientRamp(Ramp):
+            """Change only the MOT gradient; keep MOT light, EOM and biases."""
+
+            duration_default = 4.0 * ms
+            supplies = [VDrivenSupply["X"]]
+            supplies_start = [self.MOT_loading_gradient]
+            supplies_end = [self.pre_cmot_gradient]
+
+        self.pre_cmot_gradient_ramp: PreCMOTGradientRamp = self.setattr_fragment(
+            "pre_cmot_gradient_ramp", PreCMOTGradientRamp
+        )
+
         class CMOT_Ramp(Ramp):
             """
             The transition from normal MOT to CMOT
@@ -469,6 +502,26 @@ class MOT(Fragment):
             self.cmot_ramp,
             "duration",
             description="Duration of the CMOT ramp",
+        )
+
+        class RelaxedCMOTRamp(CMOT_Ramp):
+            """Normal CMOT endpoints, but begin from pre-CMOT gradient.
+
+            The original CMOT ramp is retained for zero-hold experiments.
+            Both CMOT ramps share endpoint handles (including ndscan scans).
+            If scanning CMOT duration, set the relaxed-ramp duration as well.
+            """
+
+            supplies_start = [self.pre_cmot_gradient, ramp_default]
+            supplies_end = [self.cmot_ramp.supplies_end_X, self.CMOT_detuning]
+            suservo_setpoint_end = [
+                self.cmot_ramp.suservo_setpoint_end_MOT,
+                self.cmot_ramp.suservo_setpoint_end_CDT2,
+                self.cmot_ramp.suservo_setpoint_end_CDT1,
+            ]
+
+        self.relaxed_cmot_ramp: RelaxedCMOTRamp = self.setattr_fragment(
+            "relaxed_cmot_ramp", RelaxedCMOTRamp
         )
 
     def _build_pgc(self):
@@ -682,6 +735,8 @@ class MOT(Fragment):
             )
         self.core.break_realtime()
         self.cmot_ramp.precalculate_dma_handle()
+        self.pre_cmot_gradient_ramp.precalculate_dma_handle()
+        self.relaxed_cmot_ramp.precalculate_dma_handle()
         self.pgc_ramp.precalculate_dma_handle()
         self.evaporation_ramp1.precalculate_dma_handle()
         self.evaporation_ramp2.precalculate_dma_handle()
@@ -801,6 +856,14 @@ class MOT(Fragment):
         **Timeline:** advances by `self.CMOT_duration` + `self.CMOT_settle_time`
         """
         rtio_log("stage", "load:end")
+        # Laser-cool at the lower gradient with unchanged MOT light and shims.
+        # This ends before the CMOT optical settings, push-beam shutter
+        # or cooling-laser hold/unlock are changed.
+        if self.pre_cmot_hold_time.get() > 0.0:
+            rtio_log("stage", "pre_cmot:start")
+            self.pre_cmot_gradient_ramp.do()
+            delay(self.pre_cmot_hold_time.get())
+            rtio_log("stage", "pre_cmot:end")
         rtio_log("stage", "compress:start")
         # Unlock the MOT
         TOPTICA_HOLD_JITTER = (
@@ -836,8 +899,12 @@ class MOT(Fragment):
             self.eom.set_att(
                 self.eom.config.attenuation + self.CMOT_repump_attenuation.get()
             )
-            self.cmot_ramp.do()
-            delay(self.cmot_ramp.duration.get())
+            if self.pre_cmot_hold_time.get() > 0.0:
+                self.relaxed_cmot_ramp.do()
+                delay(self.relaxed_cmot_ramp.duration.get())
+            else:
+                self.cmot_ramp.do()
+                delay(self.cmot_ramp.duration.get())
 
         delay(self.CMOT_settle_time.get())
         rtio_log("stage", "compress:end")
