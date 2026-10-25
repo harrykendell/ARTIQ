@@ -800,13 +800,14 @@ class MOT(Fragment):
 
         **Timeline:** advances by `self.CMOT_duration` + `self.CMOT_settle_time`
         """
-        rtio_log("stage", "load:end")
-        rtio_log("stage", "compress:start")
-        # Unlock the MOT
+        # The Toptica hold command is scheduled 150 us before the nominal
+        # CMOT boundary. Mark the actual start at that earlier RTIO time.
         TOPTICA_HOLD_JITTER = (
             150 * us
         )  # The Toptica PID only runs at 30kHz so give it time to hold
         delay(-TOPTICA_HOLD_JITTER)
+        rtio_log("stage", "load:end")
+        rtio_log("stage", "compress:start")
         self.unlock_mot()
 
         # 2d shutter off to prevent push beam inteference
@@ -893,7 +894,7 @@ class MOT(Fragment):
         if single_step_evaporation:
             # The atoms are released at trap extinction, before the settle delay.
             rtio_log("stage", "evaporation:end")
-            self.release_cdt()
+            self.release_cdt(mark_hold_end=False)
 
         delay(self.evaporation_settle_time1.get())
 
@@ -906,7 +907,7 @@ class MOT(Fragment):
         """
         self.evaporation_ramp2.do()
         rtio_log("stage", "evaporation:end")
-        self.release_cdt()
+        self.release_cdt(mark_hold_end=False)
 
     @kernel
     def switch_off_cdt(self) -> None:
@@ -916,14 +917,15 @@ class MOT(Fragment):
         rtio_log("stage", "cdt:end")
 
     @kernel
-    def release_cdt(self) -> None:
+    def release_cdt(self, mark_hold_end=True) -> None:
         """Release trapped atoms and mark the start of time of flight.
 
-        Keep this separate from switch_off_cdt(): switching off a beam does
-        not always imply that an absorption-imaging expansion is beginning.
+        CDT-only release ends the hold here; evaporation ended the hold at
+        the start of evaporation, so do not log an unmatched second end.
         """
         self.switch_off_cdt()
-        rtio_log("stage", "hold:end")
+        if mark_hold_end:
+            rtio_log("stage", "hold:end")
         rtio_log("stage", "expansion:start")
 
     @kernel
@@ -978,9 +980,8 @@ class MOT(Fragment):
         Here we can trun on and off sideband by turing on and off sideband, if we want sideband in imaging or not
         """
 
-        # Close loading even if CMOT/PGC was skipped. An unmatched end marker
-        # is intentionally harmless when compression already closed loading.
-        rtio_log("stage", "load:end")
+        # Loading ends at MOT light extinction in MOT-only acquisitions.
+        # The unmatched end after CMOT/PGC is ignored by the timeline.
         # Turn off the coils
 
         self.coils.turn_off()
@@ -988,10 +989,12 @@ class MOT(Fragment):
 
         if evaporation_active or odt_active:
             self.mot_beam.off()
+            rtio_log("stage", "load:end")
             # The MOT is off but the CDT continues to hold the atoms.
             rtio_log("stage", "hold:start")
         else:
             self.all_beams.off()
+            rtio_log("stage", "load:end")
             # In the absence of a trap, MOT extinction releases the atoms.
             rtio_log("stage", "expansion:start")
 
