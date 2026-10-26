@@ -215,7 +215,7 @@ class AbsorptionImageExpFrag(ExpFragment):
             "Repump_enable_duration_before_imaging",
             FloatParam,
             "repump switch on duration after pumping to F=1",
-            default=300 * us,
+            default=600 * us,
             min=0.0 * us,
             max=2000 * us,
             unit="us",
