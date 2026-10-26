@@ -46,6 +46,11 @@ def ravel(func):
     return wrapper
 
 
+# Squared elliptical radius used to integrate the fitted 2D Gaussian cloud.
+# A full 2D Gaussian contains 1 - exp(-r^2 / 2) of its area within this ellipse.
+GAUSSIAN_INTEGRATION_RADIUS_SQUARED = 4.343
+
+
 @dataclass(frozen=True)
 class AbsImageSettings:
     wavelength: float = 780.24602089 * 1e-9  # m
@@ -346,9 +351,8 @@ class AbsImage:
     def atom_number(self):
         """Calculate atom number from background-corrected cloud OD."""
         sigma_0 = (3 / (2 * np.pi)) * np.square(self.settings.wavelength)
-        sigma = sigma_0 * np.reciprocal(
-            1
-            + np.square(4 * np.square(self.settings.detuning / self.settings.linewidth))
+        sigma = sigma_0 / (
+            1 + 4 * np.square(self.settings.detuning / self.settings.linewidth)
         )
         area = np.square(self.physical_scale)  # pixel area in SI units
 
@@ -360,8 +364,10 @@ class AbsImage:
         if np.max(optical_density) < self.settings.weak_cloud_peak_od_threshold:
             return -np.inf
 
-        # Divided by 1.5-sigma area for a 2D Gaussian to get the total number of atoms
-        return (area / sigma) * np.sum(optical_density) / 0.866
+        # Recover the total Gaussian population from the integrated ellipse.
+        # This assumes the illuminated beam covers the fitted ellipse.
+        gaussian_fraction = 1 - math.exp(-GAUSSIAN_INTEGRATION_RADIUS_SQUARED / 2)
+        return (area / sigma) * np.sum(optical_density) / gaussian_fraction
 
     @functools.cached_property
     def peak(self):
@@ -388,8 +394,7 @@ class AbsImage:
 
     @functools.cached_property
     def sigma_mask(self):
-        """Returns a numpy mask of pixels within the
-        2-sigma limit of the model (no ROI)"""
+        """Return the fitted elliptical Gaussian integration mask (within the beam)."""
         bp_2D = self.best_values
         y0, x0, a, b, theta = (bp_2D[k] for k in ("y0", "x0", "sy", "sx", "theta"))
         y, x = np.ogrid[0 : self.height, 0 : self.width]
@@ -397,7 +402,7 @@ class AbsImage:
         # https://math.stackexchange.com/a/434482
         maj_axis = np.square((x - x0) * np.cos(theta) - (y - y0) * np.sin(theta))
         min_axis = np.square((x - x0) * np.sin(theta) + (y - y0) * np.cos(theta))
-        bound = 4.343  # chi2.ppf(0.886, df=2)
+        bound = GAUSSIAN_INTEGRATION_RADIUS_SQUARED
 
         array = np.zeros(self.data_image.shape, dtype="bool")
         array[maj_axis / np.square(b) + min_axis / np.square(a) <= bound] = True
