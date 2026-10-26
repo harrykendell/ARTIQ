@@ -57,9 +57,16 @@ SETTLE_TIME = {
 }
 DETUNING = {"CMOT": 9.65 * Γ_Rb, "PGC": 19 * Γ_Rb}  # Red detuning in units of Γ_Rb
 
-# NB the LSB for the fastino is 0.305mA
-# The ES030-10 LSB for programming is 0.61mA
-CURRENT_LSB = 10 / 2**16 * A  # Quantisation limit for bias scan parameters
+# Fastino.voltage_to_mu() uses 0x8000 DAC codes per 10 V. A current
+# driver's resolution is therefore the DAC voltage step *that driver's
+# configured A/V gain*, rather than a single current step for all axes.
+FASTINO_VOLTAGE_LSB = (10.0 / 0x8000) * V
+BIAS_CURRENT_STEP = {
+    name: FASTINO_VOLTAGE_LSB * VDrivenSupply[name].gain
+    for name in ("X_Bias", "Y_Bias", "Z_Bias")
+}
+# Historical common step, only appropriate to the Y_Bias gain:
+# CURRENT_LSB = 10 / 2**16 * A
 BIASES_MOT = {
     "X_Bias": 0.45 * mA,
     "Y_Bias": 0.32 * mA,
@@ -264,7 +271,7 @@ class MOT(Fragment):
             "Bias current for the Z coil during MOT",
             default=BIASES_MOT["Z_Bias"],
             unit="mA",
-            step=CURRENT_LSB,
+            step=BIAS_CURRENT_STEP["Z_Bias"],
             min=0.0 * A,
             max=0.5 * A,
         )
@@ -274,7 +281,7 @@ class MOT(Fragment):
             "Bias current for the Y coil during MOT",
             default=BIASES_MOT["Y_Bias"],
             unit="mA",
-            step=CURRENT_LSB,
+            step=BIAS_CURRENT_STEP["Y_Bias"],
             min=0.0 * A,
             max=0.5 * A,
         )
@@ -285,7 +292,7 @@ class MOT(Fragment):
             "Bias current for the X coil during MOT",
             default=BIASES_MOT["X_Bias"],
             unit="mA",
-            step=CURRENT_LSB,
+            step=BIAS_CURRENT_STEP["X_Bias"],
             min=0.0 * A,
             max=0.5 * A,
         )
@@ -296,7 +303,7 @@ class MOT(Fragment):
             "Bias current for the Z coil during CMOT",
             default=BIASES_CMOT["Z_Bias"],
             unit="mA",
-            step=CURRENT_LSB,
+            step=BIAS_CURRENT_STEP["Z_Bias"],
             min=0.0 * A,
             max=0.5 * A,
         )
@@ -306,7 +313,7 @@ class MOT(Fragment):
             "Bias current for the Y coil during CMOT",
             default=BIASES_CMOT["Y_Bias"],
             unit="mA",
-            step=CURRENT_LSB,
+            step=BIAS_CURRENT_STEP["Y_Bias"],
             min=0.0 * A,
             max=0.5 * A,
         )
@@ -317,7 +324,7 @@ class MOT(Fragment):
             "Bias current for the X coil during CMOT",
             default=BIASES_CMOT["X_Bias"],
             unit="mA",
-            step=CURRENT_LSB,
+            step=BIAS_CURRENT_STEP["X_Bias"],
             min=0.0 * A,
             max=0.5 * A,
         )
@@ -328,7 +335,7 @@ class MOT(Fragment):
             "Bias current for the Z coil during PGC",
             default=BIASES_PGC["Z_Bias"],
             unit="mA",
-            step=CURRENT_LSB,
+            step=BIAS_CURRENT_STEP["Z_Bias"],
             min=0.0 * A,
             max=0.5 * A,
         )
@@ -338,7 +345,7 @@ class MOT(Fragment):
             "Bias current for the Y coil during PGC",
             default=BIASES_PGC["Y_Bias"],
             unit="mA",
-            step=CURRENT_LSB,
+            step=BIAS_CURRENT_STEP["Y_Bias"],
             min=0.0 * A,
             max=0.5 * A,
         )
@@ -349,7 +356,7 @@ class MOT(Fragment):
             "Bias current for the X coil during PGC",
             default=BIASES_PGC["X_Bias"],
             unit="mA",
-            step=CURRENT_LSB,
+            step=BIAS_CURRENT_STEP["X_Bias"],
             min=0.0 * A,
             max=0.5 * A,
         )

@@ -5,9 +5,13 @@ import inspect
 import numpy as np
 import pytest
 
+from artiq.coredevice.fastino import Fastino
 from artiq.language.units import A, V, ms, s
 from repository.fragments.mot import (
     BIASES_PGC,
+    BIASES_CMOT,
+    BIAS_CURRENT_STEP,
+    FASTINO_VOLTAGE_LSB,
     CMOT_GRADIENT,
     DETUNING,
     DURATION,
@@ -16,6 +20,7 @@ from repository.fragments.mot import (
     MOT,
     Γ_Rb,
 )
+from repository.models.devices import VDrivenSupply
 from repository.imaging.absorption_image import (
     pseudo_psd_objective,
     weak_cloud_od_threshold,
@@ -81,6 +86,30 @@ def test_c1_cooling_defaults():
     assert DETUNING["PGC"] == 19 * Γ_Rb
     assert POWER_3D_MOT["PGC"] == 1.2 * V
     assert BIASES_PGC["X_Bias"] == 0.30e-3 * A
+
+
+@pytest.mark.parametrize(
+    ("axis", "amperes_per_volt"),
+    [("X_Bias", 2.0), ("Y_Bias", 0.5), ("Z_Bias", 2.0)],
+)
+def test_bias_steps_match_fastino_dac_and_driver_gain(axis, amperes_per_volt):
+    # ARTiq Fastino.voltage_to_mu() encodes 10 V as 0x8000 codes.
+    assert FASTINO_VOLTAGE_LSB == pytest.approx(10.0 / 0x8000)
+    assert BIAS_CURRENT_STEP[axis] == pytest.approx((10.0 / 0x8000) * amperes_per_volt)
+
+
+def test_nominal_pgc_shims_are_quantised_by_fastino():
+    def fastino_code(current, axis):
+        return (
+            int(Fastino.voltage_to_mu(None, current / VDrivenSupply[axis].gain))
+            - 0x8000
+        )
+
+    # Nominal 0.30 mA in X is less than half of one 0.610 mA DAC step.
+    assert fastino_code(BIASES_PGC["X_Bias"], "X_Bias") == 0
+    assert fastino_code(BIASES_CMOT["X_Bias"], "X_Bias") == 1
+    assert fastino_code(BIASES_PGC["Y_Bias"], "Y_Bias") == 2
+    assert fastino_code(BIASES_PGC["Z_Bias"], "Z_Bias") == 98
 
 
 def test_compress_contract_matches_all_callers():
