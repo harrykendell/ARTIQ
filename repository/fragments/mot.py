@@ -116,7 +116,7 @@ class MOT(Fragment):
             "MOT_loading_gradient",
             FloatParam,
             "X-gradient current during MOT loading",
-            default=1.0 * A,
+            default=1.0 * A,  # Low T default; High N: 0.8 * A
             unit="A",
             min=0.6 * A,
             max=1.0 * A,
@@ -524,7 +524,7 @@ class MOT(Fragment):
             "PGC_detuning",
             FloatParam,
             "Detuning of the PGC ramp",
-            default=DETUNING["PGC"],
+            default=DETUNING["PGC"],  # Low T: 19 * Γ_Rb; High N: 16 * Γ_Rb
             unit="Γ",
             scale=Γ_Rb,
         )

@@ -10,8 +10,10 @@ from repository.imaging.absorption_image import AbsorptionImageExpFrag
 logger = logging.getLogger(__name__)
 
 MOT_TOF_TIMES = tuple(value * ms for value in range(1, 7))
-CMOT_TOF_TIMES = tuple(value * ms for value in range(2, 23, 2))
-PGC_TOF_TIMES = tuple(value * ms for value in range(5, 33, 3))
+# Dense CMOT/PGC clouds give unreliable atom numbers and widths at short TOF.
+# In the 26 October benchmarks, CMOT at 2/4 ms and PGC at 5 ms were problematic.
+CMOT_TOF_TIMES = tuple(value * ms for value in range(6, 23, 2))
+PGC_TOF_TIMES = tuple(value * ms for value in range(8, 33, 3))
 ODT_TOF_TIMES = tuple(value * ms for value in range(1, 31, 3))
 
 TOF_LOADING_TIME = 10 * s
