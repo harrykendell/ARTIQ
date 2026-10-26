@@ -393,8 +393,8 @@ class AbsorptionImageExpFrag(ExpFragment):
         self.img_beam.on()
         delay(self.exposure_time.get())
         self.img_beam.off()
-        # The atoms frame ends with probe illumination, before the separate
-        # clearout operation and camera-readout wait.
+        # The atoms frame ends with probe illumination, not after the
+        # independent clearout stage and camera-readout wait.
         rtio_log("stage", "atoms:end")
 
         # wait for the img pulse to dissipate before flushing atoms beams

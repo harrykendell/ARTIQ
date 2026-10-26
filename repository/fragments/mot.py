@@ -378,6 +378,27 @@ class MOT(Fragment):
 
         self.unlock_ttl: TTLOut = self.get_device("780_unlock")
 
+        # Opt-in low-gradient MOT settling before the CMOT light changes.
+        # A zero hold bypasses this phase and retains the original CMOT ramp.
+        self.pre_cmot_gradient: FloatParamHandle = self.setattr_param(
+            "pre_cmot_gradient",
+            FloatParam,
+            "MOT field gradient during optional pre-CMOT settling",
+            default=1.0 * A,
+            unit="A",
+            min=0.6 * A,
+            max=1.0 * A,
+        )
+        self.pre_cmot_hold_time: FloatParamHandle = self.setattr_param(
+            "pre_cmot_hold_time",
+            FloatParam,
+            "Hold at reduced MOT gradient before changing CMOT light; zero disables",
+            default=0.0 * ms,
+            unit="ms",
+            min=0.0 * ms,
+            max=50.0 * ms,
+        )
+
         # Ramps
         self._build_cmot()
         self._build_pgc()
@@ -435,6 +456,18 @@ class MOT(Fragment):
             max=14.0 * dB,
         )
 
+        class PreCMOTGradientRamp(Ramp):
+            """Change only the MOT gradient; keep MOT light, EOM and biases."""
+
+            duration_default = 4.0 * ms
+            supplies = [VDrivenSupply["X"]]
+            supplies_start = [self.MOT_loading_gradient]
+            supplies_end = [self.pre_cmot_gradient]
+
+        self.pre_cmot_gradient_ramp: PreCMOTGradientRamp = self.setattr_fragment(
+            "pre_cmot_gradient_ramp", PreCMOTGradientRamp
+        )
+
         class CMOT_Ramp(Ramp):
             """
             The transition from normal MOT to CMOT
@@ -469,6 +502,26 @@ class MOT(Fragment):
             self.cmot_ramp,
             "duration",
             description="Duration of the CMOT ramp",
+        )
+
+        class RelaxedCMOTRamp(CMOT_Ramp):
+            """Normal CMOT endpoints, but begin from pre-CMOT gradient.
+
+            The original CMOT ramp is retained for zero-hold experiments.
+            Both CMOT ramps share endpoint handles (including ndscan scans).
+            If scanning CMOT duration, set the relaxed-ramp duration as well.
+            """
+
+            supplies_start = [self.pre_cmot_gradient, ramp_default]
+            supplies_end = [self.cmot_ramp.supplies_end_X, self.CMOT_detuning]
+            suservo_setpoint_end = [
+                self.cmot_ramp.suservo_setpoint_end_MOT,
+                self.cmot_ramp.suservo_setpoint_end_CDT2,
+                self.cmot_ramp.suservo_setpoint_end_CDT1,
+            ]
+
+        self.relaxed_cmot_ramp: RelaxedCMOTRamp = self.setattr_fragment(
+            "relaxed_cmot_ramp", RelaxedCMOTRamp
         )
 
     def _build_pgc(self):
@@ -682,6 +735,8 @@ class MOT(Fragment):
             )
         self.core.break_realtime()
         self.cmot_ramp.precalculate_dma_handle()
+        self.pre_cmot_gradient_ramp.precalculate_dma_handle()
+        self.relaxed_cmot_ramp.precalculate_dma_handle()
         self.pgc_ramp.precalculate_dma_handle()
         self.evaporation_ramp1.precalculate_dma_handle()
         self.evaporation_ramp2.precalculate_dma_handle()
@@ -800,13 +855,28 @@ class MOT(Fragment):
 
         **Timeline:** advances by `self.CMOT_duration` + `self.CMOT_settle_time`
         """
-        # The Toptica hold command is scheduled 150 us before the nominal
-        # CMOT boundary. Mark the actual start at that earlier RTIO time.
+        # MOT loading ends when the gradient transition begins. Keep ramp
+        # and settled-field MOT illumination distinct in RTIO analysis.
+        pre_cmot_active = self.pre_cmot_hold_time.get() > 0.0
+        if pre_cmot_active:
+            rtio_log("stage", "load:end")
+            rtio_log("stage", "pre_cmot_ramp:start")
+            self.pre_cmot_gradient_ramp.do()
+            rtio_log("stage", "pre_cmot_ramp:end")
+            rtio_log("stage", "pre_cmot_hold:start")
+            delay(self.pre_cmot_hold_time.get())
+
+        # The original Toptica hold command precedes the nominal CMOT
+        # boundary by 150 us. Place the boundary logs at the actual command
+        # time (after the rewind) rather than 150 us in its future.
         TOPTICA_HOLD_JITTER = (
             150 * us
         )  # The Toptica PID only runs at 30kHz so give it time to hold
         delay(-TOPTICA_HOLD_JITTER)
-        rtio_log("stage", "load:end")
+        if pre_cmot_active:
+            rtio_log("stage", "pre_cmot_hold:end")
+        else:
+            rtio_log("stage", "load:end")
         rtio_log("stage", "compress:start")
         self.unlock_mot()
 
@@ -837,8 +907,12 @@ class MOT(Fragment):
             self.eom.set_att(
                 self.eom.config.attenuation + self.CMOT_repump_attenuation.get()
             )
-            self.cmot_ramp.do()
-            delay(self.cmot_ramp.duration.get())
+            if self.pre_cmot_hold_time.get() > 0.0:
+                self.relaxed_cmot_ramp.do()
+                delay(self.relaxed_cmot_ramp.duration.get())
+            else:
+                self.cmot_ramp.do()
+                delay(self.cmot_ramp.duration.get())
 
         delay(self.CMOT_settle_time.get())
         rtio_log("stage", "compress:end")
@@ -980,8 +1054,8 @@ class MOT(Fragment):
         Here we can trun on and off sideband by turing on and off sideband, if we want sideband in imaging or not
         """
 
-        # Loading ends at MOT light extinction in MOT-only acquisitions.
-        # The unmatched end after CMOT/PGC is ignored by the timeline.
+        # Loading is closed at MOT light extinction in MOT-only acquisitions.
+        # When CMOT ran already, this end marker is harmlessly unmatched.
         # Turn off the coils
 
         self.coils.turn_off()
