@@ -36,23 +36,25 @@ if TYPE_CHECKING:
     def rtio_log(channel: str, *values: object) -> None: ...
 
 
-# Default constants - these can be overridden in the experiment
+# Default preparation is C1 (RID33929); ndscan overrides recover H1 with
+# MOT_loading_gradient=0.8 A and PGC_detuning=16 Γ. Hardware safe states
+# in devices.py are not changed by these per-shot defaults.
 Γ_Rb = 6.065 * MHz  # Natural linewidth of Rb-87
 DURATION = {
-    "LOADING": 30 * s,
-    "CMOT": 0.85 * ms,
-    "PGC": 10.0 * ms,
+    "LOADING": 5.0 * s,
+    "CMOT": 4.0 * ms,
+    "PGC": 8.0 * ms,
     "EVAPORATION1": 50 * ms,
     "EVAPORATION2": 100 * ms,
 }
 SETTLE_TIME = {
-    "CMOT": 6.94 * ms,
-    "PGC": 1.0 * ms,
+    "CMOT": 3.79 * ms,
+    "PGC": 0.5 * ms,
     "ODT": 0 * ms,
     "EVAPORATION1": 0 * ms,
     "EVAPORATION2": 0 * ms,
 }
-DETUNING = {"CMOT": 9.65 * Γ_Rb, "PGC": 16 * Γ_Rb}  # Red detuning in units of Γ_Rb
+DETUNING = {"CMOT": 9.65 * Γ_Rb, "PGC": 19 * Γ_Rb}  # Red detuning in units of Γ_Rb
 
 # NB the LSB for the fastino is 0.305mA
 # The ES030-10 LSB for programming is 0.61mA
@@ -72,12 +74,11 @@ BIASES_PGC = {
     "Y_Bias": 0.32 * mA,
     "Z_Bias": 60 * mA,
 }
-# Working retained-atom/PGC baseline, RID33778. Higher 1.98 A CMOT lost atoms.
-# The 1.0 A endpoint intentionally does not compress relative to MOT loading;
-# a separate 0.6 -> 1.0 A loading-gradient test remains to be validated.
-COMPRESSED_GRADIENT = {"X": 1.0 * A}
+# C1 reference (RID33929): after 0.6 A pre-CMOT relaxation, keep 0.6 A
+# through CMOT before ramping the gradient to zero during PGC.
+CMOT_GRADIENT = {"X": 0.6 * A}
 REPUMP_ATTENUATION = {"CMOT": 3.09 * dB, "PGC": 0.05 * dB}
-POWER_3D_MOT = {"MOT_loading": 3.5 * V, "CMOT": 3.5 * V, "PGC": 2.0 * V}
+POWER_3D_MOT = {"MOT_loading": 3.5 * V, "CMOT": 3.5 * V, "PGC": 1.2 * V}
 
 
 class MOT(Fragment):
@@ -101,13 +102,13 @@ class MOT(Fragment):
             unit="s",
             min=0,
         )
-        # Per-shot MOT controls. Neither modifies the device-level defaults;
-        # the CMOT ramp uses the same values as its physical starting state.
+        # Per-shot loading controls leave the device-level safe defaults untouched.
+        # The pre-CMOT gradient ramp starts from the measured loading gradient.
         self.MOT_loading_gradient: FloatParamHandle = self.setattr_param(
             "MOT_loading_gradient",
             FloatParam,
             "X-gradient current during MOT loading",
-            default=VDrivenSupply["X"].default_output,
+            default=1.0 * A,
             unit="A",
             min=0.6 * A,
             max=1.0 * A,
@@ -371,20 +372,20 @@ class MOT(Fragment):
             "relock_duration",
             FloatParam,
             "Duration of the relock ramp",
-            default=1.0 * ms,
+            default=4.0 * ms,
             unit="ms",
             min=0.0 * ms,
         )
 
         self.unlock_ttl: TTLOut = self.get_device("780_unlock")
 
-        # Opt-in low-gradient MOT settling before the CMOT light changes.
-        # A zero hold bypasses this phase and retains the original CMOT ramp.
+        # Always lower the MOT gradient before CMOT light changes.
+        # The pre-CMOT ramp and illuminated hold are separate scan parameters.
         self.pre_cmot_gradient: FloatParamHandle = self.setattr_param(
             "pre_cmot_gradient",
             FloatParam,
-            "MOT field gradient during optional pre-CMOT settling",
-            default=1.0 * A,
+            "MOT field gradient during pre-CMOT settling",
+            default=0.6 * A,
             unit="A",
             min=0.6 * A,
             max=1.0 * A,
@@ -392,10 +393,10 @@ class MOT(Fragment):
         self.pre_cmot_hold_time: FloatParamHandle = self.setattr_param(
             "pre_cmot_hold_time",
             FloatParam,
-            "Hold at reduced MOT gradient before changing CMOT light; zero disables",
-            default=0.0 * ms,
+            "Illuminated hold after pre-CMOT gradient ramp and before CMOT light changes",
+            default=15.0 * ms,
             unit="ms",
-            min=0.0 * ms,
+            min=0.2 * ms,
             max=50.0 * ms,
         )
 
@@ -416,10 +417,7 @@ class MOT(Fragment):
         }
 
     def _build_cmot(self):
-        """
-        This function generates the ramp from MOT to CMOT
-        It also creates parameters to expose to ndscan
-        """
+        """Build the gradient-only pre-CMOT stage followed by a single CMOT ramp."""
         self.CMOT_settle_time: FloatParamHandle = self.setattr_param(
             "CMOT_settle_time",
             FloatParam,
@@ -469,22 +467,16 @@ class MOT(Fragment):
         )
 
         class CMOT_Ramp(Ramp):
-            """
-            The transition from normal MOT to CMOT
-                - MOT beam detuned red by unlock+push
-                - Coils ramped up
-                - Repump power ramped down - but this must be done manually due to EOM issues
-                - MOT power reduced
+            """Change the optical settings after pre-CMOT magnetic settling.
+
+            The gradient starts from the pre-CMOT endpoint, not the MOT load
+            gradient. This is the only CMOT ramp and has one duration handle.
             """
 
             duration_default = DURATION["CMOT"]
             supplies = VDrivenSupply["X", "Detuning_780"]
-            # Start from the current actually applied during MOT loading.
-            supplies_start = [self.MOT_loading_gradient, ramp_default]
-            supplies_end = [
-                COMPRESSED_GRADIENT["X"],
-                self.CMOT_detuning,
-            ]
+            supplies_start = [self.pre_cmot_gradient, ramp_default]
+            supplies_end = [CMOT_GRADIENT["X"], self.CMOT_detuning]
             suservos = [
                 SUServoedBeam["MOT"],
                 SUServoedBeam["CDT2"],
@@ -502,26 +494,6 @@ class MOT(Fragment):
             self.cmot_ramp,
             "duration",
             description="Duration of the CMOT ramp",
-        )
-
-        class RelaxedCMOTRamp(CMOT_Ramp):
-            """Normal CMOT endpoints, but begin from pre-CMOT gradient.
-
-            The original CMOT ramp is retained for zero-hold experiments.
-            Both CMOT ramps share endpoint handles (including ndscan scans).
-            If scanning CMOT duration, set the relaxed-ramp duration as well.
-            """
-
-            supplies_start = [self.pre_cmot_gradient, ramp_default]
-            supplies_end = [self.cmot_ramp.supplies_end_X, self.CMOT_detuning]
-            suservo_setpoint_end = [
-                self.cmot_ramp.suservo_setpoint_end_MOT,
-                self.cmot_ramp.suservo_setpoint_end_CDT2,
-                self.cmot_ramp.suservo_setpoint_end_CDT1,
-            ]
-
-        self.relaxed_cmot_ramp: RelaxedCMOTRamp = self.setattr_fragment(
-            "relaxed_cmot_ramp", RelaxedCMOTRamp
         )
 
     def _build_pgc(self):
@@ -734,9 +706,8 @@ class MOT(Fragment):
                 "No more DMA sequences may be recorded after this point"
             )
         self.core.break_realtime()
-        self.cmot_ramp.precalculate_dma_handle()
         self.pre_cmot_gradient_ramp.precalculate_dma_handle()
-        self.relaxed_cmot_ramp.precalculate_dma_handle()
+        self.cmot_ramp.precalculate_dma_handle()
         self.pgc_ramp.precalculate_dma_handle()
         self.evaporation_ramp1.precalculate_dma_handle()
         self.evaporation_ramp2.precalculate_dma_handle()
@@ -853,18 +824,17 @@ class MOT(Fragment):
         """
         Compress into a CMOT while turning off the push beam
 
-        **Timeline:** advances by `self.CMOT_duration` + `self.CMOT_settle_time`
+        **Timeline:** advances by the pre-CMOT gradient ramp and hold,
+        then `self.CMOT_duration` + `self.CMOT_settle_time`.
         """
-        # MOT loading ends when the gradient transition begins. Keep ramp
-        # and settled-field MOT illumination distinct in RTIO analysis.
-        pre_cmot_active = self.pre_cmot_hold_time.get() > 0.0
-        if pre_cmot_active:
-            rtio_log("stage", "load:end")
-            rtio_log("stage", "pre_cmot_ramp:start")
-            self.pre_cmot_gradient_ramp.do()
-            rtio_log("stage", "pre_cmot_ramp:end")
-            rtio_log("stage", "pre_cmot_hold:start")
-            delay(self.pre_cmot_hold_time.get())
+        # The gradient-only pre-CMOT ramp runs on every CMOT preparation.
+        # MOT light and biases remain unchanged until the CMOT transition.
+        rtio_log("stage", "load:end")
+        rtio_log("stage", "pre_cmot_ramp:start")
+        self.pre_cmot_gradient_ramp.do()
+        rtio_log("stage", "pre_cmot_ramp:end")
+        rtio_log("stage", "pre_cmot_hold:start")
+        delay(self.pre_cmot_hold_time.get())
 
         # The original Toptica hold command precedes the nominal CMOT
         # boundary by 150 us. Place the boundary logs at the actual command
@@ -873,10 +843,7 @@ class MOT(Fragment):
             150 * us
         )  # The Toptica PID only runs at 30kHz so give it time to hold
         delay(-TOPTICA_HOLD_JITTER)
-        if pre_cmot_active:
-            rtio_log("stage", "pre_cmot_hold:end")
-        else:
-            rtio_log("stage", "load:end")
+        rtio_log("stage", "pre_cmot_hold:end")
         rtio_log("stage", "compress:start")
         self.unlock_mot()
 
@@ -907,12 +874,8 @@ class MOT(Fragment):
             self.eom.set_att(
                 self.eom.config.attenuation + self.CMOT_repump_attenuation.get()
             )
-            if self.pre_cmot_hold_time.get() > 0.0:
-                self.relaxed_cmot_ramp.do()
-                delay(self.relaxed_cmot_ramp.duration.get())
-            else:
-                self.cmot_ramp.do()
-                delay(self.cmot_ramp.duration.get())
+            self.cmot_ramp.do()
+            delay(self.cmot_ramp.duration.get())
 
         delay(self.CMOT_settle_time.get())
         rtio_log("stage", "compress:end")
