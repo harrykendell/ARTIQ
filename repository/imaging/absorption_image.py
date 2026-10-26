@@ -2,16 +2,13 @@ import json
 import logging
 from time import time
 from typing import TYPE_CHECKING
-from scipy.constants import h as H_PLANCK, k as K_B
-
-
 import numpy as np
 from artiq.coredevice.core import Core
 from artiq.coredevice.dma import CoreDMA
 from artiq.coredevice.suservo import SUServo
 from artiq.coredevice.ttl import TTLInOut
-from artiq.experiment import EnumerationValue, kernel, rpc
-from artiq.language import delay, ms, now_mu, parallel, s, sequential, us, dB
+from artiq.experiment import kernel, rpc
+from artiq.language import delay, ms, now_mu, parallel, s, sequential, us
 from artiq.language.core import host_only
 
 # from repository.models.device_db import server_addr
@@ -21,7 +18,6 @@ from ndscan.experiment import (
     FloatChannel,
     FloatParam,
     OpaqueChannel,
-    RestartKernelTransitoryError,
     make_fragment_scan_exp,
 )
 from ndscan.experiment.annotations import curve_1d
@@ -43,9 +39,37 @@ if TYPE_CHECKING:
     def rtio_log(channel: str, *values: object) -> None: ...
 
 
-# from repository.Dipole_trap.moving_stage import MovingStage
+def weak_cloud_od_threshold(odt_active: bool) -> float:
+    """Lower peak-OD acceptance threshold for dilute CDT clouds."""
+    return 0.01 if odt_active else 0.1
 
-M_RB = 1.443160648e-25  # kg
+
+def pseudo_psd_objective(atom_number, sigma_x_mm, sigma_y_mm, r_squared):
+    """Minimised single-shot proxy for phase-space density.
+
+    Uses the *expanded* image widths, not in-situ dimensions or a measured
+    kinetic temperature. Compare only at matching time of flight and imaging
+    conditions. Invalid number, widths, or Gaussian fits receive a penalty.
+    Earlier stage-dependent proposals are retained as comments in
+    repository/imaging/objective_prototypes.py.
+    """
+    if (
+        not np.isfinite(atom_number)
+        or atom_number <= 0.0
+        or not np.isfinite(sigma_x_mm)
+        or sigma_x_mm <= 0.0
+        or not np.isfinite(sigma_y_mm)
+        or sigma_y_mm <= 0.0
+        or not np.isfinite(r_squared)
+        or r_squared < 0.9
+    ):
+        return 5.0
+
+    # Historical normalisations are retained so optimisation scores remain
+    # numerically comparable for well-fitted, positive-number images.
+    return -np.log(atom_number / 2.0e8) + 2.0 * (
+        np.log(sigma_x_mm / 2.5) + np.log(sigma_y_mm / 2.5)
+    )
 
 
 class AbsorptionImageExpFrag(ExpFragment):
@@ -309,8 +333,6 @@ class AbsorptionImageExpFrag(ExpFragment):
                 evaporation_active=self.do_evaporation1.get()
                 or self.do_evaporation2.get(),
                 odt_active=self.odt_active.get(),
-                power_dimple=self.mot.power_dimple.get(),
-                power_reservoir=self.mot.power_reservoir.get(),
             )
             if self.do_pgc.get():
                 self.mot.pgc()
@@ -450,18 +472,17 @@ class AbsorptionImageExpFrag(ExpFragment):
             self.expansion_time.get(),
             broadcast=True,
         )
-        # setting thresold for OD
-        if self.odt_active:
-            OD_thresold = 0.01
-        else:
-            OD_thresold = 0.1
+        # Trapped clouds can have much lower OD than an untrapped MOT.
+        # Use the parameter *value*, not the always-truthy ndscan handle.
+        odt_active = self.odt_active.get()
+        OD_threshold = weak_cloud_od_threshold(odt_active)
 
         settings = AbsImageSettings(
             magnification=self.magnification.get(),
             time_of_flight=self.expansion_time.get(),
-            fit_tilt=self.odt_active.get(),
-            show_principal_axes=self.odt_active.get(),
-            weak_cloud_peak_od_threshold=OD_thresold,  # default is 0.1
+            fit_tilt=odt_active,
+            show_principal_axes=odt_active,
+            weak_cloud_peak_od_threshold=OD_threshold,
         )  # Set default magnification
 
         self.set_dataset(
@@ -477,14 +498,16 @@ class AbsorptionImageExpFrag(ExpFragment):
             settings=settings,
         )
 
+        # Optional raw-image channels (would require result-channel declarations):
         # self.raw_tof.push(images[0])
         # self.raw_ref.push(images[1])
         # self.raw_bg.push(images[2])
-
         # raw_images = np.asarray(images, dtype=np.uint16)
         # self.raw_images.push(raw_images)
 
-        # If the image seems invalid dont log it
+        # Dormant interactive retry on low-quality images. Re-enabling this
+        # would require uncommenting imports of EnumerationValue from
+        # artiq.experiment and RestartKernelTransitoryError from ndscan.experiment.
         # if self.absimg.atom_number < 0.0 or self.absimg.fit.summary()["rsquared"] < 0.7:
         #     logger.error("No atoms detected - Fix and retry from Interactive Args")
         #     with self.interactive(title="Zero atoms detected; retry?") as interactive:
@@ -500,155 +523,27 @@ class AbsorptionImageExpFrag(ExpFragment):
         #     if interactive.retry == "Abort":
         #         raise RuntimeError("Scan aborted after a failed point")
 
+        sigma_x_mm = self.absimg.sigmax * self.absimg.physical_scale * 1e3
+        sigma_y_mm = self.absimg.sigmay * self.absimg.physical_scale * 1e3
         self.atom_number.push(self.absimg.atom_number)
         self.sigmax.push(self.absimg.sigmax)
         self.sigmay.push(self.absimg.sigmay)
-        self.sigmax_mm.push(self.absimg.sigmax * self.absimg.physical_scale * 1e3)
-        self.sigmay_mm.push(self.absimg.sigmay * self.absimg.physical_scale * 1e3)
+        self.sigmax_mm.push(sigma_x_mm)
+        self.sigmay_mm.push(sigma_y_mm)
         self.phase_space_density.push(self.absimg.phase_space_density_1)
         self.gaussian_fit_centre_x.push(self.absimg.x0)
         self.gaussian_fit_centre_y.push(self.absimg.y0)
         self.peak_od.push(self.absimg.peak_od)
 
-        # Start of custom objective setion
-
-        # obtain the fit quality from the Abs Image
-        r_squared = self.absimg.fit.summary()["rsquared"]
-
-        # Check the fit quality
-        fit_failed = (
-            self.absimg.atom_number <= 0 or r_squared < 0.9  # filter bad shots
-        )
-        PENALTY = 5.0  # objective value for invalid shots
-
-        # Measured state variables
-        N = self.absimg.atom_number
-        sx_mm = self.absimg.sigmax * self.absimg.physical_scale * 1e3
-        sy_mm = self.absimg.sigmay * self.absimg.physical_scale * 1e3
-
-        # fixed reference values during expansion (based on benchmarks)
-        STAGE_REF = {
-            "cmot": {
-                "N": 3.0e8,
-                "x_mm": 2.0,
-                "y_mm": 2.0,
-            },
-            "pgc": {
-                "N": 2.0e8,
-                "x_mm": 2.5,
-                "y_mm": 2.5,
-            },
-        }
-
-        # In situ fixed reference values
-        STAGE_SITU_ = {
-            "cmot": {
-                "x_mm": 0.91,
-                "y_mm": 1.08,
-                "source": "parameter-scan thermometry, 2026-10-05",
-            },
-            "pgc": {
-                "x_mm": 0.91,
-                "y_mm": 1.07,
-                "source": "parameter-scan thermometry, 2026-10-06",
-            },
-        }
-
-        #     # last enabled stage
-        #     if self.do_pgc.get():
-        #         stage = "pgc"
-        #     elif self.do_cmot.get():
-        #         stage = "cmot"
-        #     else:
-        #         raise ValueError(
-        #             "Neither CMOT nor PGC enabled: no PSD reference for this sequence"
-        #         )
-
-        # Custom Objective 1 : negated log(pseduo PSD)
-        exponent = 2.0  # Exponent for the size terms
-
-        N_ref = 2.0e8
-        sx_ref = 2.5  # in mm
-        sy_ref = 2.5
-
-        if fit_failed:
-            # Push a large value penalty
-            self.custom_objective.push(PENALTY)
-        else:
-            self.custom_objective.push(
-                -np.log(self.absimg.atom_number / N_ref)
-                + exponent * (np.log(sx_mm / sx_ref) + np.log(sy_mm / sy_ref))
+        # Optimiser channel: comparable only at fixed TOF and probe geometry.
+        self.custom_objective.push(
+            pseudo_psd_objective(
+                self.absimg.atom_number,
+                sigma_x_mm,
+                sigma_y_mm,
+                self.absimg.fit.summary()["rsquared"],
             )
-
-        # def pseudo_psd_objective(N, STAGE_REF, exponent, stage):
-        #     """
-        #     Returns the negated log(pseduo PSD) for a single shot.
-        #     """
-        #     # initial cloud widths (in-situ) in x-y directions
-        #     sx_ref = STAGE_REF[stage]["x_mm"]
-        #     sy_ref = STAGE_REF[stage]["y_mm"]
-
-        #     return -np.log(N / STAGE_REF[stage]["N"]) + exponent * (
-        #         np.log(sx_mm / sx_ref) + np.log(sy_mm / sy_ref)
-        #     )
-
-        # if fit_failed:
-        #     # Push a large value penalty
-        #     self.custom_objective.push(5)
-        # else:
-        #     self.custom_objective.push(pseudo_psd_objective(N, STAGE_REF, exponent, stage))
-
-        # Custom Objective 2 : negated log(estimate PSD)
-
-        # PSD_REF = 1e-7  # reference PSD
-
-        # def estimate_psd_objective(N, STAGE_SITU, sx_mm, sy_mm, stage):
-        #     """
-        #      Computes for a single shot,
-        #           - the objective value (J)
-        #           - the average temperature estimate (T_avr)
-        #           - the computed PSD (psd) for one shot,
-        #      Otherwise returns (PSD_PENALTY, None, None) if invalid.
-        #     """
-
-        #     # initial x-y (in-situ) cloud widths (in m)
-        #     s0x = STAGE_SITU[stage]["x_mm"] * 1e-3
-        #     s0y = STAGE_SITU[stage]["y_mm"] * 1e-3
-
-        #     # imaging TOF
-        #     t = self.expansion_time * 1e-3  # s
-
-        #     # compute x-y temperatures
-        #     T_x = (M_RB / K_B) * ((sx_mm * 1e-3) ** 2 - s0x**2) / t**2
-        #     T_y = (M_RB / K_B) * ((sy_mm * 1e-3) ** 2 - s0y**2) / t**2
-
-        #     if not (T_x > 0 and T_y > 0 and N > 0):
-        #         return PENALTY, None, None
-
-        #     # find average temperature
-        #     T_avr = 0.5 * (T_x + T_y)
-
-        #     # compute PSD
-        #     n = N / ((2 * np.pi) ** 1.5 * s0x**2 * s0y)  # peak density, σ_z = σ_x
-
-        #     lam = H_PLANCK / np.sqrt(
-        #         2 * np.pi * M_RB * K_B * T_avr
-        #     )  # thermal de Broglie wavelength
-
-        #     psd = n * lam**3
-
-        #     return -np.log(psd / PSD_REF), T_avr, psd
-
-        # if fit_failed:
-        #     self.custom_objective.push(PENALTY)
-
-        # else:
-        #     J, self.T_avr, self.psd = estimate_psd_objective(
-        #         N, STAGE_SITU, sx_mm, sy_mm, stage
-        #     )
-        #     self.custom_objective.push(J)
-
-        # End of objective section
+        )
 
         frame_timestamp = time()
         self.image_timestamp.push(frame_timestamp)

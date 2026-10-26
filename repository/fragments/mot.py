@@ -50,15 +50,16 @@ DURATION = {
 SETTLE_TIME = {
     "CMOT": 3.79 * ms,
     "PGC": 0.5 * ms,
-    "ODT": 0 * ms,
     "EVAPORATION1": 0 * ms,
-    "EVAPORATION2": 0 * ms,
+    # Reserved for optional ODT hold / second evaporation settling:
+    # "ODT": 0 * ms,
+    # "EVAPORATION2": 0 * ms,
 }
 DETUNING = {"CMOT": 9.65 * Γ_Rb, "PGC": 19 * Γ_Rb}  # Red detuning in units of Γ_Rb
 
 # NB the LSB for the fastino is 0.305mA
 # The ES030-10 LSB for programming is 0.61mA
-CURRENT_LSB = 10 / 2**16 * A
+CURRENT_LSB = 10 / 2**16 * A  # Quantisation limit for bias scan parameters
 BIASES_MOT = {
     "X_Bias": 0.45 * mA,
     "Y_Bias": 0.32 * mA,
@@ -202,15 +203,18 @@ class MOT(Fragment):
             max=6800 * MHz,
         )
 
-        self.MOT_frequency: FloatParamHandle = self.setattr_param(
-            "MOT_frequency",
-            FloatParam,
-            "MOT AOM frequency",
-            default=SUServoedBeam["MOT"].frequency,
-            unit="MHz",
-            min=150 * MHz,
-            max=195 * MHz,
-        )
+        # Optional MOT AOM frequency override, not connected to load() yet.
+        # Keep this declaration for future frequency-tuning experiments rather
+        # than exposing a scan parameter that currently has no effect:
+        # self.MOT_frequency: FloatParamHandle = self.setattr_param(
+        #     "MOT_frequency",
+        #     FloatParam,
+        #     "MOT AOM frequency",
+        #     default=SUServoedBeam["MOT"].frequency,
+        #     unit="MHz",
+        #     min=150 * MHz,
+        #     max=195 * MHz,
+        # )
 
         # Supplies
         self.coils: SetSupplies = self.setattr_fragment(
@@ -353,7 +357,7 @@ class MOT(Fragment):
         self.power_dimple: FloatParamHandle = self.setattr_param(
             "power_dimple",
             FloatParam,
-            "Power of the dimple trap",
+            "CDT2 setpoint (V); applied only when experiment calls set_dimple_trap_power",
             default=0.1 * V,
             unit="V",
             min=0.0 * V,
@@ -362,7 +366,7 @@ class MOT(Fragment):
         self.power_reservoir: FloatParamHandle = self.setattr_param(
             "power_reservoir",
             FloatParam,
-            "Power of the reservoir trap",
+            "CDT1 setpoint (V); applied only when experiment calls set_reservoir_trap_power",
             default=0.1 * V,
             unit="V",
             min=0.0 * V,
@@ -542,7 +546,7 @@ class MOT(Fragment):
             The transition from CMOT to PGC
                 - MOT beam further detuned
                 - Coils ramped back off
-                - Bias ramped on
+                - Bias coils step to their PGC settings before the ramp
             """
 
             duration_default = DURATION["PGC"]
@@ -569,14 +573,16 @@ class MOT(Fragment):
         # This function generates the ramp for single beam evaporation
         # It also creates parameters to expose to ndscan
 
-        self.evaporation_duration1: FloatParamHandle = self.setattr_param(
-            "evaporation_duration1",
-            FloatParam,
-            "Duration of the evaporation ramp 1",
-            default=DURATION["EVAPORATION1"],
-            unit="ms",
-            min=0,
-        )
+        # The ramp itself already exposes duration via its Ramp.duration.
+        # Keep the old duplicate alias as a dormant design sketch:
+        # self.evaporation_duration1: FloatParamHandle = self.setattr_param(
+        #     "evaporation_duration1",
+        #     FloatParam,
+        #     "Duration of the evaporation ramp 1",
+        #     default=DURATION["EVAPORATION1"],
+        #     unit="ms",
+        #     min=0,
+        # )
         self.evaporation_settle_time1: FloatParamHandle = self.setattr_param(
             "evaporation_settle_time1",
             FloatParam,
@@ -606,22 +612,27 @@ class MOT(Fragment):
         # This function generates the ramp for single beam evaporation
         # It also creates parameters to expose to ndscan
 
-        self.evaporation_duration2: FloatParamHandle = self.setattr_param(
-            "evaporation_duration2",
-            FloatParam,
-            "Duration of the evaporation ramp 2",
-            default=DURATION["EVAPORATION2"],
-            unit="ms",
-            min=0,
-        )
-        self.evaporation_settle_time2: FloatParamHandle = self.setattr_param(
-            "evaporation_settle_time2",
-            FloatParam,
-            "Time to wait after evaporation ramp 2",
-            default=SETTLE_TIME["EVAPORATION2"],
-            unit="ms",
-            min=0,
-        )
+        # The second ramp already has a working Ramp.duration parameter.
+        # Possible future alias and post-ramp settle, not wired into the
+        # evaporation2() sequence yet:
+        # self.evaporation_duration2: FloatParamHandle = self.setattr_param(
+        #     "evaporation_duration2",
+        #     FloatParam,
+        #     "Duration of the evaporation ramp 2",
+        #     default=DURATION["EVAPORATION2"],
+        #     unit="ms",
+        #     min=0,
+        # )
+        # self.evaporation_settle_time2: FloatParamHandle = self.setattr_param(
+        #     "evaporation_settle_time2",
+        #     FloatParam,
+        #     "Time to wait after evaporation ramp 2",
+        #     default=SETTLE_TIME["EVAPORATION2"],
+        #     unit="ms",
+        #     min=0,
+        # )
+        # To activate, follow evaporation_ramp2.do() with
+        # delay(self.evaporation_settle_time2.get()).
 
         class Evaporation_RAMP2(Ramp):
             # The transition from ODT to single beam evaporation
@@ -777,10 +788,6 @@ class MOT(Fragment):
         self.all_beams.off()
         # self.shutter_2d.on()
 
-        # set detuning of the MOT suservo to some value that is not too far from the default, so that we can load atoms
-        # self.suervoed_beam_mot = SUServoedBeam["MOT"]
-        # self.suervoed_beam_mot.frequency
-
         if clearout:
             self.clear_atoms(clearout_time=clearout_time)
 
@@ -814,13 +821,7 @@ class MOT(Fragment):
             delay(9.0 * self.loading_time.get() / 10.0)
 
     @kernel
-    def compress(
-        self,
-        evaporation_active,
-        odt_active,
-        power_dimple,
-        power_reservoir,
-    ) -> None:
+    def compress(self, evaporation_active, odt_active) -> None:
         """
         Compress into a CMOT while turning off the push beam
 
@@ -856,10 +857,8 @@ class MOT(Fragment):
             # CDT overlaps the cooling and evaporation stages.
             rtio_log("stage", "cdt:start")
 
-        # if we are doing evaporation then only turn on the dimple and reservoir in cmot step
-        # self.set_dimple_trap_power(power_dimple)
-        # self.set_reservoir_trap_power(power_reservoir)
-
+        # CDT powers are not changed here; trap setpoints must be configured
+        # explicitly by the experiment before enabling the beams.
         # set CMOT bias coils
         self.z_coil.set_outputs([self.CMOT_Z_current.get()])
         self.y_coil.set_outputs([self.CMOT_Y_current.get()])
@@ -1055,10 +1054,8 @@ class MOT(Fragment):
 
     @kernel
     def Enable_EOM(self) -> None:
-        """
-        Set the repump EOM to go into F=2
-        """
-        self.eom.disable()
+        """Enable repump EOM sidebands for imaging."""
+        self.eom.enable()
 
     @kernel
     def dipole_trap_com_shift(self) -> None:
