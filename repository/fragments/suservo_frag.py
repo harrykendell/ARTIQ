@@ -348,7 +348,7 @@ class SUServoFrag(Fragment):
         # Set channel output state
         self.set_channel_state(en_out, enable_iir)
         delay(
-            10 * us
+            15 * us
         )  # This is needed otherwise we seem to lose slack on setting state
 
     @kernel
