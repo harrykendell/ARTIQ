@@ -60,40 +60,135 @@ def main():
     loop.run_until_complete(rpc.start(bind, args.port))
     atexit_register_coroutine(rpc.stop, loop=loop)
 
-    vals = {
+    # Read-only DLC telemetry. The browser consumes the cached sipyco
+    # publisher on port 3271; hardware commands still go to RPC port 3272.
+    # Keep the historical colon-delimited keys for the existing ARTIQ GUI.
+    legacy = {
         "emission_button_enabled": dev._dlcpro.emission_button_enabled,
         "emission": dev._dlcpro.emission,
-        "laser1:label": dev._dlcpro.laser1.label,
-        "laser1:enabled": dev._dlcpro.laser1.enabled,
-        "laser1:dl:cc:current_set": dev._dlcpro.laser1.dl.cc.current_set,
-        "laser1:amp:cc:current_set": dev._dlcpro.laser1.amp.cc.current_set,
-        "laser1:dl:lock:lock_enabled": dev._dlcpro.laser1.dl.lock.lock_enabled,
-        "laser1:scan:enabled": dev._dlcpro.laser1.scan.enabled,
-        "laser1:scope:data": dev._dlcpro.laser1.scope.data,
-        "laser1:scope:channel1:signal": dev._dlcpro.laser1.scope.channel1.signal,
-        "laser1:dl:lock:candidates": dev._dlcpro.laser1.dl.lock.candidates,
-        "laser1:dl:lock:background_trace": dev._dlcpro.laser1.dl.lock.background_trace,
-        "laser2:label": dev._dlcpro.laser2.label,
-        "laser2:enabled": dev._dlcpro.laser2.enabled,
-        "laser2:dl:cc:current_set": dev._dlcpro.laser2.dl.cc.current_set,
-        "laser2:amp:cc:current_set": dev._dlcpro.laser2.amp.cc.current_set,
-        "laser2:dl:lock:lock_enabled": dev._dlcpro.laser2.dl.lock.lock_enabled,
-        "laser2:scan:enabled": dev._dlcpro.laser2.scan.enabled,
-        "laser2:scope:data": dev._dlcpro.laser2.scope.data,
-        "laser2:scope:channel1:signal": dev._dlcpro.laser2.scope.channel1.signal,
-        "laser2:dl:lock:candidates": dev._dlcpro.laser2.dl.lock.candidates,
-        "laser2:dl:lock:background_trace": dev._dlcpro.laser2.dl.lock.background_trace,
     }
-    notifier = Notifier(
-        {key: val.get() for key, val in vals.items()},
+    for laser in ("laser1", "laser2"):
+        head = getattr(dev._dlcpro, laser)
+        for suffix, decop in (
+            ("label", head.label),
+            ("enabled", head.enabled),
+            ("dl_cc_current_set", head.dl.cc.current_set),
+            ("amp_cc_current_set", head.amp.cc.current_set),
+            ("dl_lock_lock_enabled", head.dl.lock.lock_enabled),
+            ("scan_enabled", head.scan.enabled),
+            ("scope_data", head.scope.data),
+            ("scope_channel1_signal", head.scope.channel1.signal),
+            ("dl_lock_candidates", head.dl.lock.candidates),
+            ("dl_lock_background_trace", head.dl.lock.background_trace),
+        ):
+            legacy[f"{laser}:" + {
+                "label": "label",
+                "enabled": "enabled",
+                "dl_cc_current_set": "dl:cc:current_set",
+                "amp_cc_current_set": "amp:cc:current_set",
+                "dl_lock_lock_enabled": "dl:lock:lock_enabled",
+                "scan_enabled": "scan:enabled",
+                "scope_data": "scope:data",
+                "scope_channel1_signal": "scope:channel1:signal",
+                "dl_lock_candidates": "dl:lock:candidates",
+                "dl_lock_background_trace": "dl:lock:background_trace",
+            }[suffix]] = decop
+
+    # Controller RPC names flatten SDK paths with underscores. Discover the
+    # corresponding Decop nodes without making any hardware reads.
+    def resolve(node, flattened):
+        parts = flattened.split("_")
+        for n in range(len(parts), 0, -1):
+            name = "_".join(parts[:n])
+            if not hasattr(node, name):
+                continue
+            value = getattr(node, name)
+            if n == len(parts):
+                if hasattr(value, "get") and hasattr(value, "subscribe"):
+                    return value
+                break
+            return resolve(value, "_".join(parts[n:]))
+        raise AttributeError(f"No subscribable TOPTICA parameter: {flattened}")
+
+    from_fields = (
+        "enabled", "dl_cc_enabled", "amp_cc_enabled",
+        "dl_cc_current_set", "dl_cc_current_act",
+        "dl_cc_current_clip_limit", "dl_cc_current_clip",
+        "amp_cc_current_set", "amp_cc_current_act",
+        "amp_cc_current_clip_limit", "amp_cc_current_clip",
+        "dl_tc_temp_set", "dl_tc_temp_act", "dl_tc_temp_set_min",
+        "dl_tc_temp_set_max", "dl_tc_ready",
+        "dl_pc_voltage_set", "dl_pc_voltage_act",
+        "dl_pc_voltage_min", "dl_pc_voltage_max",
+        "scan_enabled", "scan_offset", "scan_amplitude", "scan_frequency",
+        "dl_lock_lock_enabled", "dl_lock_state", "dl_lock_state_txt",
+        "dl_lock_lockpoint_type", "dl_lock_pid1_regulating_state",
+        "dl_lock_pid2_regulating_state", "dl_lock_window_enabled",
+        "dl_lock_window_level_low", "dl_lock_window_level_high",
+        "health_txt", "dl_lock_candidates", "dl_lock_background_trace",
+        "scope_data", "scope_channel1_signal", "label",
     )
+    # One SDK subscription per parameter, and one initial get per parameter.
+    # Names are canonical and match the flattened RPC getter methods.
+    vals = {
+        "emission": dev._dlcpro.emission,
+        "emission_button_enabled": dev._dlcpro.emission_button_enabled,
+    }
+    for laser in ("laser1", "laser2"):
+        for method in from_fields:
+            vals[f"{laser}_{method}"] = resolve(getattr(dev._dlcpro, laser), method)
 
-    def callback(subscription: Subscription, time: Timestamp, value: SubscriptionValue):
-        logging.debug(f"Callback: {subscription.name} = {value.get()}")
-        notifier[subscription.name] = value.get()
+    def canonical(name: str) -> str:
+        # SDK uses hyphenated leaf names on update, e.g. current-set.
+        return name.replace(":", "_").replace("-", "_")
 
-    for val in vals.values():
-        val.subscribe(callback)
+    old_names = {}
+    for name in legacy:
+        old_names.setdefault(canonical(name), []).append(name)
+
+    initial = {}
+    for key, decop in vals.items():
+        try:
+            initial[key] = decop.get()
+        except Exception as error:
+            logging.warning("DLC initial subscription value %s unavailable: %s", key, error)
+            initial[key] = None
+    for key, aliases in old_names.items():
+        if key in initial:
+            for alias in aliases:
+                initial[alias] = initial[key]
+    # The ARTIQ GUI reads the SDK spelling of this global setting.
+    initial["emission-button-enabled"] = initial["emission_button_enabled"]
+    notifier = Notifier(initial)
+
+    def callback(subscription: Subscription, time: Timestamp,
+                 value: SubscriptionValue):
+        key = canonical(subscription.name)
+        if key not in vals:
+            return
+        reading = value.get()
+        notifier[key] = reading
+        for legacy_name in old_names.get(key, ()):
+            if legacy_name != key:
+                notifier[legacy_name] = reading
+        # Preserve SDK hyphenated keys for older GUI clients.
+        if subscription.name != key and subscription.name not in old_names.get(key, ()):
+            notifier[subscription.name] = reading
+
+    for key, decop in vals.items():
+        try:
+            decop.subscribe(callback)
+        except Exception as error:
+            logging.warning("DLC parameter %s cannot subscribe: %s", key, error)
+
+    # A low-rate heartbeat lets the website fail closed if this controller
+    # stops polling the SDK while its publisher TCP connection stays open.
+    async def heartbeat():
+        while True:
+            notifier["_publisher_heartbeat"] = asyncio.get_running_loop().time()
+            await asyncio.sleep(2.0)
+    heartbeat_task = loop.create_task(heartbeat())
+    atexit.register(heartbeat_task.cancel)
 
     publisher = Publisher(notifiers={"DLCProState": notifier})
     loop.run_until_complete(publisher.start(bind, args.port - 1))
