@@ -452,6 +452,12 @@ class Ramp(Fragment):
         """
         self.device_setup_subfragments()
 
+        # Zero-duration ramp is a no-op; recording zero RTIO intervals
+        # would otherwise underflow during DMA construction.
+        if self.duration.get() == 0.0:
+            self.dma_handle_valid = False
+            return
+
         # Compute grid for writes. See comments in docstring regarding how the
         # ramp is played / ends - it's easy to introduce an off-by-one error
         # unless you're really careful
@@ -680,6 +686,9 @@ class Ramp(Fragment):
         method is called otherwise the handle will become invalid. That's why
         this step is not done automatically as part of device_setup.
         """
+        if self.duration.get() == 0.0:
+            self.dma_handle_valid = False
+            return
         self.dma_handle = self.core_dma.get_handle(self.fqn)
         self.dma_handle_valid = True
 
@@ -692,6 +701,8 @@ class Ramp(Fragment):
         **Timeline:** advances to the end of the ramp
         """
 
+        if self.duration.get() == 0.0:
+            return
         t_end_mu = now_mu() + self.core.seconds_to_mu(self.duration.get())
 
         # It's nicer to use handles here instead of string lookup.
