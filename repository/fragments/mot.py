@@ -43,13 +43,13 @@ if TYPE_CHECKING:
 DURATION = {
     "LOADING": 5.0 * s,
     "CMOT": 4.0 * ms,
-    "PGC": 8.0 * ms,
+    "PGC": 9.0 * ms,
     "EVAPORATION1": 50 * ms,
     "EVAPORATION2": 100 * ms,
 }
 SETTLE_TIME = {
     "CMOT": 3.79 * ms,
-    "PGC": 0.5 * ms,
+    "PGC": 0.0 * ms,
     "EVAPORATION1": 0 * ms,
     # Reserved for optional ODT hold / second evaporation settling:
     # "ODT": 0 * ms,
@@ -518,7 +518,7 @@ class MOT(Fragment):
             "Time to wait after PGC ramp",
             default=SETTLE_TIME["PGC"],
             unit="ms",
-            min=0.5 * ms,
+            min=0.0 * ms,
         )
         self.PGC_detuning: FloatParamHandle = self.setattr_param(
             "PGC_detuning",
