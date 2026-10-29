@@ -36,9 +36,9 @@ if TYPE_CHECKING:
     def rtio_log(channel: str, *values: object) -> None: ...
 
 
-# Default preparation is C1 (RID33929); ndscan overrides recover H1 with
-# MOT_loading_gradient=0.8 A and PGC_detuning=16 Γ. Hardware safe states
-# in devices.py are not changed by these per-shot defaults.
+# Default preparation: 1.0 A MOT loading gradient, 19 Γ PGC detuning,
+# 9 ms PGC ramp and 0 ms final illuminated hold (RID34010/34013).
+# Per-shot defaults do not change the hardware safe states in devices.py.
 Γ_Rb = 6.065 * MHz  # Natural linewidth of Rb-87
 DURATION = {
     "LOADING": 5.0 * s,
@@ -82,8 +82,8 @@ BIASES_PGC = {
     "Y_Bias": 0.32 * mA,
     "Z_Bias": 60 * mA,
 }
-# C1 reference (RID33929): after 0.6 A pre-CMOT relaxation, keep 0.6 A
-# through CMOT before ramping the gradient to zero during PGC.
+# After pre-CMOT relaxation to 0.6 A, retain that gradient through CMOT
+# before ramping it to zero during PGC.
 CMOT_GRADIENT = {"X": 0.6 * A}
 REPUMP_ATTENUATION = {"CMOT": 3.09 * dB, "PGC": 0.05 * dB}
 POWER_3D_MOT = {"MOT_loading": 3.5 * V, "CMOT": 3.5 * V, "PGC": 1.2 * V}
@@ -116,7 +116,7 @@ class MOT(Fragment):
             "MOT_loading_gradient",
             FloatParam,
             "X-gradient current during MOT loading",
-            default=1.0 * A,  # Low T default; High N: 0.8 * A
+            default=1.0 * A,
             unit="A",
             min=0.6 * A,
             max=1.0 * A,
@@ -524,7 +524,7 @@ class MOT(Fragment):
             "PGC_detuning",
             FloatParam,
             "Detuning of the PGC ramp",
-            default=DETUNING["PGC"],  # Low T: 19 * Γ_Rb; High N: 16 * Γ_Rb
+            default=DETUNING["PGC"],
             unit="Γ",
             scale=Γ_Rb,
         )
