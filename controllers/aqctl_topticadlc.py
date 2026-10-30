@@ -133,6 +133,11 @@ def main():
     vals = {
         "emission": dev._dlcpro.emission,
         "emission_button_enabled": dev._dlcpro.emission_button_enabled,
+        # Physical safety state is read-only: this does NOT make the key or
+        # external interlock controllable by RPC or by the browser.
+        "frontkey_locked": dev._dlcpro.frontkey_locked,
+        "interlock_open": dev._dlcpro.interlock_open,
+        "system_health_txt": dev._dlcpro.system_health_txt,
     }
     for laser in ("laser1", "laser2"):
         for method in from_fields:
