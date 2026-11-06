@@ -67,8 +67,8 @@ def pseudo_psd_objective(atom_number, sigma_x_mm, sigma_y_mm, r_squared):
 
     # Historical normalisations are retained so optimisation scores remain
     # numerically comparable for well-fitted, positive-number images.
-    return -np.log(atom_number / 2.0e8) + 2.0 * (
-        np.log(sigma_x_mm / 2.5) + np.log(sigma_y_mm / 2.5)
+    return -np.log(atom_number / 3.0e8) + 2.0 * (
+        np.log(sigma_x_mm / 3.0) + np.log(sigma_y_mm / 3.0)
     )
 
 
