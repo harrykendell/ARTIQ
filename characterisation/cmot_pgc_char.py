@@ -6,7 +6,7 @@ master as ndscan experiments. Companion to cmot_char.py.
 
 Every step starts from the experiment's full ndscan parameter tree (read from
 experiment_db), adds overrides / scan axes, and is validated against the tree
-BEFORE anything is submitted -- a typo in an FQN or path aborts the whole
+BEFORE anything is submitted : a typo in an FQN or path aborts the whole
 run instead of failing halfway through the night.
 
 Usage
@@ -68,7 +68,7 @@ PARAMS = {
     "CMOT_settle_time":        dict(default=3.79,  lo=1.5,  hi=10.0,  scale=1e-3, unit="ms"),
     "CMOT_repump_detuning":    dict(default=0.075, lo=0.0,  hi=5.0,   scale=GAMMA_HZ, unit="Γ"),
     "CMOT_repump_attenuation": dict(default=3.09,  lo=0.0,  hi=5.0,   scale=1.0,  unit="dB"),
-    "CMOT_Y_current":          dict(default=0.84,  lo=0.3,  hi=5.0,   scale=1e-3, unit="mA"),
+    "CMOT_Y_current":          dict(default=0.84,  lo=0.3,  hi=5.0,   scale=1e-3, unit="mA"),  # lo = smallest supply setting
     "CMOT_Z_current":          dict(default=59.8,  lo=10.0, hi=100.0, scale=1e-3, unit="mA"),
     # CMOT_X_current is not on the run sheet: left at the experiment default.
 }
@@ -101,10 +101,14 @@ HOLD = {
     "PGC_Z_current": (60.0, "mA"),
 }
 
+# Run-sheet constants pinned on every step, in GUI units (converted and unit-checked
+# like PARAMS):  fqn: (path, value, unit)
+CONSTANTS = {
+    "repository.fragments.mot.MOT.MOT_loading_gradient": ("MOT", 0.8, "A"),
+}
+
 # Further constants pinned on every step (fqn, path, SI value). Empty -> experiment defaults.
-FIXED = [
-    # ("repository.fragments.mot.MOT.gradient", "MOT", 0.8),                  # EDIT
-]
+FIXED = []
 
 # Sequence configuration. PGCBench fixes these inside PGCBenchFragment
 # (_TOFBenchmarkExpFrag.build_fragment), so they are NOT free parameters there and
@@ -145,7 +149,7 @@ TOF_SINGLE_MS = 25.0
 SCAN_POINTS, SCAN_REPEATS = 21, 5
 BENCH_THERM_REPEATS, BENCH_SHOT_REPEATS = 3, 3
 PARAM_THERM_POINTS = 30
-PARAM_THERM_FILE = Path("LHS_initial_samples_temp_cmot.csv")  # EDIT: 30 rows, one column per parameter
+PARAM_THERM_FILE = Path("LHS_initial_samples_temp_cmot.csv")  # 30 rows, one column per parameter
 RANDOMISE = False                       # shuffle points within an axis
 
 # ndscan scan options applied to every step (step builders override num_repeats).
@@ -182,9 +186,7 @@ LHS_OPTIMISE = {
     "skip_on_persistent_transitory_error": False,
 }
 
-SHOT_PERIOD_S = 6.0                     
-
-
+SHOT_PERIOD_S = 6.0                     # only used for the time estimate
 
 # Step description
 
@@ -200,6 +202,7 @@ class Step:
 
 
 UNIT_SCALES = {}          # fqn -> (scale, unit), read from the experiments' schemata
+ALLOW_PLACEHOLDERS = False   # offline only: preview without the thermometry CSV
 
 
 def to_si(fqn, value, fallback_scale):
@@ -211,13 +214,17 @@ def si(key, v):
     return to_si(PARAMS[key]["fqn"], v, PARAMS[key]["scale"])
 
 
+def constant_overrides():
+    return [(fqn, path, to_si(fqn, v, 1.0)) for fqn, (path, v, _unit) in CONSTANTS.items()]
+
+
 def hold_overrides():
     return [(f"{PARAM_FQN_PREFIX}.{name}", PARAM_PATH, to_si(f"{PARAM_FQN_PREFIX}.{name}", v, float("nan")))
             for name, (v, _unit) in HOLD.items()]
 
 
 def base_overrides(kind):
-    ov = STAGE_OVERRIDES[EXPERIMENTS[kind]] + list(FIXED) + hold_overrides()
+    ov = STAGE_OVERRIDES[EXPERIMENTS[kind]] + constant_overrides() + list(FIXED) + hold_overrides()
     if PIN_DEFAULTS:
         ov += [(p["fqn"], p["path"], si(k, p["default"])) for k, p in PARAMS.items()]
     skip = NOT_SETTABLE.get(EXPERIMENTS[kind], set())
@@ -262,14 +269,16 @@ def load_column(key, n):
         col = pd.read_csv(PARAM_THERM_FILE)[PARAMS[key]["csv_col"]].to_numpy()
         assert len(col) == n, f"{PARAM_THERM_FILE}:{key} has {len(col)} values, expected {n}"
         return col
+    if not ALLOW_PLACEHOLDERS:
+        raise SystemExit(f"{PARAM_THERM_FILE} not found (needed for the {key} parameter thermometry); "
+                         f"nothing submitted. Put it next to this script, or use --offline to preview.")
     logging.warning("%s not found -- evenly spaced placeholder values for %s", PARAM_THERM_FILE, key)
     p = PARAMS[key]
     return [p["lo"] + i * (p["hi"] - p["lo"]) / (n - 1) for i in range(n)]
 
 
-# ----------------------------------------------------------------------------
 # Step builders
-# ----------------------------------------------------------------------------
+
 def benchmark_thermometry():
     return Step("benchmark_thermometry", "all defaults, TOF scan",
                 len(TOF_BENCH_THERM_MS) * BENCH_THERM_REPEATS,
@@ -343,7 +352,6 @@ def build_steps():
     ]
 
 
-
 # ndscan parameter tree: fetch, validate, apply
 
 def fetch_param_trees(kinds):
@@ -377,6 +385,7 @@ def load_unit_scales(trees):
                 UNIT_SCALES.setdefault(fqn, (float(spec["scale"]), spec.get("unit", "")))
     wanted = [(p["fqn"], p["unit"], p["scale"]) for p in PARAMS.values()]
     wanted += [(f"{PARAM_FQN_PREFIX}.{n}", unit, None) for n, (_v, unit) in HOLD.items()]
+    wanted += [(fqn, unit, None) for fqn, (_path, _v, unit) in CONSTANTS.items()]
     wanted += [(fqn, "ms", TOF_SCALE) for fqn, _path in filter(None, TOF_PARAM.values())]
     problems, notes = [], []
     for fqn, unit, fallback in wanted:
@@ -495,8 +504,6 @@ def make_expid(file, cls, params):
             "argument_defaults": {}, "repo_rev": None, "devarg_override": {},
             "log_level": logging.WARNING}
 
-
-
 # Commands
 
 def print_plan(steps, start):
@@ -582,6 +589,8 @@ def main():
     if opts.list_params is not None:
         return list_params(opts.list_params)
 
+    global ALLOW_PLACEHOLDERS
+    ALLOW_PLACEHOLDERS = opts.offline
     trees = None if opts.offline else prepare_units()   # unit scales before any value is built
     steps = build_steps()
     print_plan(steps, opts.start_at)
