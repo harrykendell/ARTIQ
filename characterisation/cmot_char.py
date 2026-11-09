@@ -84,6 +84,10 @@ TOF_PARAM = {
 }
 TOF_SCALE = 1e-3          # ms -> s
 
+# Camera exposure, set on every step. It lives on the same top-level fragment as
+# the expansion time, so its FQN is taken from TOF_PARAM for each experiment.
+EXPOSURE_TIME_MS = 0.02   # value (in ms) avoids overexposure
+
 # MOT loading time shared by ALL steps. The benchmark fixes its own value at build
 # time (not settable from here) -- keep CMOTCharBenchFragment.LOADING_TIME equal.
 LOADING_TIME_S = 5.0
@@ -200,6 +204,13 @@ def to_si(fqn, value, fallback_scale):
 def si(key, v):
     return to_si(PARAMS[key]["fqn"], v, PARAMS[key]["scale"])
 
+def exposure_override(kind):
+    entry = TOF_PARAM[EXPERIMENTS[kind]]
+    if not entry:
+        return []
+    fqn = entry[0].rsplit(".", 1)[0] + ".exposure_time"
+    return [(fqn, entry[1], to_si(fqn, EXPOSURE_TIME_MS, 1e-3))]
+
 
 def constant_overrides():
     return [(fqn, path, to_si(fqn, v, 1.0)) for fqn, (path, v, _unit) in CONSTANTS.items()]
@@ -211,7 +222,13 @@ def hold_overrides():
 
 
 def base_overrides(kind):
-    ov = STAGE_OVERRIDES[EXPERIMENTS[kind]] + constant_overrides() + list(FIXED) + hold_overrides()
+    ov = (
+        STAGE_OVERRIDES[EXPERIMENTS[kind]]
+        + constant_overrides()
+        + exposure_override(kind)
+        + list(FIXED)
+        + hold_overrides()
+    )
     if PIN_DEFAULTS:
         ov += [(p["fqn"], p["path"], si(k, p["default"])) for k, p in PARAMS.items()]
     skip = NOT_SETTABLE.get(EXPERIMENTS[kind], set())
@@ -372,6 +389,8 @@ def load_unit_scales(trees):
     wanted = [(p["fqn"], p["unit"], p["scale"]) for p in PARAMS.values()]
     wanted += [(f"{PARAM_FQN_PREFIX}.{n}", unit, None) for n, (_v, unit) in HOLD.items()]
     wanted += [(fqn, unit, None) for fqn, (_path, _v, unit) in CONSTANTS.items()]
+    wanted += [(fqn.rsplit(".", 1)[0] + ".exposure_time", "ms", 1e-3) 
+               for fqn, _path in filter(None, TOF_PARAM.values())] 
     wanted += [(fqn, "ms", TOF_SCALE) for fqn, _path in filter(None, TOF_PARAM.values())]
     problems, notes = [], []
     for fqn, unit, fallback in wanted:

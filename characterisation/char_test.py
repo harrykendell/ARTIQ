@@ -8,7 +8,7 @@ It imports a characterisation script (cmot_char.py by default) and reuses its
 parameter names, sequence overrides, benchmark experiment and validation, so it
 tests exactly the code the full run will use -- only the sizes are shrunk:
 
-    benchmark thermometry   2 expansion times x 1 repeat           2 shots
+    benchmark thermometry   2 expansion times x 1 repeat            2 shots
     benchmark shot          1 shot                                  1 shot
     1D scan                 3 points x 1 repeat                     3 shots
     parameter thermometry   2 values x 2 expansion times            4 shots
