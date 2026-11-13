@@ -61,7 +61,7 @@ class SUServoFrag(Fragment):
         self.channel = channel
 
         # Kernel variables
-        self.debug_enabled = logging.getLogger().getEffectiveLevel() >= logging.DEBUG
+        self.debug_enabled = logging.getLogger().isEnabledFor(logging.DEBUG)
         self.first_run = True
 
         # %% Kernel invariants
