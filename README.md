@@ -82,9 +82,16 @@ through the existing `artiq-control` process and the
 No per-experiment temperature artefacts, special experiment tabs or RTIO
 integrations are introduced.
 
-**Deployment is pending.** These home-PC changes have not accessed the lab
-logger or restarted ARTIQ. See the temperature deployment instructions in
-`artiq-tool/artiq_lab_control/TEMPERATURE_LOGGER.md`.
+**Laboratory deployment (19 November 2026):** ARTIQ `main` was installed on
+the lab PC and the stack restarted when the scheduler was empty. The TC-08
+controller was launched automatically, opened the physical USB logger, and
+advanced five-second samples with `recording_ok=true`. SQLite passed its
+integrity check. The laboratory's pre-existing staged and unstaged edits were
+preserved. The eight probe channels are intentionally disabled until their
+physical connection/type/name is confirmed, so per-image temperature results
+are not yet hardware-validated. The current USB ACL is temporary; an
+administrator must install the scoped udev rule before a USB reconnection.
+See `artiq-tool/artiq_lab_control/TEMPERATURE_LOGGER.md` for acceptance checks.
 
 ## Libraries
 Any code that we write is based on top of Artiq and NDScan, This allows us to take a much higher level approach than if we were spinning our own control system.
