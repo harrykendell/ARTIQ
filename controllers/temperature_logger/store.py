@@ -79,6 +79,11 @@ class TemperatureStore:
                     name TEXT NOT NULL,
                     type TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS cold_junction (
+                    timestamp REAL PRIMARY KEY,
+                    value_c REAL,
+                    status TEXT NOT NULL
+                );
                 CREATE INDEX IF NOT EXISTS readings_channel_time
                     ON readings(channel, timestamp);
                 CREATE INDEX IF NOT EXISTS readings_time ON readings(timestamp);
@@ -90,6 +95,17 @@ class TemperatureStore:
                         (channel, name, type, enabled, record_with_experiments)
                     VALUES (?, ?, 'K', 0, 0)
                 """, (ch, f"Channel {ch}"))
+            # Existing records contain one CJC value per enabled probe. Recover
+            # their timestamps once, without altering physical-channel data or
+            # expanding a large seven-day history in Python.
+            if db.execute("SELECT 1 FROM metadata WHERE key='cjc_backfilled'").fetchone() is None:
+                db.execute("""
+                    INSERT OR IGNORE INTO cold_junction(timestamp, value_c, status)
+                    SELECT timestamp, MAX(cjc_c),
+                           CASE WHEN MAX(cjc_c) IS NULL THEN 'invalid' ELSE 'ok' END
+                    FROM readings GROUP BY timestamp
+                """)
+                db.execute("INSERT INTO metadata(key, value) VALUES ('cjc_backfilled', '1')")
 
     @contextmanager
     def _connection(self):
@@ -138,9 +154,16 @@ class TemperatureStore:
         return self.config()
 
     def append(self, timestamp, config, readings, cjc_c):
-        """Insert status records for every enabled physical channel at one instant."""
+        """Atomically log CJC at every acquisition, plus each enabled probe."""
         timestamp = float(timestamp)
+        cjc = finite_or_none(cjc_c)
         with self._connection() as db:
+            # The cold junction is measured even when all physical channels
+            # are disabled; it has no channel configuration or experiment flag.
+            db.execute("""
+                INSERT OR REPLACE INTO cold_junction(timestamp, value_c, status)
+                VALUES (?, ?, ?)
+            """, (timestamp, cjc, "ok" if cjc is not None else "invalid"))
             db.executemany("""
                 INSERT INTO readings
                     (timestamp, channel, value_c, status, cjc_c, revision, name, type)
@@ -149,8 +172,7 @@ class TemperatureStore:
                 (timestamp, entry["channel"],
                  finite_or_none(readings.get(entry["channel"], {}).get("value_c")),
                  str(readings.get(entry["channel"], {}).get("status", "missing"))[:40],
-                 finite_or_none(cjc_c), config["revision"],
-                 entry["name"], entry["type"])
+                 cjc, config["revision"], entry["name"], entry["type"])
                 for entry in config["channels"] if entry["enabled"]
             ])
 
@@ -188,10 +210,10 @@ class TemperatureStore:
         if (not math.isfinite(start) or not math.isfinite(end) or start < 0 or
                 end <= start or end - start > MAX_HISTORY_SPAN):
             raise ValueError("History range must be <= 7 days")
-        if (not isinstance(channels, list) or not 1 <= len(channels) <= 8 or
-                any(type(ch) is not int or not 1 <= ch <= 8 for ch in channels) or
+        if (not isinstance(channels, list) or not 1 <= len(channels) <= 9 or
+                any(type(ch) is not int or not 0 <= ch <= 8 for ch in channels) or
                 len(set(channels)) != len(channels)):
-            raise ValueError("Choose 1-8 distinct channels")
+            raise ValueError("Choose 1-9 distinct sources (CJC=0, channels 1-8)")
         if type(max_points) is not int or not 20 <= max_points <= MAX_HISTORY_POINTS:
             raise ValueError("max_points must be 20..600")
         # One bucket retains first, last, minimum and maximum plus first
@@ -202,12 +224,24 @@ class TemperatureStore:
         output = []
         with self._connection() as db:
             for ch in sorted(channels):
-                cursor = db.execute("""
-                    SELECT timestamp, channel, value_c, status, cjc_c, revision,
-                           name, type FROM readings
-                    WHERE channel=? AND timestamp>=? AND timestamp<=?
-                    ORDER BY timestamp ASC
-                """, (ch, start, end))
+                if ch == 0:
+                    # Channel 0 identifies the internal CJC sensor only in
+                    # history requests; it is not a configurable probe.
+                    cursor = db.execute("""
+                        SELECT timestamp, 0 AS channel, value_c, status,
+                               value_c AS cjc_c, 0 AS revision,
+                               'Cold junction' AS name, 'CJC' AS type
+                        FROM cold_junction
+                        WHERE timestamp>=? AND timestamp<=?
+                        ORDER BY timestamp ASC
+                    """, (start, end))
+                else:
+                    cursor = db.execute("""
+                        SELECT timestamp, channel, value_c, status, cjc_c, revision,
+                               name, type FROM readings
+                        WHERE channel=? AND timestamp>=? AND timestamp<=?
+                        ORDER BY timestamp ASC
+                    """, (ch, start, end))
                 current_bucket = None
                 candidates = {}
                 previous = None
@@ -258,4 +292,5 @@ class TemperatureStore:
         cutoff = (time.time() if now is None else now) - RETENTION_SECONDS
         with self._connection() as db:
             removed = db.execute("DELETE FROM readings WHERE timestamp < ?", (cutoff,)).rowcount
+            removed += db.execute("DELETE FROM cold_junction WHERE timestamp < ?", (cutoff,)).rowcount
         return removed

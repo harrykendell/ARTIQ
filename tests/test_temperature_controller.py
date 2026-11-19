@@ -79,6 +79,64 @@ def test_disabled_sensor_keeps_its_recorded_history_for_the_website(store):
     assert store.nearest(timestamp, [1])["1"]["name"] == "Former chamber sensor"
 
 
+def test_cold_junction_is_logged_without_enabled_thermocouples(store):
+    config = store.config()
+    assert all(not entry["enabled"] for entry in config["channels"])
+    stamp = time.time() - 10
+    store.append(stamp, config, {}, 22.7)
+    store.append(stamp + 5, config, {}, float("nan"))
+
+    rows = store.history(stamp - 1, stamp + 6, [0])["rows"]
+    assert [(row[1], row[2], row[3]) for row in rows] == [
+        (0, 22.7, "ok"), (0, None, "invalid")
+    ]
+    assert all((row[6], row[7]) == ("Cold junction", "CJC") for row in rows)
+    assert store.history(stamp - 1, stamp + 6, [1])["rows"] == []
+    assert store.nearest(stamp, [1]) == {}
+    assert all(entry["channel"] != 0 for entry in store.config()["channels"])
+    with pytest.raises(ValueError):
+        store.update_channel(channel(0), config["revision"])
+
+
+def test_cold_junction_backfills_legacy_readings_once(store):
+    import sqlite3
+
+    enabled = enable(store, 1)
+    enabled = store.update_channel(channel(2), enabled["revision"])
+    stamp = time.time() - 10
+    store.append(stamp, enabled, {
+        1: {"value_c": 21.0, "status": "ok"},
+        2: {"value_c": 22.0, "status": "ok"},
+    }, 20.5)
+    # Simulate the old database: CJC existed only as a column on probe rows.
+    with sqlite3.connect(store.path) as db:
+        db.execute("DROP TABLE cold_junction")
+        db.execute("DELETE FROM metadata WHERE key='cjc_backfilled'")
+
+    reopened = TemperatureStore(store.path)
+    assert reopened.history(stamp - 1, stamp + 1, [0])["rows"][0][2] == 20.5
+    assert len(reopened.history(stamp - 1, stamp + 1, [0])["rows"]) == 1
+    assert len(TemperatureStore(store.path).history(stamp - 1, stamp + 1, [0])["rows"]) == 1
+
+
+def test_cold_junction_decimation_retains_invalid_markers_and_extrema(store):
+    config = store.config()
+    stamp = time.time() - 1000
+    for index in range(101):
+        value = float("nan") if index == 25 else (
+            60.0 if index == 44 else (5.0 if index == 65 else 20.0))
+        store.append(stamp + index * 5, config, {}, value)
+    rows = store.history(stamp - 1, stamp + 510, [0], max_points=30)["rows"]
+    assert len(rows) <= 30
+    assert any(row[2] == 60.0 for row in rows)
+    assert any(row[2] == 5.0 for row in rows)
+    assert any(row[3] == "invalid" for row in rows)
+    assert len(store.history(stamp - 1, stamp + 510, list(range(9)))["rows"]) <= 600
+    for channels in ([0, 0], [-1], [0, 9], [True]):
+        with pytest.raises(ValueError):
+            store.history(stamp - 1, stamp + 510, channels)
+
+
 def test_concurrent_config_updates_cannot_overwrite(store):
     barrier = threading.Barrier(3)
     results = []
@@ -135,7 +193,7 @@ def test_retention_restart_and_bounds(store):
                  {1: {"status": "ok", "value_c": 20.0}}, 18)
     store.append(base - RETENTION_SECONDS + 20, config,
                  {1: {"status": "invalid", "value_c": float("nan")}}, float("nan"))
-    assert store.prune(now=base) == 1
+    assert store.prune(now=base) == 2  # expired probe and CJC records
     assert len(TemperatureStore(store.path).history(
         base - RETENTION_SECONDS, base, [1])["rows"]) == 1
     assert TemperatureStore(store.path).history(
@@ -328,6 +386,10 @@ def test_controller_exclusive_owner_and_loopback_rpc(store, monkeypatch, tmp_pat
     try:
         with pytest.raises(BlockingIOError):
             asyncio.run(run_controller(store.path, port=3273))
+        untouched = tmp_path / "unopened.sqlite3"
+        with pytest.raises(BlockingIOError):
+            asyncio.run(run_controller(str(untouched), port=3273))
+        assert not untouched.exists()  # migration must run only after the lock
     finally:
         os.close(fd)
 

@@ -31,11 +31,14 @@ async def run_controller(db_path, *, bind="127.0.0.1", port=3273, interval=5.0,
     # on an externally reachable interface. The Worker authenticates users.
     if not ipaddress.ip_address(bind).is_loopback:
         raise ValueError("TC-08 controller must bind to a loopback address")
-    store = TemperatureStore(db_path)
-    owner_fd = os.open(str(Path(db_path).parent / "owner.lock"),
+    db_directory = Path(db_path).parent
+    db_directory.mkdir(parents=True, exist_ok=True)
+    owner_fd = os.open(str(db_directory / "owner.lock"),
                        os.O_CREAT | os.O_RDWR, 0o600)
     try:
+        # Own the database before running any schema changes or CJC backfill.
         fcntl.flock(owner_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        store = TemperatureStore(db_path)
         stop = asyncio.Event()
         options = {"stop": stop, "interval": interval}
         if driver_factory is not None:

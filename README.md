@@ -37,6 +37,14 @@ every 5 seconds, maintains seven days of SQLite-WAL history and persists the
 channel configuration. It starts with the ARTIQ stack and stops when the
 controller manager shuts down, as intended.
 
+**Staged locally, not yet deployed:** the cold junction is recorded as an
+independent history source (ID 0) on every acquisition, even with all eight
+physical thermocouple channels disabled. Previous CJC values embedded in probe
+rows are backfilled once on opening an existing database. Source 0 is read-only
+and is not an experiment ndscan channel. Its website display and history query
+require coordinated updates from the `artiq-tool` repository; do not update
+the running lab controller outside an idle maintenance window.
+
 `repository/models/device_db.py` registers `temperature_logger_controller`
 as a `type="controller"` device on loopback port 3273. The single
 controller manager treats `127.0.0.1` as a local controller host and starts
