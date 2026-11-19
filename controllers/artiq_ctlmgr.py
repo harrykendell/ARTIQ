@@ -205,7 +205,10 @@ class Controllers:
             if (
                 isinstance(v, dict)
                 and v["type"] == "controller"
-                and self.host_filter in get_ip_addresses(v["host"])
+                # In this single-manager installation, loopback controllers
+                # are local to the manager even when it binds the lab IP.
+                and (self.host_filter in get_ip_addresses(v["host"])
+                     or v["host"] == "127.0.0.1")
                 and "command" in v
             ):
                 v["command"] = v["command"].format(name=k, bind=self.host_filter, **v)

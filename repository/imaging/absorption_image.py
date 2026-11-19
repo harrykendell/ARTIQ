@@ -2,6 +2,7 @@ import json
 import logging
 from time import time
 from typing import TYPE_CHECKING
+
 import numpy as np
 from artiq.coredevice.core import Core
 from artiq.coredevice.dma import CoreDMA
@@ -29,6 +30,10 @@ from repository.fragments.mot import MOT
 from repository.imaging.analysis import fit_gravity, fit_temperature
 from repository.imaging.PCO_Camera import ROI, PcoCamera, camera_name
 from repository.imaging.processor import AbsImage, AbsImageSettings
+from repository.imaging.temperature_results import (
+    declare_temperature_results,
+    push_temperature_results,
+)
 from repository.models.devices import SUServoedBeam
 
 logger = logging.getLogger(__name__)
@@ -264,6 +269,17 @@ class AbsorptionImageExpFrag(ExpFragment):
         self.peak_od: FloatChannel = self.setattr_result("peak_od")
         # Used to link points to images on the website
         self.image_timestamp: FloatChannel = self.setattr_result("image_timestamp")
+
+        # Channel schema is snapshotted at construction, never during a scan.
+        # A missing logger yields no auxiliary channels, not an aborted run.
+        self._temperature_logger = None
+        config = {}
+        try:
+            self._temperature_logger = self.get_device("temperature_logger")
+            config = self._temperature_logger.get_config()
+        except Exception as error:
+            logger.warning("Temperature logger unavailable at build: %s", error)
+        self._temperature_results = declare_temperature_results(self, config)
         # self.raw_tof: OpaqueChannel = self.setattr_result(
         #     "raw_tof",
         #     OpaqueChannel,
@@ -453,6 +469,9 @@ class AbsorptionImageExpFrag(ExpFragment):
 
     @rpc
     def update_images(self):
+        # Timestamp is taken on entering the host RPC, after all kernel pulses.
+        # This is NOT the imaging pulse/exposure timestamp.
+        temperature_observed_at = time()
         # print roi for debugging
         images = self.pco_camera.retrieve_images(
             roi=self.imaging_roi.get(), timeout=1.0 * s
@@ -547,6 +566,10 @@ class AbsorptionImageExpFrag(ExpFragment):
 
         frame_timestamp = time()
         self.image_timestamp.push(frame_timestamp)
+        push_temperature_results(
+            self._temperature_logger, self._temperature_results,
+            temperature_observed_at,
+        )
         self.set_dataset(
             "Images.absorption.analysis",
             json.dumps(

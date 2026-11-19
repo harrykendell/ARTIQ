@@ -1,0 +1,3 @@
+# On the lab PC, replace artiq-usb with a group containing the ARTIQ user.
+# Do not add general USB access; only this Pico TC-08 device is affected.
+SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ATTR{idVendor}=="0ce9", ATTR{idProduct}=="1000", GROUP="artiq-usb", MODE="0660"

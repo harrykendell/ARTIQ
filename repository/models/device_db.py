@@ -285,6 +285,24 @@ device_db.update({
     },
 })
 
+# Only the controller owns Pico USB/SQLite. Loopback-hosted controllers
+# launch locally under the existing (single) controller manager.
+device_db["temperature_logger_controller"] = {
+    "type": "controller",
+    "host": "127.0.0.1",
+    "port": 3273,
+    "target_name": "temperature_logger",
+    "command": "python controllers/aqctl_temperature_logger.py -p {port} --bind {host}",
+}
+# Experiments use a bounded-timeout host adapter so a stalled controller
+# cannot block an absorption-image update indefinitely.
+device_db["temperature_logger"] = {
+    "type": "local",
+    "module": "repository.utils.temperature_logger",
+    "class": "TemperatureLogger",
+    "arguments": {"host": "127.0.0.1", "port": 3273, "timeout": 0.35},
+}
+
 # Aliases
 aliases = {
     # 780 Laser

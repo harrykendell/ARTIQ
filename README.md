@@ -28,6 +28,64 @@ The primary interface for this codebase is [run_gui.sh](run_gui.sh). This should
 </details>
 
 
+## TC-08 temperature monitor (staged integration)
+
+The Pico USB TC-08 is owned by a **native ARTIQ controller**,
+`controllers/aqctl_temperature_logger.py`, started and supervised by the
+existing `artiq_ctlmgr`. Its only USB client continuously samples approximately
+every 5 seconds, maintains seven days of SQLite-WAL history and persists the
+channel configuration. It starts with the ARTIQ stack and stops when the
+controller manager shuts down, as intended.
+
+`repository/models/device_db.py` registers `temperature_logger_controller`
+as a `type="controller"` device on loopback port 3273. The single
+controller manager treats `127.0.0.1` as a local controller host and starts
+it without a separate `launch_host` setting. This assumption would need
+revisiting if additional controller-manager hosts were introduced.
+ARTIQ experiments use the separate
+lightweight `temperature_logger` **local device adapter** in
+`repository/utils/temperature_logger.py`, which makes short-lived Sipyco
+RPC requests with a 350-ms socket timeout and returns an unavailable state
+on failure. No Pico SDK or USB access occurs within experiment workers or
+RTIO kernels. Controller methods: `get_config()`,
+`get_latest()`, `get_channel(channel)`, `get_nearest(timestamp)`,
+`get_history(start, end, channels, max_points)`, `configure_channel(channel,
+expected_revision)`, `ping()`, and `terminate()`.
+
+By default, the persistent SQLite file is
+`~/.local/state/artiq-temperature/history.sqlite3` for the ARTIQ process
+account; override with `ARTIQ_TEMPERATURE_DB` when more appropriate (for example
+on `/storage`). The Pico official `libusbtc08.so` is required for hardware
+acquisition, optionally selected with `PICO_TC08_LIBRARY`. The controller
+binds strictly to loopback because native Sipyco RPC is not authenticated.
+Provide the ARTIQ account with **persistent** USB `0ce9:1000` access,
+using the example udev rule in `controllers/temperature_logger/` (adjust
+the group to the actual lab account). Do not change device permissions or
+restart the ARTIQ stack during experiments.
+
+During `AbsorptionImageExpFrag.build_fragment()`, the configured selection
+is frozen as optional `lab_temp_ch1` through `lab_temp_ch8` ndscan
+`FloatChannel` result IDs (with `_age_s` and `_valid` channels).
+The host-side `update_images()` RPC requests the nearest previously
+**recorded** sample relative to a host observation timestamp taken after the
+imaging kernel, **not** the optical pulse timestamp. Missing, stale, invalid
+and unavailable readings become NaN rather than interrupting imaging.
+Configuration changes never mutate an active experiment's result schema.
+The controller also reports `recording_ok` separately from USB connection.
+SQLite configuration or write failures log a traceback, invalidate cached
+readings for experiments, and are retried on the next sampling cycle without
+reopening a healthy USB driver or attempting a second write in the handler.
+
+The `artiq-tool` repository provides the demand-driven website adapter
+through the existing `artiq-control` process and the
+`/devices/temperature-logger` UI. It never takes ownership of the USB.
+No per-experiment temperature artefacts, special experiment tabs or RTIO
+integrations are introduced.
+
+**Deployment is pending.** These home-PC changes have not accessed the lab
+logger or restarted ARTIQ. See the temperature deployment instructions in
+`artiq-tool/artiq_lab_control/TEMPERATURE_LOGGER.md`.
+
 ## Libraries
 Any code that we write is based on top of Artiq and NDScan, This allows us to take a much higher level approach than if we were spinning our own control system.
 
