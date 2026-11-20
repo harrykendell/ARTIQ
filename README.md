@@ -28,7 +28,7 @@ The primary interface for this codebase is [run_gui.sh](run_gui.sh). This should
 </details>
 
 
-## TC-08 temperature monitor (staged integration)
+## TC-08 temperature monitor
 
 The Pico USB TC-08 is owned by a **native ARTIQ controller**,
 `controllers/aqctl_temperature_logger.py`, started and supervised by the
@@ -37,13 +37,20 @@ every 5 seconds, maintains seven days of SQLite-WAL history and persists the
 channel configuration. It starts with the ARTIQ stack and stops when the
 controller manager shuts down, as intended.
 
-**Staged locally, not yet deployed:** the cold junction is recorded as an
-independent history source (ID 0) on every acquisition, even with all eight
-physical thermocouple channels disabled. Previous CJC values embedded in probe
-rows are backfilled once on opening an existing database. Source 0 is read-only
-and is not an experiment ndscan channel. Its website display and history query
-require coordinated updates from the `artiq-tool` repository; do not update
-the running lab controller outside an idle maintenance window.
+**Laboratory CJC deployment (20 November 2026):** The cold junction is
+recorded as an independent read-only history source (ID 0) at every acquisition,
+even with all eight physical thermocouples disabled. Previous CJC values embedded
+in probe rows were backfilled at startup. CJC is not an experiment ndscan
+channel. Both required controller source files from ARTIQ commit `38d54b1` were
+installed individually on the lab PC after a verified online SQLite backup in
+`~/.local/share/tc08-deployment-20261120/backup/`. Only the TC-08 controller
+child process was restarted by its existing manager; the ARTIQ master and
+other services continued running. Direct loopback RPC verified live CJC and
+physical-channel history, and SQLite passed its integrity check. The lab
+checkout remains on its earlier Git HEAD with unrelated staged/unstaged edits;
+the two targeted source files match the committed revision, but the lab
+repository as a whole was not reset or fast-forwarded. The matching website
+and Cloudflare Worker changes were separately deployed from `artiq-tool`.
 
 `repository/models/device_db.py` registers `temperature_logger_controller`
 as a `type="controller"` device on loopback port 3273. The single
