@@ -95,17 +95,6 @@ class TemperatureStore:
                         (channel, name, type, enabled, record_with_experiments)
                     VALUES (?, ?, 'K', 0, 0)
                 """, (ch, f"Channel {ch}"))
-            # Existing records contain one CJC value per enabled probe. Recover
-            # their timestamps once, without altering physical-channel data or
-            # expanding a large seven-day history in Python.
-            if db.execute("SELECT 1 FROM metadata WHERE key='cjc_backfilled'").fetchone() is None:
-                db.execute("""
-                    INSERT OR IGNORE INTO cold_junction(timestamp, value_c, status)
-                    SELECT timestamp, MAX(cjc_c),
-                           CASE WHEN MAX(cjc_c) IS NULL THEN 'invalid' ELSE 'ok' END
-                    FROM readings GROUP BY timestamp
-                """)
-                db.execute("INSERT INTO metadata(key, value) VALUES ('cjc_backfilled', '1')")
 
     @contextmanager
     def _connection(self):
@@ -222,6 +211,11 @@ class TemperatureStore:
         bucket_count = max(1, max_points // (5 * len(channels)))
         width = (end - start) / bucket_count
         output = []
+
+        def bucket_rows(candidates):
+            unique = {row["timestamp"]: row for row in candidates.values()}
+            return sorted(unique.values(), key=lambda row: row["timestamp"])
+
         with self._connection() as db:
             for ch in sorted(channels):
                 if ch == 0:
@@ -246,10 +240,6 @@ class TemperatureStore:
                 candidates = {}
                 previous = None
                 segment = 0
-                def flush():
-                    if candidates:
-                        unique = {row["timestamp"]: row for row in candidates.values()}
-                        output.extend(sorted(unique.values(), key=lambda row: row["timestamp"]))
                 for raw_row in cursor:
                     row = dict(raw_row)
                     if previous is not None and (
@@ -262,7 +252,7 @@ class TemperatureStore:
                     previous = row
                     bucket = min(bucket_count - 1, int((row["timestamp"] - start) / width))
                     if bucket != current_bucket:
-                        flush()
+                        output.extend(bucket_rows(candidates))
                         candidates = {}
                         current_bucket = bucket
                     candidates.setdefault("first", row)
@@ -276,7 +266,7 @@ class TemperatureStore:
                         if ("max" not in candidates or
                                 row["value_c"] > candidates["max"]["value_c"]):
                             candidates["max"] = row
-                flush()
+                output.extend(bucket_rows(candidates))
         output.sort(key=lambda row: (row["timestamp"], row["channel"]))
         return {
             "start": start, "end": end,

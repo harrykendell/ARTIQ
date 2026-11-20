@@ -37,20 +37,10 @@ every 5 seconds, maintains seven days of SQLite-WAL history and persists the
 channel configuration. It starts with the ARTIQ stack and stops when the
 controller manager shuts down, as intended.
 
-**Laboratory CJC deployment (20 November 2026):** The cold junction is
-recorded as an independent read-only history source (ID 0) at every acquisition,
-even with all eight physical thermocouples disabled. Previous CJC values embedded
-in probe rows were backfilled at startup. CJC is not an experiment ndscan
-channel. Both required controller source files from ARTIQ commit `38d54b1` were
-installed individually on the lab PC after a verified online SQLite backup in
-`~/.local/share/tc08-deployment-20261120/backup/`. Only the TC-08 controller
-child process was restarted by its existing manager; the ARTIQ master and
-other services continued running. Direct loopback RPC verified live CJC and
-physical-channel history, and SQLite passed its integrity check. The lab
-checkout remains on its earlier Git HEAD with unrelated staged/unstaged edits;
-the two targeted source files match the committed revision, but the lab
-repository as a whole was not reset or fast-forwarded. The matching website
-and Cloudflare Worker changes were separately deployed from `artiq-tool`.
+The cold junction is recorded independently as a read-only history source
+(ID 0), including when every physical thermocouple is disabled. It is not
+an ndscan experiment channel. Existing laboratory history was migrated to
+this layout when CJC recording was introduced.
 
 `repository/models/device_db.py` registers `temperature_logger_controller`
 as a `type="controller"` device on loopback port 3273. The single
@@ -97,16 +87,12 @@ through the existing `artiq-control` process and the
 No per-experiment temperature artefacts, special experiment tabs or RTIO
 integrations are introduced.
 
-**Laboratory deployment (19 November 2026):** ARTIQ `main` was installed on
-the lab PC and the stack restarted when the scheduler was empty. The TC-08
-controller was launched automatically, opened the physical USB logger, and
-advanced five-second samples with `recording_ok=true`. SQLite passed its
-integrity check. The laboratory's pre-existing staged and unstaged edits were
-preserved. The eight probe channels are intentionally disabled until their
-physical connection/type/name is confirmed, so per-image temperature results
-are not yet hardware-validated. The current USB ACL is temporary; an
-administrator must install the scoped udev rule before a USB reconnection.
-See `artiq-tool/artiq_lab_control/TEMPERATURE_LOGGER.md` for acceptance checks.
+**Lab operations:** The controller has been verified against the physical
+TC-08 and its SQLite store. Probe names, types and experiment-recording flags
+must be configured for the actual sensors before using the resulting data in
+experiments. The lab's temporary USB ACL must still be replaced with the
+scoped udev rule above to survive device reconnection. See
+`artiq-tool/artiq_lab_control/TEMPERATURE_LOGGER.md` for acceptance checks.
 
 ## Libraries
 Any code that we write is based on top of Artiq and NDScan, This allows us to take a much higher level approach than if we were spinning our own control system.

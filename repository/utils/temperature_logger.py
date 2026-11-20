@@ -31,7 +31,7 @@ class TemperatureLogger:
                 return getattr(client, method)(*arguments)
             finally:
                 client.close_rpc()
-        except Exception as error:
+        except Exception as error:  # noqa: BLE001 - return unavailable on RPC faults
             return {"available": False, "connected": False,
                     "error": str(error)[:160]}
 

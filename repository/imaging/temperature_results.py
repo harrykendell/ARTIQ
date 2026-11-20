@@ -66,7 +66,7 @@ def push_temperature_results(logger, bindings, observed_at):
             snapshot = {}
         readings = snapshot.get("readings") or {}
         connected = snapshot.get("connected") is True and snapshot.get("available") is not False
-    except Exception:
+    except Exception:  # noqa: BLE001 - logger faults must never abort imaging
         readings = {}
         connected = False
     for ch, value_channel, age_channel, valid_channel, expected_type in bindings:

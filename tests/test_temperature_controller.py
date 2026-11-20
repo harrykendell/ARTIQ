@@ -2,24 +2,22 @@
 from __future__ import annotations
 
 import asyncio
-import ctypes as ct
-import json
 import os
-import socket
-import tempfile
+import sys
 import threading
 import time
 from pathlib import Path
 
 import pytest
 
-import sys
 sys.path.insert(0, str(Path(__file__).parent.parent / "controllers"))
 
-from temperature_logger.pico import PicoError, PicoTC08
 from temperature_logger.acquisition import TemperatureController
+from temperature_logger.pico import PicoError, PicoTC08
 from temperature_logger.store import (
-    RETENTION_SECONDS, TemperatureStore, validate_configuration,
+    RETENTION_SECONDS,
+    TemperatureStore,
+    validate_configuration,
 )
 
 
@@ -91,32 +89,13 @@ def test_cold_junction_is_logged_without_enabled_thermocouples(store):
         (0, 22.7, "ok"), (0, None, "invalid")
     ]
     assert all((row[6], row[7]) == ("Cold junction", "CJC") for row in rows)
+    assert TemperatureStore(store.path).history(stamp - 1, stamp + 6, [0])["rows"] == rows
     assert store.history(stamp - 1, stamp + 6, [1])["rows"] == []
     assert store.nearest(stamp, [1]) == {}
     assert all(entry["channel"] != 0 for entry in store.config()["channels"])
     with pytest.raises(ValueError):
         store.update_channel(channel(0), config["revision"])
 
-
-def test_cold_junction_backfills_legacy_readings_once(store):
-    import sqlite3
-
-    enabled = enable(store, 1)
-    enabled = store.update_channel(channel(2), enabled["revision"])
-    stamp = time.time() - 10
-    store.append(stamp, enabled, {
-        1: {"value_c": 21.0, "status": "ok"},
-        2: {"value_c": 22.0, "status": "ok"},
-    }, 20.5)
-    # Simulate the old database: CJC existed only as a column on probe rows.
-    with sqlite3.connect(store.path) as db:
-        db.execute("DROP TABLE cold_junction")
-        db.execute("DELETE FROM metadata WHERE key='cjc_backfilled'")
-
-    reopened = TemperatureStore(store.path)
-    assert reopened.history(stamp - 1, stamp + 1, [0])["rows"][0][2] == 20.5
-    assert len(reopened.history(stamp - 1, stamp + 1, [0])["rows"]) == 1
-    assert len(TemperatureStore(store.path).history(stamp - 1, stamp + 1, [0])["rows"]) == 1
 
 
 def test_cold_junction_decimation_retains_invalid_markers_and_extrema(store):
@@ -214,7 +193,7 @@ def test_parallel_sqlite_reads_and_writes(store):
             for index in range(100):
                 store.append(1000 + index, config,
                              {1: {"status": "ok", "value_c": float(index)}}, 21)
-        except Exception as error:
+        except Exception as error:  # noqa: BLE001 - collect all thread failures
             failures.append(error)
     def reader():
         barrier.wait()
@@ -222,7 +201,7 @@ def test_parallel_sqlite_reads_and_writes(store):
             for _ in range(50):
                 store.history(999, 1101, [1], max_points=50)
                 store.nearest(1042)
-        except Exception as error:
+        except Exception as error:  # noqa: BLE001 - collect all thread failures
             failures.append(error)
     threads = [threading.Thread(target=func) for func in (writer, reader)]
     for thread in threads:
@@ -364,9 +343,9 @@ def test_controller_rpc_contract_is_cached_and_reconfigurable(store):
 
 def test_controller_exclusive_owner_and_loopback_rpc(store, monkeypatch, tmp_path):
     # No native Sipyco installation needed for an early owner-lock rejection.
+    import importlib.util
     import sys
     import types
-    import importlib.util
     entry = Path(__file__).parent.parent / "controllers/aqctl_temperature_logger.py"
     spec = importlib.util.spec_from_file_location("_tc08_controller_entry", entry)
     controller_entry = importlib.util.module_from_spec(spec)

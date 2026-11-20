@@ -164,7 +164,7 @@ class TemperatureController:
                         read_succeeded = True
                     except asyncio.CancelledError:
                         raise
-                    except Exception as error:
+                    except Exception as error:  # noqa: BLE001 - hardware must recover
                         # Only USB/SDK faults should close and reopen the driver.
                         log.warning("Pico TC-08 unavailable: %s", error)
                         self.connected = False
@@ -214,7 +214,7 @@ class TemperatureController:
                 remaining = max(0.1, self.interval - (time.monotonic() - started))
                 try:
                     await asyncio.wait_for(self._reconfigure.wait(), timeout=remaining)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     pass
         finally:
             self.connected = False

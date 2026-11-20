@@ -2,9 +2,9 @@
 from __future__ import annotations
 
 import ctypes as ct
-from ctypes.util import find_library
 import math
 import os
+from ctypes.util import find_library
 from pathlib import Path
 
 from .store import THERMOCOUPLE_TYPES

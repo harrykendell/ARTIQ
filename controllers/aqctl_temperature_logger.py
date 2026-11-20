@@ -12,8 +12,8 @@ import fcntl
 import ipaddress
 import logging
 import os
-from pathlib import Path
 import signal
+from pathlib import Path
 
 from temperature_logger.acquisition import TemperatureController
 from temperature_logger.store import TemperatureStore
@@ -69,7 +69,7 @@ async def run_controller(db_path, *, bind="127.0.0.1", port=3273, interval=5.0,
             # handle: cancelling asyncio.to_thread() does not stop the worker.
             try:
                 await asyncio.wait_for(sample_task, timeout=15)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 log.error("TC-08 read did not stop within 15s; forcing shutdown")
             except asyncio.CancelledError:
                 pass
