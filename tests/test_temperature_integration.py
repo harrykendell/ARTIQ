@@ -56,6 +56,62 @@ def test_artiq_adapter_is_best_effort_and_never_reads_usb():
     with pytest.raises(ValueError):
         logger.get_nearest(float("nan"))
 
+def test_artiq_read_returns_cached_temperatures_and_cjc_with_invalid_as_nan():
+    from time import time
+
+    calls = []
+    now = time()
+
+    class FakeClient:
+        def __init__(self, host, port, target, timeout=None):
+            calls.append("open")
+
+        def get_latest(self):
+            calls.append("get_latest")
+            return {
+                "available": True, "connected": True, "recording_ok": True,
+                "timestamp": now, "sample_interval_s": 5.0,
+                "cold_junction_c": 22.2,
+                "channels": [
+                    {"channel": 1, "enabled": True},
+                    {"channel": 2, "enabled": True},
+                    {"channel": 3, "enabled": False},
+                ],
+                "readings": {
+                    "1": {"value_c": 19.5, "status": "ok",
+                          "valid": True, "timestamp": now},
+                    "2": {"value_c": 99.0, "status": "disconnected",
+                          "valid": False, "timestamp": now},
+                },
+            }
+
+        def close_rpc(self):
+            calls.append("close")
+
+    logger = TemperatureLogger(rpc_factory=FakeClient)
+    snapshot = logger.read()
+    assert snapshot["connected"] and snapshot["available"]
+    assert snapshot["timestamp"] == now
+    assert snapshot["cold_junction_c"] == 22.2
+    assert set(snapshot["channels"]) == {1, 2}
+    assert snapshot["channels"][1] == {
+        "temperature_c": 19.5, "timestamp": now, "valid": True
+    }
+    assert math.isnan(snapshot["channels"][2]["temperature_c"])
+    assert snapshot["channels"][2]["valid"] is False
+    assert calls == ["open", "get_latest", "close"]
+
+
+def test_artiq_read_reports_disconnected_as_unavailable():
+    def timeout(*args, **kwargs):
+        raise TimeoutError("Controller unavailable")
+
+    snapshot = TemperatureLogger(rpc_factory=timeout).read()
+    assert snapshot["available"] is False
+    assert snapshot["connected"] is False
+    assert math.isnan(snapshot["cold_junction_c"])
+    assert snapshot["channels"] == {}
+
 
 @pytest.fixture
 def results_module(monkeypatch):
@@ -111,50 +167,43 @@ def test_dynamic_channel_names_types_and_low_priority(results_module):
     fragment = Fragment()
     bindings = results_module.declare_temperature_results(fragment, config())
     assert [item[0] for item in bindings] == [1, 2]
-    assert sorted(fragment.outputs) == sorted([
-        "lab_temp_ch1", "lab_temp_ch1_age_s", "lab_temp_ch1_valid",
-        "lab_temp_ch2", "lab_temp_ch2_age_s", "lab_temp_ch2_valid",
-    ])
+    assert sorted(fragment.outputs) == ["lab_temp_ch1", "lab_temp_ch2"]
     value = fragment.outputs["lab_temp_ch1"]
     assert value.props["description"].startswith("MOT chamber (TC-08 CH1, type K)")
     assert value.props["unit"] == "°C" and value.props["scale"] == 1.0
     assert value.props["display_hints"]["priority"] < 0
-    assert fragment.outputs["lab_temp_ch1_age_s"].props["unit"] == "s"
-    assert fragment.outputs["lab_temp_ch1_valid"].props["display_hints"]["priority"] < 0
+    assert all(len(binding) == 4 for binding in bindings)
 
 
 def test_one_value_per_declared_channel_per_acquisition(results_module):
     fragment = Fragment()
     bindings = results_module.declare_temperature_results(fragment, config())
+
     class Logger:
         calls = 0
+
         def get_nearest(self, timestamp):
             self.calls += 1
             assert timestamp == 1000
             return {
                 "available": True, "connected": True, "readings": {
                     "1": {"value_c": 21.5, "valid": True, "status": "ok",
-                          "timestamp": 999.0},
+                          "timestamp": 999.0, "name": "MOT chamber", "type": "K"},
                     "2": {"value_c": 22.0, "valid": True, "status": "ok",
-                          "timestamp": 800.0}
-                }
+                          "timestamp": 800.0, "name": "Optical table", "type": "T"},
+                },
             }
+
     logger = Logger()
     results_module.push_temperature_results(logger, bindings, 1000)
     assert logger.calls == 1
     assert fragment.outputs["lab_temp_ch1"].values == [21.5]
-    assert fragment.outputs["lab_temp_ch1_age_s"].values == [1.0]
-    assert fragment.outputs["lab_temp_ch1_valid"].values == [1.0]
     assert math.isnan(fragment.outputs["lab_temp_ch2"].values[0])
-    assert fragment.outputs["lab_temp_ch2_age_s"].values == [200.0]
-    assert fragment.outputs["lab_temp_ch2_valid"].values == [0.0]
-    # A second shot advances EVERY existing numeric channel by one value,
-    # even though the logger could not be reached.
+
+    # Every shot must push a result even if the logger is disconnected.
     results_module.push_temperature_results(None, bindings, 1005)
-    for result in fragment.outputs.values():
-        assert len(result.values) == 2
-    assert math.isnan(fragment.outputs["lab_temp_ch1"].values[-1])
-    assert math.isnan(fragment.outputs["lab_temp_ch1_age_s"].values[-1])
+    assert all(len(result.values) == 2 for result in fragment.outputs.values())
+    assert all(math.isnan(result.values[-1]) for result in fragment.outputs.values())
 
 
 def test_snapshot_schema_stays_fixed_and_rejects_invalid_samples(results_module):
@@ -162,18 +211,37 @@ def test_snapshot_schema_stays_fixed_and_rejects_invalid_samples(results_module)
     configuration = config()
     bindings = results_module.declare_temperature_results(fragment, configuration)
     configuration["channels"].clear()
-    assert len(fragment.outputs) == 6
+    assert len(fragment.outputs) == 2
+
     results_module.push_temperature_results(
         types.SimpleNamespace(get_nearest=lambda timestamp: {
             "available": True, "connected": False,
             "readings": {
                 "1": {"value_c": 30, "status": "ok", "valid": True,
-                      "timestamp": timestamp}
+                      "timestamp": timestamp, "name": "MOT chamber", "type": "K"}
             }
         }), bindings, 1000)
-    assert math.isnan(fragment.outputs["lab_temp_ch1"].values[0])
-    assert fragment.outputs["lab_temp_ch1_valid"].values[0] == 0.0
-    assert fragment.outputs["lab_temp_ch2_valid"].values[0] == 0.0
+    assert all(math.isnan(result.values[0]) for result in fragment.outputs.values())
+
+
+def test_reconfigured_probe_does_not_change_existing_result_label(results_module):
+    fragment = Fragment()
+    bindings = results_module.declare_temperature_results(fragment, config())
+
+    class Logger:
+        def get_nearest(self, timestamp):
+            return {
+                "available": True, "connected": True,
+                "readings": {
+                    "1": {"value_c": 25.0, "status": "ok", "valid": True,
+                          "timestamp": timestamp, "name": "Different probe", "type": "K"},
+                    "2": {"value_c": 26.0, "status": "ok", "valid": True,
+                          "timestamp": timestamp, "name": "Optical table", "type": "J"},
+                },
+            }
+
+    results_module.push_temperature_results(Logger(), bindings, 1000)
+    assert all(math.isnan(result.values[0]) for result in fragment.outputs.values())
 
 
 def test_failed_nearest_query_never_interrupts_result_pushing(results_module):

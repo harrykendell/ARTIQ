@@ -52,10 +52,15 @@ lightweight `temperature_logger` **local device adapter** in
 `repository/utils/temperature_logger.py`, which makes short-lived Sipyco
 RPC requests with a 350-ms socket timeout and returns an unavailable state
 on failure. No Pico SDK or USB access occurs within experiment workers or
-RTIO kernels. Controller methods: `get_config()`,
-`get_latest()`, `get_channel(channel)`, `get_nearest(timestamp)`,
-`get_history(start, end, channels, max_points)`, `configure_channel(channel,
-expected_revision)`, `ping()`, and `terminate()`.
+RTIO kernels. For simple host-side access, use
+`self.get_device("temperature_logger").read()`: the result contains
+`timestamp`, `cold_junction_c` and `channels` keyed by physical channel
+number, each with `temperature_c`, `timestamp` and `valid`. Invalid or
+unavailable temperatures are NaN. For time-correlated data, use
+`get_nearest(timestamp)`; other controller methods are `get_config()`,
+`get_latest()`, `get_channel(channel)`, `get_history(start, end, channels,
+max_points)`, `configure_channel(channel, expected_revision)`, `ping()`
+and `terminate()`.
 
 By default, the persistent SQLite file is
 `~/.local/state/artiq-temperature/history.sqlite3` for the ARTIQ process
@@ -70,7 +75,8 @@ restart the ARTIQ stack during experiments.
 
 During `AbsorptionImageExpFrag.build_fragment()`, the configured selection
 is frozen as optional `lab_temp_ch1` through `lab_temp_ch8` ndscan
-`FloatChannel` result IDs (with `_age_s` and `_valid` channels).
+`FloatChannel` result IDs: **one °C value per selected thermocouple**, or
+NaN when invalid. No sample-age or validity result channels are published.
 The host-side `update_images()` RPC requests the nearest previously
 **recorded** sample relative to a host observation timestamp taken after the
 imaging kernel, **not** the optical pulse timestamp. Missing, stale, invalid
