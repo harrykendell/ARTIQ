@@ -2,8 +2,6 @@ from artiq.language import kernel, EnvExperiment, us, ms, MHz, V, dB, delay
 
 from artiq.coredevice.core import Core
 from artiq.coredevice.suservo import SUServo, Channel as SUServoChannel
-from artiq.coredevice.ttl import TTLInOut
-
 import numpy as np
 
 
@@ -16,7 +14,7 @@ class SUServoManager:  # {{{
         core: Core,
         suservo: SUServo,
         suservo_chs: list[SUServoChannel],
-        shutters: list[TTLInOut],
+        shutters,
         beams,
         shutter_infos,
         name="suservo",
@@ -25,7 +23,18 @@ class SUServoManager:  # {{{
         self.core: Core = core
         self.suservo: SUServo = suservo
         self.channels: list[SUServoChannel] = suservo_chs
-        self.shutters: list[TTLInOut] = shutters
+        # Keep the heterogeneous device list on the host. ARTIQ kernels cannot
+        # infer a list containing both TTLOut and TTLInOut, so expose each
+        # configured shutter as a separately typed attribute for kernel use.
+        self.shutters = list(shutters)
+        if len(self.shutters) != 6:
+            raise ValueError("SUServoManager expects exactly six configured shutters")
+        self.shutter0 = self.shutters[0]
+        self.shutter1 = self.shutters[1]
+        self.shutter2 = self.shutters[2]
+        self.shutter3 = self.shutters[3]
+        self.shutter4 = self.shutters[4]
+        self.shutter5 = self.shutters[5]
         self.beams = list(beams)
         self.shutter_infos = list(shutter_infos)
         self.name = name
@@ -191,6 +200,31 @@ class SUServoManager:  # {{{
         self._persist(self.output_enabled_datasets[ch], False)
         self._set_output_enabled_hardware(ch, False)
 
+    def pulse(self, ch: np.int32, on_time=100 * ms, off_time=100 * ms, count=1):
+        """Emit a pulse train and leave the DDS output disabled."""
+        if on_time <= 0 or off_time < 0 or count < 1:
+            raise ValueError("Pulse times and count are invalid")
+        self.en_outs[ch] = False
+        self._persist(self.output_enabled_datasets[ch], False)
+        self._pulse_output_hardware(ch, on_time, off_time, count)
+
+    @kernel
+    def _pulse_output_hardware(self, ch, on_time, off_time, count):
+        self.core.break_realtime()
+        for pulse_index in range(count):
+            self.channels[ch].set(
+                en_out=1,
+                en_iir=1 if self.en_iirs[ch] else 0,
+                profile=ch,
+            )
+            delay(on_time)
+            self.channels[ch].set(
+                en_out=0,
+                en_iir=1 if self.en_iirs[ch] else 0,
+                profile=ch,
+            )
+            delay(off_time)
+
     @kernel
     def _set_output_enabled_hardware(self, ch, enabled):
         self.core.break_realtime()
@@ -317,23 +351,78 @@ class SUServoManager:  # {{{
 
     def open_shutter(self, ch):
         """Enable a given shutter"""
+        if ch in (4, 5):
+            self._pulse_flip_mirror_hardware(ch, self.shutter_infos[ch].delay)
+        else:
+            self._set_shutter_hardware(ch, True)
         self.en_shutters[ch] = True
         self._persist(self.shutter_datasets[ch], True)
-        self._set_shutter_hardware(ch, True)
 
     def close_shutter(self, ch):
         """Disable a given shutter"""
+        if ch in (4, 5):
+            self._pulse_flip_mirror_hardware(ch, self.shutter_infos[ch].delay)
+        else:
+            self._set_shutter_hardware(ch, False)
         self.en_shutters[ch] = False
         self._persist(self.shutter_datasets[ch], False)
-        self._set_shutter_hardware(ch, False)
 
     @kernel
     def _set_shutter_hardware(self, ch, opened):
         self.core.break_realtime()
-        if opened:
-            self.shutters[ch].on()
-        else:
-            self.shutters[ch].off()
+        if ch == 0:
+            if opened:
+                self.shutter0.on()
+            else:
+                self.shutter0.off()
+        elif ch == 1:
+            if opened:
+                self.shutter1.on()
+            else:
+                self.shutter1.off()
+        elif ch == 2:
+            if opened:
+                self.shutter2.on()
+            else:
+                self.shutter2.off()
+        elif ch == 3:
+            if opened:
+                self.shutter3.on()
+            else:
+                self.shutter3.off()
+        elif ch == 4:
+            # TTLInOut channels start in input mode. Enable output and allow
+            # the direction change to settle before setting their level.
+            self.shutter4.output()
+            delay(1 * us)
+            if opened:
+                self.shutter4.on()
+            else:
+                self.shutter4.off()
+        elif ch == 5:
+            self.shutter5.output()
+            delay(1 * us)
+            if opened:
+                self.shutter5.on()
+            else:
+                self.shutter5.off()
+
+    @kernel
+    def _pulse_flip_mirror_hardware(self, ch, duration):
+        """Pulse a flip-mirror output, then leave its TTL low."""
+        self.core.break_realtime()
+        if ch == 4:
+            self.shutter4.output()
+            delay(1 * us)
+            self.shutter4.on()
+            delay(duration)
+            self.shutter4.off()
+        elif ch == 5:
+            self.shutter5.output()
+            delay(1 * us)
+            self.shutter5.on()
+            delay(duration)
+            self.shutter5.off()
 
     def set_all(self):
         """Restore all configured state without rewriting its datasets."""
@@ -349,11 +438,13 @@ class SUServoManager:  # {{{
         delay(150 * ms)
 
         # shutters
-        for shutter in range(len(self.shutters)):
-            if self.en_shutters[shutter]:
-                self.shutters[shutter].on()
+        for shutter in range(len(self.en_shutters)):
+            if shutter == 4 or shutter == 5:
+                # The saved state tracks the selected mirror position; the
+                # trigger line itself must remain low between pulses.
+                self._set_shutter_hardware(shutter, False)
             else:
-                self.shutters[shutter].off()
+                self._set_shutter_hardware(shutter, self.en_shutters[shutter])
 
         delay(10 * ms)
         self.core.break_realtime()

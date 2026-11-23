@@ -330,15 +330,19 @@ aliases = {
     "pco_camera_pixelfly": "ttl8",
     "pco_camera_edge": "ttl9",
     # probe - generic use
-    "probe": "ttl11",
+    # "probe": "ttl11",
     # we need the dummy to also be a TTLOut not TTLInOut for typing reasons
     "dummy_shutter": "shutter_2DMOT",
     # moving stage
-    "moving_stage_ttl": "ttl11",
+    # "moving_stage_ttl": "ttl11",
     # Shaking the Red Pitaya for the 852nm laser unlock
     "AFG_ext_trigger": "ttl7",  # external trigger to Function Generator
-    "RedPitaya_trigger": "ttl10",
-    "scope_trigger": "ttl11",
+    # "RedPitaya_trigger": "ttl10",
+    # "scope_trigger": "ttl11",
+  
+    "ODT_dimple_flip_mirror": "ttl11", # needs a  different TTL channel 
+
+    "ODT_reserviour_flip_mirror": "ttl10",
 }
 
 device_db |= aliases

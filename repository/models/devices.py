@@ -78,6 +78,7 @@ VDRIVEN_SUPPLIES = {supply.name: supply for supply in VDRIVEN_SUPPLIES}
 
 THORLABS_SHUTTER_DELAY = 35.0 * ms
 EBAY_SHUTTER_DELAY = 25.0 * ms
+THORLABS_FLIP_MIRROR = 10 * ms
 # the switch on time is actually quick fast. The limit is the dislike of short pulses
 
 SHUTTERS = [
@@ -85,6 +86,16 @@ SHUTTERS = [
     Shutter(name="3D MOT", ttl="shutter_3DMOT", delay=THORLABS_SHUTTER_DELAY),
     Shutter(name="Imaging", ttl="shutter_IMG", delay=EBAY_SHUTTER_DELAY),
     Shutter(name="Lattice", ttl="shutter_LATTICE", delay=THORLABS_SHUTTER_DELAY),
+    Shutter(
+        name="ODT Dimple flip mirror",
+        ttl="ODT_dimple_flip_mirror",
+        delay=THORLABS_FLIP_MIRROR,
+    ),
+    Shutter(
+        name="ODT Res flip mirror",
+        ttl="ODT_reserviour_flip_mirror",
+        delay=THORLABS_FLIP_MIRROR,
+    ),
 ]
 SHUTTERS = {shutter.name: shutter for shutter in SHUTTERS}
 
@@ -150,18 +161,18 @@ SUSERVOED_BEAMS = [
         frequency=110.0 * MHz,
         attenuation=18.0 * dB,
         servo_enabled=True,
-        calib_gain=547.53,
-        calib_offset=-27.048,
+        calib_gain=368.1,
+        calib_offset=-32.5,
         setpoint=0.0001 * V,  # 0.324 * V,
     ),
     SUServoedBeam(
         name="CDT2",
         suservo_device="suservo_aom_CDT2",
-        frequency=110.0 * MHz,
+        frequency=111.1 * MHz,
         attenuation=18.0 * dB,
         servo_enabled=True,
-        calib_gain=3751.411,
-        calib_offset=-306.046,
+        calib_gain=2336.1,
+        calib_offset=-196.4,
         setpoint=0.0001 * V,
     ),
 ]

@@ -1,0 +1,26 @@
+step,rid,kind,label,shots,submitted,finished
+0,34218,benchmark_thermometry,"all defaults, TOF scan",27,2026-11-10T11:40:22,2026-11-10T11:43:45
+1,34219,scan_1d,CMOT_settle_time: 1.5-10 ms,105,2026-11-10T11:43:45,2026-11-10T11:56:15
+2,34220,benchmark_shot,all defaults @ 12 ms,3,2026-11-10T11:56:15,2026-11-10T11:56:55
+3,34221,scan_1d,CMOT_Z_current: 10-100 mA,105,2026-11-10T11:56:55,2026-11-10T12:09:32
+4,34222,param_thermometry,CMOT_Z_current x TOF,180,2026-11-10T12:09:32,2026-11-10T12:30:59
+5,34223,benchmark_shot,all defaults @ 12 ms,3,2026-11-10T12:30:59,2026-11-10T12:31:39
+6,34224,scan_1d,CMOT_detuning: 6-12 Γ,105,2026-11-10T12:31:39,2026-11-10T12:43:59
+7,34225,param_thermometry,CMOT_repump_detuning x TOF,180,2026-11-10T12:43:59,2026-11-10T13:03:47
+8,34226,benchmark_shot,all defaults @ 12 ms,3,2026-11-10T13:03:47,2026-11-10T13:04:19
+9,34227,lhs,"7-D LHS, Bayesian (optimise)",794,2026-11-10T13:04:19,2026-11-10T14:59:19
+10,34228,benchmark_thermometry,"all defaults, TOF scan",27,2026-11-10T14:59:19,2026-11-10T15:02:29
+11,34229,param_thermometry,CMOT_duration x TOF,180,2026-11-10T15:02:29,2026-11-10T15:22:25
+12,34230,benchmark_shot,all defaults @ 12 ms,3,2026-11-10T15:22:25,2026-11-10T15:22:57
+13,34231,scan_1d,CMOT_duration: 0.5-10 ms,105,2026-11-10T15:22:57,2026-11-10T15:34:38
+14,34232,param_thermometry,CMOT_detuning x TOF,180,2026-11-10T15:34:38,2026-11-10T15:54:34
+15,34233,benchmark_shot,all defaults @ 12 ms,3,2026-11-10T15:54:34,2026-11-10T15:55:06
+16,34234,scan_1d,CMOT_repump_detuning: 0-5 Γ,105,2026-11-10T15:55:06,2026-11-10T16:06:39
+17,34235,param_thermometry,CMOT_Y_current x TOF,180,2026-11-10T16:06:39,2026-11-10T16:26:39
+18,34236,benchmark_shot,all defaults @ 12 ms,3,2026-11-10T16:26:39,2026-11-10T16:27:11
+19,34237,scan_1d,CMOT_repump_attenuation: 0-5 dB,105,2026-11-10T16:27:11,2026-11-10T16:38:56
+20,34238,param_thermometry,CMOT_settle_time x TOF,180,2026-11-10T16:38:56,2026-11-10T16:58:56
+21,34239,benchmark_shot,all defaults @ 12 ms,3,2026-11-10T16:58:56,2026-11-10T16:59:28
+22,34240,scan_1d,CMOT_Y_current: 0.3-5 mA,105,2026-11-10T16:59:28,2026-11-10T17:11:13
+23,34241,param_thermometry,CMOT_repump_attenuation x TOF,180,2026-11-10T17:11:13,2026-11-10T17:31:19
+24,34242,benchmark_thermometry,"all defaults, TOF scan",27,2026-11-10T17:31:19,2026-11-10T17:34:29

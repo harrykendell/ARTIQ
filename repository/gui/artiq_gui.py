@@ -3,6 +3,12 @@ import logging
 import os
 import sys
 
+# Avoid loading unnecessary GTK integration in this Qt-only GUI.
+os.environ.pop("XDG_CURRENT_DESKTOP", None)
+
+# Suppress Qt's harmless GLX framebuffer warnings.
+os.environ["QT_LOGGING_RULES"] = "qt.glx.warning=false"
+
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal
 from PyQt5.QtGui import QDoubleValidator, QIcon
 from PyQt5.QtWidgets import (
@@ -13,6 +19,7 @@ from PyQt5.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QMessageBox,
     QPushButton,
     QSlider,
     QTabWidget,
@@ -48,12 +55,23 @@ from repository.models.devices import (
 
 
 class Switch(QWidget):
-    def __init__(self, default: bool, turn_on, turn_off, on_text="ON", off_text="OFF"):
+    def __init__(
+        self,
+        default: bool,
+        turn_on,
+        turn_off,
+        on_text="ON",
+        off_text="OFF",
+        colors=None,
+    ):
         super().__init__()
         self.turn = [turn_on, turn_off]
         self.state = default
         self.text = [off_text, on_text]
-        self.color = ["background-color: #b75d5d", "background-color: #5db75d"]
+        self.color = colors or [
+            "background-color: #b75d5d",
+            "background-color: #5db75d",
+        ]
         # Main layout for this widget
         layout = QVBoxLayout()
 
@@ -416,6 +434,51 @@ class SingleChannelSUServo(QWidget):
             ),
         )
         top.addWidget(self.dds_button)
+        if beam.name in {"CDT1", "CDT2"}:
+            self.pulse = QWidget()
+            pulse_layout = QHBoxLayout(self.pulse)
+            pulse_layout.setContentsMargins(8, 8, 8, 8)
+            pulse_layout.setSpacing(12)
+
+            timing_layout = QVBoxLayout()
+            timing_layout.setSpacing(4)
+            timing_layout.addWidget(QLabel("On time (ms)"))
+            self.pulse_on_time = QDoubleSpinBox()
+            self.pulse_on_time.setRange(0.001, 10000.0)
+            self.pulse_on_time.setDecimals(3)
+            self.pulse_on_time.setSingleStep(1.0)
+            self.pulse_on_time.setValue(100.0)
+            self.pulse_on_time.setMaximumWidth(120)
+            timing_layout.addWidget(self.pulse_on_time)
+            timing_layout.addWidget(QLabel("Off time (ms)"))
+            self.pulse_off_time = QDoubleSpinBox()
+            self.pulse_off_time.setRange(0.0, 10000.0)
+            self.pulse_off_time.setDecimals(3)
+            self.pulse_off_time.setSingleStep(1.0)
+            self.pulse_off_time.setValue(100.0)
+            self.pulse_off_time.setMaximumWidth(120)
+            timing_layout.addWidget(self.pulse_off_time)
+            pulse_layout.addLayout(timing_layout)
+
+            action_layout = QVBoxLayout()
+            action_layout.setSpacing(4)
+            self.pulse_button = QPushButton("Start pulsing")
+            self.pulse_button.setMaximumWidth(120)
+            self.pulse_button.setToolTip(
+                "Start accurately timed AOM pulses; click again to stop after the current batch"
+            )
+            self.pulse_button.clicked.connect(self.start_pulsing)
+            action_layout.addWidget(self.pulse_button)
+            action_layout.addStretch(1)
+            pulse_layout.addLayout(action_layout)
+            pulse_layout.addStretch(1)
+            self._pulse_running = False
+            self._pulse_on_time = 0.0
+            self._pulse_off_time = 0.0
+            self._pulse_batch_count = 1
+            self._pulse_timer = QTimer(self)
+            self._pulse_timer.setSingleShot(True)
+            self._pulse_timer.timeout.connect(self._emit_next_pulse)
         self.pid_button = Switch(
             default=self.manager.en_iirs[channel],
             turn_on=lambda: self.bridge.change_control(
@@ -471,8 +534,58 @@ class SingleChannelSUServo(QWidget):
         # Booster
         self.booster = BoosterControl(boostermanager, self.set_tab, ch=channel)
         self.tabs.addTab(self.booster, "Booster")
+        if beam.name in {"CDT1", "CDT2"}:
+            self.tabs.addTab(self.pulse, "Pulse")
 
         vbox.addWidget(self.tabs)
+
+    def start_pulsing(self):
+        if self._pulse_running:
+            self.stop_pulsing()
+            return
+        self._pulse_running = True
+        self._pulse_on_time = self.pulse_on_time.value() * ms
+        self._pulse_off_time = self.pulse_off_time.value() * ms
+        period = self._pulse_on_time + self._pulse_off_time
+        self._pulse_batch_count = max(1, min(10000, int(1.0 / period)))
+        self.pulse_button.setText("Stop pulsing")
+        self.pulse_on_time.setEnabled(False)
+        self.pulse_off_time.setEnabled(False)
+        self.dds_button.setEnabled(False)
+        self.pid_button.setEnabled(False)
+        self._emit_next_pulse()
+
+    def _emit_next_pulse(self):
+        if not self._pulse_running:
+            return
+        try:
+            self.bridge.pulse_beam(
+                self.beam.name,
+                self._pulse_on_time,
+                self._pulse_off_time,
+                self._pulse_batch_count,
+            )
+        except Exception as error:
+            logging.getLogger(__name__).exception("SUServo pulse failed")
+            QMessageBox.critical(self, "SUServo pulse failed", str(error))
+            self.stop_pulsing()
+            return
+
+        if self._pulse_running:
+            # Yield to the event loop so Stop pulsing can be handled between batches.
+            self._pulse_timer.start(1)
+        else:
+            self.stop_pulsing()
+
+    def stop_pulsing(self):
+        self._pulse_running = False
+        self._pulse_timer.stop()
+        self.pulse_button.setEnabled(True)
+        self.pulse_button.setText("Start pulsing")
+        self.pulse_on_time.setEnabled(True)
+        self.pulse_off_time.setEnabled(True)
+        self.dds_button.setEnabled(True)
+        self.pid_button.setEnabled(True)
 
     def set_tab(self, index):
         self.tabs.setCurrentIndex(index)
@@ -619,6 +732,8 @@ class SUServoGUI(QWidget):
         hbox.addWidget(shutterlabel)
         self.shutter_buttons = []
         for ch, shutter in enumerate(self.manager.shutter_infos):
+            if shutter.name in FlipMirrorGUI.FLIP_MIRROR_NAMES:
+                continue
             shutter_button = Switch(
                 default=self.manager.en_shutters[ch],
                 turn_on=lambda name=shutter.name: self.bridge.change_control(
@@ -711,6 +826,105 @@ class MirnyGUI(QWidget):
                 self.ch[event.key() - Qt.Key_0].dds_button.switch_state()
             return 1
         return super().eventFilter(obj, event)
+
+
+class FlipMirrorGUI(QWidget):
+    """Small standalone window for the two ODT flip mirrors."""
+
+    FLIP_MIRROR_NAMES = (
+        "ODT Dimple flip mirror",
+        "ODT Res flip mirror",
+    )
+
+    def __init__(self, manager, bridge):
+        super().__init__()
+        self.manager = manager
+        self.bridge = bridge
+        shutter_indices = {
+            shutter.name: index for index, shutter in enumerate(manager.shutter_infos)
+        }
+        missing = [
+            name for name in self.FLIP_MIRROR_NAMES if name not in shutter_indices
+        ]
+        if missing:
+            raise ValueError(f"Flip mirror shutters are not configured: {missing}")
+
+        self.shutter_indices = [
+            shutter_indices[name] for name in self.FLIP_MIRROR_NAMES
+        ]
+        self.buttons = []
+        self._warnings = []
+        layout = QVBoxLayout(self)
+        for name, channel in zip(self.FLIP_MIRROR_NAMES, self.shutter_indices):
+            row = QHBoxLayout()
+            label = QLabel(name)
+            label.setStyleSheet("font: bold 11pt")
+            row.addWidget(label)
+
+            button = Switch(
+                default=manager.en_shutters[channel],
+                turn_on=lambda shutter_name=name: self._set_mirror(shutter_name, True),
+                turn_off=lambda shutter_name=name: self._set_mirror(
+                    shutter_name, False
+                ),
+                on_text="Beam blocked",
+                off_text="Beam unblocked",
+                colors=[
+                    "background-color: #5db75d",
+                    "background-color: #b75d5d",
+                ],
+            )
+            button.button.setToolTip(
+                "Inserted mirror diverts the beam to the coupler (blocked from the experiment)."
+                if manager.en_shutters[channel]
+                else "Mirror is retracted; the beam path to the experiment is unblocked."
+            )
+            self.buttons.append(button)
+            row.addWidget(button)
+            layout.addLayout(row)
+
+        self.setWindowTitle("ODT Flip Mirrors")
+        bridge.state_changed.connect(self.refresh)
+
+    def _set_mirror(self, name, enabled):
+        if not enabled:
+            self._show_unblocked_beam_warning(name)
+        try:
+            return self.bridge.change_control(f"shutter.{name}.open", enabled)
+        except Exception as error:
+            logging.getLogger(__name__).exception("Flip-mirror switch failed")
+            QMessageBox.critical(self, "Flip-mirror switch failed", str(error))
+            return bool(
+                self.manager.en_shutters[
+                    self.shutter_indices[self.FLIP_MIRROR_NAMES.index(name)]
+                ]
+            )
+
+    def _show_unblocked_beam_warning(self, name):
+        warning = QMessageBox(self)
+        warning.setIcon(QMessageBox.Warning)
+        warning.setWindowTitle("Beam path warning")
+        warning.setText(f"Retracting {name} unblocks the beam path to the experiment.")
+        warning.setStandardButtons(QMessageBox.Ok)
+        warning.setModal(False)
+        warning.setAttribute(Qt.WA_DeleteOnClose)
+        self._warnings.append(warning)
+        warning.finished.connect(
+            lambda _result, dialog=warning: (
+                self._warnings.remove(dialog) if dialog in self._warnings else None
+            )
+        )
+        warning.show()
+
+    def refresh(self, _state=None):
+        for button, channel in zip(self.buttons, self.shutter_indices):
+            blocked = bool(self.manager.en_shutters[channel])
+            button.set_state(blocked)
+            button.button.setToolTip(
+                "Inserted mirror diverts the beam to the coupler (blocked from the experiment)."
+                if blocked
+                else "Mirror is retracted; the beam path to the experiment is unblocked."
+            )
 
 
 class ArtiqGUIExperiment(EnvExperiment):
@@ -815,6 +1029,9 @@ class ArtiqGUIExperiment(EnvExperiment):
 
         mirnyGUI = MirnyGUI(self.mirnyManager, bridge)
         mirnyGUI.show()
+
+        flipMirrorGUI = FlipMirrorGUI(self.suservoManager, bridge)
+        flipMirrorGUI.show()
 
         vdrivenGUI = VDrivenSuppliesGUI(self.vdrivenSupplyManager, bridge)
         vdrivenGUI.show()

@@ -124,8 +124,16 @@ class AbsorptionImageExpFrag(ExpFragment):
             "img_beam", ControlBeamsWithoutCoolingAOM, [SUServoedBeam["Imaging"]]
         )
 
-        self.setattr_device("scope_trigger")
-        self.scope_trigger: TTLInOut = self.scope_trigger
+        # self.setattr_device("scope_trigger")
+        # self.scope_trigger: TTLInOut = self.scope_trigger
+
+        # |Code for flipper mirror below causes issues with the benchmarks|
+
+        # self.setattr_device("ODT_dimple_mirror_shutter")
+        # self.ODT_dimple_mirror_shutter: TTLInOut = self.ODT_dimple_mirror_shutter
+
+        # self.setattr_device("ODT_reserviour_mirror_shutter")
+        # self.ODT_reserviour_mirror_shutter: TTLInOut = self.ODT_reserviour_mirror_shutter
 
         # self.setattr_fragment("absolute_moving_stage", MovingStage)
         # self.absolute_moving_stage: MovingStage
@@ -341,6 +349,13 @@ class AbsorptionImageExpFrag(ExpFragment):
         #         # pass
         #     delay(self.mot.loading_time.get() / 1000.0)
         # # self.mot_voltages.push(self.mot_voltages_temp)
+
+
+        # |Code for flipper mirror below causes issues with the benchmarks|
+
+        # self.ODT_reserviour_flip_mirror.on()
+        # delay(100 * us)
+        # self.ODT_reserviour_flip_mirror.off()
 
         delay(self.mot.loading_time.get())
 
@@ -567,7 +582,8 @@ class AbsorptionImageExpFrag(ExpFragment):
         frame_timestamp = time()
         self.image_timestamp.push(frame_timestamp)
         push_temperature_results(
-            self._temperature_logger, self._temperature_results,
+            self._temperature_logger,
+            self._temperature_results,
             temperature_observed_at,
         )
         self.set_dataset(

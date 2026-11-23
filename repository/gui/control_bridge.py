@@ -110,6 +110,22 @@ class GuiControlBridge(QObject):
             ),
         )
 
+    def pulse_beam(
+        self, beam_name: str, on_time=100e-3, off_time=100e-3, count=1
+    ) -> bool:
+        """Pulse one configured SUServo beam and return its final output state."""
+        try:
+            channel = self._beam_channels[beam_name]
+        except KeyError as error:
+            raise ValueError("Unknown SUServo beam") from error
+        on_time = _bounded(on_time, 1e-6, 10.0)
+        off_time = _bounded(off_time, 0.0, 10.0)
+        count = _integer(count, 1, 100_000)
+        return self._change(
+            lambda: self.suservo.pulse(channel, on_time, off_time, count),
+            lambda: bool(self.suservo.en_outs[channel]),
+        )
+
     def _build_registry(self) -> None:
         def add(control: _Control) -> str:
             if control.id in self.controls:
