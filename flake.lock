@@ -369,11 +369,11 @@
     "src-ndscan": {
       "flake": false,
       "locked": {
-        "lastModified": 1787662478,
-        "narHash": "sha256-QUn+PFR7GOArtC8Na/jBElKdTUWnK+QCIOyfl3ws1zM=",
+        "lastModified": 1795439478,
+        "narHash": "sha256-o0COQ67VkEtHXwcn+T4+0goGSi+azvyypSlmw/TrSc4=",
         "owner": "harrykendell",
         "repo": "ndscan",
-        "rev": "fc927d68f51c036eb646f0522af2976a7b498713",
+        "rev": "3d3a7071fe29f063f693ac0c99978fdc7002eec1",
         "type": "github"
       },
       "original": {
@@ -385,11 +385,11 @@
     "src-oitg": {
       "flake": false,
       "locked": {
-        "lastModified": 1788048936,
-        "narHash": "sha256-fUG5UBWoUppNPLQBQ4LFJu7ooGTMxuxRX1odTTI/siU=",
+        "lastModified": 1792785287,
+        "narHash": "sha256-eWlGfxQIiWwiW1P5RrIPDF4qgjB9PLEsghn3N00LaH8=",
         "owner": "OxfordIonTrapGroup",
         "repo": "oitg",
-        "rev": "207aac89101421515282f36885a07c2a019954bc",
+        "rev": "e8188b943be64ebc6864d16444407f4ed33dfa3c",
         "type": "github"
       },
       "original": {
@@ -401,11 +401,11 @@
     "src-oxart-devices": {
       "flake": false,
       "locked": {
-        "lastModified": 1788197413,
-        "narHash": "sha256-sLvPI7FZpWggg9U31mnJrU9yNKpHswN+jOKZyMvyOYY=",
+        "lastModified": 1794709039,
+        "narHash": "sha256-56jLTHELxii/GpYJzsZviu4xU8aIgt2FzBObJxbRpz4=",
         "owner": "OxfordIonTrapGroup",
         "repo": "oxart-devices",
-        "rev": "42d500dadabdf2bf5ce5089d580f4006cce18552",
+        "rev": "ce108714e4c6c14399a2108933d9453c67ef6b66",
         "type": "github"
       },
       "original": {
