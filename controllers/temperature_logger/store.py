@@ -9,7 +9,7 @@ from pathlib import Path
 
 THERMOCOUPLE_TYPES = frozenset("BEJKNRST")
 RETENTION_SECONDS = 7 * 24 * 3600
-MAX_HISTORY_POINTS = 600
+MAX_HISTORY_POINTS = 24_000
 MAX_HISTORY_SPAN = RETENTION_SECONDS
 
 
@@ -195,6 +195,7 @@ class TemperatureStore:
         return result
 
     def history(self, start, end, channels, max_points=600):
+        """Return one bounded range, retaining every sample when it fits."""
         start, end = float(start), float(end)
         if (not math.isfinite(start) or not math.isfinite(end) or start < 0 or
                 end <= start or end - start > MAX_HISTORY_SPAN):
@@ -203,13 +204,9 @@ class TemperatureStore:
                 any(type(ch) is not int or not 0 <= ch <= 8 for ch in channels) or
                 len(set(channels)) != len(channels)):
             raise ValueError("Choose 1-9 distinct sources (CJC=0, channels 1-8)")
-        if type(max_points) is not int or not 20 <= max_points <= MAX_HISTORY_POINTS:
-            raise ValueError("max_points must be 20..600")
-        # One bucket retains first, last, minimum and maximum plus first
-        # invalid marker. Streaming aggregation bounds memory independently
-        # of 7-day raw sample count; raw SQLite rows are never loaded into RAM.
-        bucket_count = max(1, max_points // (5 * len(channels)))
-        width = (end - start) / bucket_count
+        if (type(max_points) is not int or
+                not max(20, 5 * len(channels)) <= max_points <= MAX_HISTORY_POINTS):
+            raise ValueError("Invalid history point budget")
         output = []
 
         def bucket_rows(candidates):
@@ -217,10 +214,27 @@ class TemperatureStore:
             return sorted(unique.values(), key=lambda row: row["timestamp"])
 
         with self._connection() as db:
+            # Count and read one consistent WAL snapshot, including during
+            # acquisition. Empty/disabled sources consume no plot budget.
+            db.execute("BEGIN")
+            counts = {}
             for ch in sorted(channels):
                 if ch == 0:
-                    # Channel 0 identifies the internal CJC sensor only in
-                    # history requests; it is not a configurable probe.
+                    count = db.execute(
+                        "SELECT count(*) FROM cold_junction WHERE timestamp>=? AND timestamp<=?",
+                        (start, end)).fetchone()[0]
+                else:
+                    count = db.execute(
+                        "SELECT count(*) FROM readings WHERE channel=? AND timestamp>=? AND timestamp<=?",
+                        (ch, start, end)).fetchone()[0]
+                if count:
+                    counts[ch] = count
+            total = sum(counts.values())
+            reduced = total > max_points
+            bucket_count = max(1, max_points // (5 * max(1, len(counts))))
+            width = (end - start) / bucket_count
+            for ch in counts:
+                if ch == 0:
                     cursor = db.execute("""
                         SELECT timestamp, 0 AS channel, value_c, status,
                                value_c AS cjc_c, 0 AS revision,
@@ -244,12 +258,18 @@ class TemperatureStore:
                     row = dict(raw_row)
                     if previous is not None and (
                             row["timestamp"] - previous["timestamp"] > 20 or
-                            previous["status"] != "ok" or previous["value_c"] is None):
+                            previous["status"] != "ok" or previous["value_c"] is None or
+                            (row["name"], row["type"]) != (previous["name"], previous["type"])):
                         segment += 1
                     row["segment"] = segment
                     if row["status"] != "ok" or row["value_c"] is None:
                         segment += 1
                     previous = row
+                    if not reduced:
+                        output.append(row)
+                        continue
+                    # Only reduce oversized views. Keep actual time-ordered
+                    # first/last/extrema/invalid samples, never bin averages.
                     bucket = min(bucket_count - 1, int((row["timestamp"] - start) / width))
                     if bucket != current_bucket:
                         output.extend(bucket_rows(candidates))
@@ -269,7 +289,8 @@ class TemperatureStore:
                 output.extend(bucket_rows(candidates))
         output.sort(key=lambda row: (row["timestamp"], row["channel"]))
         return {
-            "start": start, "end": end,
+            "start": start, "end": end, "sample_count": total,
+            "reduced": reduced,
             "rows": [
                 [row["timestamp"], row["channel"], row["value_c"], row["status"],
                  row["cjc_c"], row["revision"], row["name"], row["type"],

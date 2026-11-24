@@ -116,6 +116,40 @@ def test_cold_junction_decimation_retains_invalid_markers_and_extrema(store):
             store.history(stamp - 1, stamp + 510, channels)
 
 
+def test_history_returns_every_recorded_sample_when_budget_allows(store):
+    config = enable(store, 1, name="Probe", type="K")
+    start = 1000
+    # 101 cycles, including irregularly timed closely spaced readings.
+    timestamps = [start + 5 * i for i in range(100)] + [1495.1]
+    for i, stamp in enumerate(timestamps):
+        store.append(stamp, config,
+                     {1: {"value_c": 20 + i / 100, "status": "ok"}}, 21)
+    result = store.history(999, 1500, [0, 1, 7], max_points=24000)
+    assert result["sample_count"] == 202
+    assert result["reduced"] is False
+    assert len(result["rows"]) == 202
+    assert [row[0] for row in result["rows"] if row[1] == 1] == timestamps
+    reduced = store.history(999, 1500, [0, 1, 7], max_points=60)
+    assert reduced["sample_count"] == 202
+    assert reduced["reduced"] is True
+    assert len(reduced["rows"]) <= 60
+    assert all(row in result["rows"] for row in reduced["rows"])
+    with pytest.raises(ValueError):
+        store.history(999, 1500, [0], max_points=24001)
+
+
+def test_history_does_not_join_distinct_probe_identities(store):
+    config = enable(store, 1, name="Probe", type="K")
+    for i, name in enumerate(["Probe", "Other", "Probe"]):
+        if i:
+            config = store.update_channel(channel(1, name=name, type="K"),
+                                          config["revision"])
+        store.append(1000 + 5 * i, config,
+                     {1: {"value_c": 20, "status": "ok"}}, 21)
+    rows = store.history(999, 1011, [1], max_points=100)["rows"]
+    assert [row[8] for row in rows] == [0, 1, 2]
+
+
 def test_concurrent_config_updates_cannot_overwrite(store):
     barrier = threading.Barrier(3)
     results = []
