@@ -115,7 +115,7 @@ def estimate_psd_objective(N, STAGE_SITU, sx_mm, sy_mm, stage, tof, r_squared):
     - the average temperature estimate (T_avr)
     - the computed PSD (psd) for one shot,
 
-    Otherwise returns (PSD_PENALTY, None, None) if invalid.
+    Otherwise returns PSD_PENALTY if invalid.
     """
     if (
         not np.isfinite(N)
@@ -134,14 +134,14 @@ def estimate_psd_objective(N, STAGE_SITU, sx_mm, sy_mm, stage, tof, r_squared):
     s0y = STAGE_SITU[stage]["y_mm"] * 1e-3
 
     # imaging TOF
-    t = tof * 1e-3  # s
+    t = tof  # s
 
     # compute x-y temperatures
     T_x = (M_RB / K_B) * ((sx_mm * 1e-3) ** 2 - s0x**2) / t**2
     T_y = (M_RB / K_B) * ((sy_mm * 1e-3) ** 2 - s0y**2) / t**2
 
     if not (T_x > 0 and T_y > 0 and N > 0):
-        return PENALTY, None, None
+        return PENALTY
 
     # find average temperature
     T_avr = 0.5 * (T_x + T_y)
@@ -827,7 +827,7 @@ class AbsorptionImageExpFrag(ExpFragment):
                 abs(gravity_pixel_size - pixel_size) <= 3.0 * gravity_pixel_size_error
             )
             if not agrees:
-                logger.warning(
+                logger.info(
                     "Magnification pixel size %.4g m does not agree with the gravity"
                     " fit %.4g +/- %.2g m",
                     pixel_size,
