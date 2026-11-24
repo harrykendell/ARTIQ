@@ -11,6 +11,7 @@ from artiq.coredevice.ttl import TTLInOut
 from artiq.experiment import kernel, rpc
 from artiq.language import delay, ms, now_mu, parallel, s, sequential, us
 from artiq.language.core import host_only
+import scipy.constants as const
 
 # from repository.models.device_db import server_addr
 from ndscan.experiment import (
@@ -49,6 +50,15 @@ def weak_cloud_od_threshold(odt_active: bool) -> float:
     return 0.01 if odt_active else 0.1
 
 
+# Custom Objective 1 : negated log(pseduo PSD)
+exponent = 2.0  # Exponent for the size terms
+N_ref = 3.0e8
+sx_ref = 3.0  # in mm
+sy_ref = 3.0
+
+PENALTY = 5.0
+
+
 def pseudo_psd_objective(atom_number, sigma_x_mm, sigma_y_mm, r_squared):
     """Minimised single-shot proxy for phase-space density.
 
@@ -68,13 +78,83 @@ def pseudo_psd_objective(atom_number, sigma_x_mm, sigma_y_mm, r_squared):
         or not np.isfinite(r_squared)
         or r_squared < 0.9
     ):
-        return 5.0
+        return PENALTY
 
     # Historical normalisations are retained so optimisation scores remain
     # numerically comparable for well-fitted, positive-number images.
-    return -np.log(atom_number / 3.0e8) + 2.0 * (
-        np.log(sigma_x_mm / 3.0) + np.log(sigma_y_mm / 3.0)
+    return -np.log(atom_number / N_ref) + exponent * (
+        np.log(sigma_x_mm / sx_ref) + np.log(sigma_y_mm / sy_ref)
     )
+
+
+# In situ fixed reference values
+STAGE_SITU = {
+    "cmot": {
+        "x_mm": 0.8573,
+        "y_mm": 0.9131,
+        "source": "parameter scan thermometry, 2026-11-10",
+    },
+    "pgc": {
+        "x_mm": 0.7998,
+        "y_mm": 0.9108,
+        "source": "parameter scan thermometry, 2026-11-09",
+    },
+}
+
+# Custom Objective 2 : negated log(estimate PSD)
+PSD_REF = 3.0e-7  # reference PSD
+M_RB = 1.443e-25  # kg, mass of Rb87
+K_B = const.k  # Boltzmann constant
+H = const.h  # Planck's constant
+
+
+def estimate_psd_objective(N, STAGE_SITU, sx_mm, sy_mm, stage, tof, r_squared):
+    """
+    Computes for a single shot,
+    - the objective value (J)
+    - the average temperature estimate (T_avr)
+    - the computed PSD (psd) for one shot,
+
+    Otherwise returns (PSD_PENALTY, None, None) if invalid.
+    """
+    if (
+        not np.isfinite(N)
+        or N <= 0.0
+        or not np.isfinite(sx_mm)
+        or sx_mm <= 0.0
+        or not np.isfinite(sy_mm)
+        or sy_mm <= 0.0
+        or not np.isfinite(r_squared)
+        or r_squared < 0.9
+    ):
+        return PENALTY
+
+    #  initial x-y (in-situ) cloud widths (in m)
+    s0x = STAGE_SITU[stage]["x_mm"] * 1e-3
+    s0y = STAGE_SITU[stage]["y_mm"] * 1e-3
+
+    # imaging TOF
+    t = tof * 1e-3  # s
+
+    # compute x-y temperatures
+    T_x = (M_RB / K_B) * ((sx_mm * 1e-3) ** 2 - s0x**2) / t**2
+    T_y = (M_RB / K_B) * ((sy_mm * 1e-3) ** 2 - s0y**2) / t**2
+
+    if not (T_x > 0 and T_y > 0 and N > 0):
+        return PENALTY, None, None
+
+    # find average temperature
+    T_avr = 0.5 * (T_x + T_y)
+
+    # peak density, σ_z = σ_x
+    n = N / ((2 * np.pi) ** 1.5 * s0x**2 * s0y)
+
+    # Thermal de Broglie wavelength : λ_dB = h / sqrt(2 π m k_B T)
+    lam = H / np.sqrt(2 * np.pi * M_RB * K_B * T_avr)  # thermal de Broglie wavelength
+
+    # compute PSD = n x λ_dB^3
+    psd = n * lam**3
+    return -np.log(psd / PSD_REF)
 
 
 class AbsorptionImageExpFrag(ExpFragment):
@@ -350,7 +430,6 @@ class AbsorptionImageExpFrag(ExpFragment):
         #     delay(self.mot.loading_time.get() / 1000.0)
         # # self.mot_voltages.push(self.mot_voltages_temp)
 
-
         # |Code for flipper mirror below causes issues with the benchmarks|
 
         # self.ODT_reserviour_flip_mirror.on()
@@ -367,6 +446,15 @@ class AbsorptionImageExpFrag(ExpFragment):
             )
             if self.do_pgc.get():
                 self.mot.pgc()
+        elif self.do_pgc.get():
+            # PGC straight from the MOT: pre-CMOT step, then a PGC ramp that
+            # starts from the pre-CMOT values instead of the CMOT end values.
+            self.mot.pre_pgc(
+                evaporation_active=self.do_evaporation1.get()
+                or self.do_evaporation2.get(),
+                odt_active=self.odt_active.get(),
+            )
+            self.mot.pgc(after_cmot=False)
 
         # # self.mot.Disable_EOM()
         if self.Pump_to_F1ground.get():
@@ -570,11 +658,32 @@ class AbsorptionImageExpFrag(ExpFragment):
         self.peak_od.push(self.absimg.peak_od)
 
         # Optimiser channel: comparable only at fixed TOF and probe geometry.
+
+        # Custom objective 1 : pseduo PSD
+        # self.custom_objective.push(
+        #     pseudo_psd_objective(
+        #         self.absimg.atom_number,
+        #         sigma_x_mm,
+        #         sigma_y_mm,
+        #         self.absimg.fit.summary()["rsquared"],
+        #     )
+        # )
+
+        # Custom objective 2 : estimate PSD
+        # last enabled stage
+        if self.do_pgc.get():
+            stage = "pgc"
+        else:
+            stage = "cmot"
+
         self.custom_objective.push(
-            pseudo_psd_objective(
+            estimate_psd_objective(
                 self.absimg.atom_number,
+                STAGE_SITU,
                 sigma_x_mm,
                 sigma_y_mm,
+                stage,
+                self.expansion_time.get(),
                 self.absimg.fit.summary()["rsquared"],
             )
         )
