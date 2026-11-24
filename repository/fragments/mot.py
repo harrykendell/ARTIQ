@@ -576,6 +576,32 @@ class MOT(Fragment):
             description="Duration of the PGC ramp",
         )
 
+        class PGC_From_MOT_Ramp(Ramp):
+            """
+            PGC straight from the MOT, with CMOT skipped. Same end values as
+            PGC_Ramp, but every start value is the state the pre-CMOT step
+            leaves (the same start values CMOT_Ramp uses):
+                - gradient from the pre-CMOT gradient, not the CMOT end gradient
+                - detuning from the supply default, not the CMOT detuning
+                - MOT beam from the loading setpoint, not the CMOT setpoint
+            """
+
+            duration_default = DURATION["PGC"]
+
+            supplies = VDrivenSupply["X", "Detuning_780"]
+            supplies_start = [self.pre_cmot_gradient, ramp_default]
+            supplies_end = [0.0, self.PGC_detuning]
+            suservos = [SUServoedBeam["MOT"]]
+            suservo_setpoint_start = [self.MOT_loading_setpoint]
+            suservo_setpoint_end = [POWER_3D_MOT["PGC"]]
+
+        self.pgc_from_mot_ramp: PGC_From_MOT_Ramp = self.setattr_fragment(
+            "pgc_from_mot_ramp",
+            PGC_From_MOT_Ramp,
+        )
+        # PGC_duration parameter applied to all PGC ramps
+        self.pgc_from_mot_ramp.bind_param("duration", self.PGC_duration)
+
     def build_evaporation1(self):
         # This function generates the ramp for single beam evaporation
         # It also creates parameters to expose to ndscan
@@ -727,6 +753,7 @@ class MOT(Fragment):
         self.pre_cmot_gradient_ramp.precalculate_dma_handle()
         self.cmot_ramp.precalculate_dma_handle()
         self.pgc_ramp.precalculate_dma_handle()
+        self.pgc_from_mot_ramp.precalculate_dma_handle()
         self.evaporation_ramp1.precalculate_dma_handle()
         self.evaporation_ramp2.precalculate_dma_handle()
 
@@ -887,9 +914,43 @@ class MOT(Fragment):
         rtio_log("stage", "compress:end")
 
     @kernel
-    def pgc(self) -> None:
+    def pre_pgc(self, evaporation_active, odt_active) -> None:
+        """
+        Prepare PGC straight from the MOT (CMOT skipped). Mirrors compress()
+        up to its CMOT ramp: pre-CMOT gradient ramp and hold, laser unlock,
+        2D shutter closed and CDT on if needed. Follow with pgc(after_cmot=False).
+
+        **Timeline:** advances by the pre-CMOT gradient ramp and hold.
+        """
+        rtio_log("stage", "load:end")
+        rtio_log("stage", "pre_cmot_ramp:start")
+        self.pre_cmot_gradient_ramp.do()
+        rtio_log("stage", "pre_cmot_ramp:end")
+        rtio_log("stage", "pre_cmot_hold:start")
+        delay(self.pre_cmot_hold_time.get())
+
+        # As in compress(): give the Toptica PID time to hold before the
+        # detuning starts to move.
+        TOPTICA_HOLD_JITTER = 150 * us
+        delay(-TOPTICA_HOLD_JITTER)
+        rtio_log("stage", "pre_cmot_hold:end")
+        self.unlock_mot()
+
+        # 2d shutter off to prevent push beam inteference
+        self.shutter_2d.off()
+
+        if evaporation_active or odt_active:
+            self.odt_dimple.on()
+            self.odt_reservoir.on()
+            rtio_log("stage", "cdt:start")
+
+    @kernel
+    def pgc(self, after_cmot=True) -> None:
         """
         Cool further using Polarisation Gradient Cooling
+
+        after_cmot=True: ramp from the CMOT end state (after compress()).
+        after_cmot=False: ramp from the pre-CMOT state (after pre_pgc()).
 
         **Timeline:** advances by `self.PGC_duration` + `self.PGC_settle_time`
         """
@@ -909,7 +970,10 @@ class MOT(Fragment):
                 + self.PGC_detuning.get()
                 + self.PGC_repump_detuning.get()
             )
-            self.pgc_ramp.do()
+            if after_cmot:
+                self.pgc_ramp.do()
+            else:
+                self.pgc_from_mot_ramp.do()
         delay(self.PGC_settle_time.get())
         rtio_log("stage", "pgc:end")
 
