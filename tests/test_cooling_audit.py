@@ -36,15 +36,16 @@ from repository.imaging.absorption_image import (
         (3.5e8, 3.1, 4.2),
     ],
 )
-def test_objective_preserves_previous_valid_fit_formula(
+def test_objective_matches_current_reference_formula(
     atom_number, sigma_x_mm, sigma_y_mm
 ):
-    previous = -np.log(atom_number / 2.0e8) + 2.0 * (
-        np.log(sigma_x_mm / 2.5) + np.log(sigma_y_mm / 2.5)
+    # Reference values intentionally changed in 4a54ec1 for CMOT/PGC scans.
+    expected = -np.log(atom_number / 3.0e8) + 2.0 * (
+        np.log(sigma_x_mm / 3.0) + np.log(sigma_y_mm / 3.0)
     )
     assert pseudo_psd_objective(
         atom_number, sigma_x_mm, sigma_y_mm, 0.95
-    ) == pytest.approx(previous, abs=1e-14)
+    ) == pytest.approx(expected, abs=1e-14)
 
 
 @pytest.mark.parametrize(
@@ -76,12 +77,12 @@ def test_od_threshold_depends_on_boolean_parameter_value(odt_active, expected):
     assert weak_cloud_od_threshold(odt_active) == expected
 
 
-def test_c1_cooling_defaults():
+def test_nominal_cooling_defaults():
     assert DURATION["LOADING"] == 5.0 * s
     assert DURATION["CMOT"] == 4.0 * ms
-    assert DURATION["PGC"] == 8.0 * ms
+    assert DURATION["PGC"] == 9.0 * ms
     assert SETTLE_TIME["CMOT"] == 3.79 * ms
-    assert SETTLE_TIME["PGC"] == 0.5 * ms
+    assert SETTLE_TIME["PGC"] == 0.0 * ms
     assert CMOT_GRADIENT["X"] == 0.6 * A
     assert DETUNING["PGC"] == 19 * Γ_Rb
     assert POWER_3D_MOT["PGC"] == 1.2 * V
