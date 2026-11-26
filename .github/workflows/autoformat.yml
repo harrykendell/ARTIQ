@@ -28,12 +28,21 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
+          fetch-depth: 0
 
       - name: Check Python for critical lint errors
         run: |
           python3 -m venv "$RUNNER_TEMP/artiq-lint"
           "$RUNNER_TEMP/artiq-lint/bin/python" -m pip install ruff==0.17.4
           git ls-files -z '*.py' | xargs -0 -r "$RUNNER_TEMP/artiq-lint/bin/ruff" check --select E9,F63,F7,F82
+
+      - name: Check formatting of changed Python files
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git diff --name-only -z --diff-filter=ACMR "$BASE_SHA" HEAD -- '*.py' ':(exclude)submodules/**' ':(exclude)ThorlabsPM/**' |
+            xargs -0 -r "$RUNNER_TEMP/artiq-lint/bin/ruff" format --isolated --check --
 
       - uses: DeterminateSystems/nix-installer-action@2559b44fed7d4fc978e8dd0e379661afb8b73590
         with:

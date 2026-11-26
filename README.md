@@ -28,6 +28,10 @@ The primary interface for this codebase is [run_gui.sh](run_gui.sh). This should
 </details>
 
 
+## Commit formatting and CI
+
+Ruff 0.17.4 formats staged Python files automatically before committing when the repository hook is installed. Install the hook in a standard checkout with `install -m 755 scripts/ruff_pre_commit.py .git/hooks/pre-commit` (check for an existing hook first). It uses `uvx` or a matching Ruff executable; set `git config --local artiq.ruffPath /path/to/ruff` if needed. Only staged project Python files are formatted, and a file needing formatting that also has unstaged changes stops the commit without modifying either version. The CI workflow checks formatting of changed Python files on pull requests and runs the hardware-independent regression suite. It does not push formatting commits or hold write credentials.
+
 ## TC-08 temperature monitor
 
 The Pico USB TC-08 is owned by a **native ARTIQ controller**,

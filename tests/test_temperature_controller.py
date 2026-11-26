@@ -1,4 +1,5 @@
 """TC-08 acquisition, SDK, SQLite, IPC and persistence contract tests."""
+
 from __future__ import annotations
 
 import asyncio
@@ -23,8 +24,11 @@ from temperature_logger.store import (
 
 def channel(ch=1, **changes):
     config = {
-        "channel": ch, "name": f"Channel {ch}", "type": "K",
-        "enabled": True, "record_with_experiments": True,
+        "channel": ch,
+        "name": f"Channel {ch}",
+        "type": "K",
+        "enabled": True,
+        "record_with_experiments": True,
     }
     return {**config, **changes}
 
@@ -63,11 +67,10 @@ def test_disabled_sensor_keeps_its_recorded_history_for_the_website(store):
     """Disabling acquisition must not make previous readings inaccessible."""
     enabled = enable(store, 1, name="Former chamber sensor", type="T")
     timestamp = time.time() - 10
-    store.append(timestamp, enabled, {
-        1: {"value_c": 19.75, "status": "ok"}
-    }, 20.0)
-    disabled = dict(enabled["channels"][0],
-                    enabled=False, record_with_experiments=False)
+    store.append(timestamp, enabled, {1: {"value_c": 19.75, "status": "ok"}}, 20.0)
+    disabled = dict(
+        enabled["channels"][0], enabled=False, record_with_experiments=False
+    )
     updated = store.update_channel(disabled, enabled["revision"])
     assert updated["channels"][0]["enabled"] is False
     rows = store.history(timestamp - 1, timestamp + 1, [1])["rows"]
@@ -86,10 +89,13 @@ def test_cold_junction_is_logged_without_enabled_thermocouples(store):
 
     rows = store.history(stamp - 1, stamp + 6, [0])["rows"]
     assert [(row[1], row[2], row[3]) for row in rows] == [
-        (0, 22.7, "ok"), (0, None, "invalid")
+        (0, 22.7, "ok"),
+        (0, None, "invalid"),
     ]
     assert all((row[6], row[7]) == ("Cold junction", "CJC") for row in rows)
-    assert TemperatureStore(store.path).history(stamp - 1, stamp + 6, [0])["rows"] == rows
+    assert (
+        TemperatureStore(store.path).history(stamp - 1, stamp + 6, [0])["rows"] == rows
+    )
     assert store.history(stamp - 1, stamp + 6, [1])["rows"] == []
     assert store.nearest(stamp, [1]) == {}
     assert all(entry["channel"] != 0 for entry in store.config()["channels"])
@@ -97,13 +103,15 @@ def test_cold_junction_is_logged_without_enabled_thermocouples(store):
         store.update_channel(channel(0), config["revision"])
 
 
-
 def test_cold_junction_decimation_retains_invalid_markers_and_extrema(store):
     config = store.config()
     stamp = time.time() - 1000
     for index in range(101):
-        value = float("nan") if index == 25 else (
-            60.0 if index == 44 else (5.0 if index == 65 else 20.0))
+        value = (
+            float("nan")
+            if index == 25
+            else (60.0 if index == 44 else (5.0 if index == 65 else 20.0))
+        )
         store.append(stamp + index * 5, config, {}, value)
     rows = store.history(stamp - 1, stamp + 510, [0], max_points=30)["rows"]
     assert len(rows) <= 30
@@ -122,8 +130,7 @@ def test_history_returns_every_recorded_sample_when_budget_allows(store):
     # 101 cycles, including irregularly timed closely spaced readings.
     timestamps = [start + 5 * i for i in range(100)] + [1495.1]
     for i, stamp in enumerate(timestamps):
-        store.append(stamp, config,
-                     {1: {"value_c": 20 + i / 100, "status": "ok"}}, 21)
+        store.append(stamp, config, {1: {"value_c": 20 + i / 100, "status": "ok"}}, 21)
     result = store.history(999, 1500, [0, 1, 7], max_points=24000)
     assert result["sample_count"] == 202
     assert result["reduced"] is False
@@ -142,10 +149,10 @@ def test_history_does_not_join_distinct_probe_identities(store):
     config = enable(store, 1, name="Probe", type="K")
     for i, name in enumerate(["Probe", "Other", "Probe"]):
         if i:
-            config = store.update_channel(channel(1, name=name, type="K"),
-                                          config["revision"])
-        store.append(1000 + 5 * i, config,
-                     {1: {"value_c": 20, "status": "ok"}}, 21)
+            config = store.update_channel(
+                channel(1, name=name, type="K"), config["revision"]
+            )
+        store.append(1000 + 5 * i, config, {1: {"value_c": 20, "status": "ok"}}, 21)
     rows = store.history(999, 1011, [1], max_points=100)["rows"]
     assert [row[8] for row in rows] == [0, 1, 2]
 
@@ -153,6 +160,7 @@ def test_history_does_not_join_distinct_probe_identities(store):
 def test_concurrent_config_updates_cannot_overwrite(store):
     barrier = threading.Barrier(3)
     results = []
+
     def attempt(ch):
         barrier.wait()
         try:
@@ -160,6 +168,7 @@ def test_concurrent_config_updates_cannot_overwrite(store):
             results.append(True)
         except ValueError:
             results.append(False)
+
     first = threading.Thread(target=attempt, args=(1,))
     second = threading.Thread(target=attempt, args=(2,))
     first.start()
@@ -177,9 +186,12 @@ def test_history_retains_extrema_invalids_gaps_and_metadata(store):
     for i in range(101):
         status = "overflow" if i == 30 else "ok"
         val = 123.0 if i == 61 else (-19.0 if i == 65 else 20 + i / 100)
-        store.append(start + 5 * i, config, {
-            1: {"value_c": None if status != "ok" else val, "status": status}
-        }, 24.3)
+        store.append(
+            start + 5 * i,
+            config,
+            {1: {"value_c": None if status != "ok" else val, "status": status}},
+            24.3,
+        )
     store.append(start + 850, config, {1: {"value_c": 23.5, "status": "ok"}}, 24.4)
     assert store.nearest(start + 10.1)["1"]["value_c"] == 20.02
     result = store.history(start - 1, start + 860, [1], max_points=60)
@@ -192,7 +204,9 @@ def test_history_retains_extrema_invalids_gaps_and_metadata(store):
     gap_start = next(row[8] for row in rows if row[0] == start + 500)
     gap_after = next(row[8] for row in rows if row[0] == start + 850)
     assert gap_start != gap_after
-    changed = store.update_channel(channel(1, name="Renamed", type="J"), config["revision"])
+    changed = store.update_channel(
+        channel(1, name="Renamed", type="J"), config["revision"]
+    )
     store.append(start + 860, changed, {1: {"status": "ok", "value_c": 24.0}}, 21.0)
     newer = store.nearest(start + 860)["1"]
     assert (newer["name"], newer["type"], newer["revision"]) == ("Renamed", "J", 2)
@@ -202,17 +216,38 @@ def test_history_retains_extrema_invalids_gaps_and_metadata(store):
 def test_retention_restart_and_bounds(store):
     config = enable(store)
     base = time.time()
-    store.append(base - RETENTION_SECONDS - 20, config,
-                 {1: {"status": "ok", "value_c": 20.0}}, 18)
-    store.append(base - RETENTION_SECONDS + 20, config,
-                 {1: {"status": "invalid", "value_c": float("nan")}}, float("nan"))
+    store.append(
+        base - RETENTION_SECONDS - 20,
+        config,
+        {1: {"status": "ok", "value_c": 20.0}},
+        18,
+    )
+    store.append(
+        base - RETENTION_SECONDS + 20,
+        config,
+        {1: {"status": "invalid", "value_c": float("nan")}},
+        float("nan"),
+    )
     assert store.prune(now=base) == 2  # expired probe and CJC records
-    assert len(TemperatureStore(store.path).history(
-        base - RETENTION_SECONDS, base, [1])["rows"]) == 1
-    assert TemperatureStore(store.path).history(
-        base - RETENTION_SECONDS, base, [1])["rows"][0][2] is None
-    for args in ((base - RETENTION_SECONDS - 10, base, [1]),
-                 (base - 10, base, []), (base - 10, base, [9])):
+    assert (
+        len(
+            TemperatureStore(store.path).history(base - RETENTION_SECONDS, base, [1])[
+                "rows"
+            ]
+        )
+        == 1
+    )
+    assert (
+        TemperatureStore(store.path).history(base - RETENTION_SECONDS, base, [1])[
+            "rows"
+        ][0][2]
+        is None
+    )
+    for args in (
+        (base - RETENTION_SECONDS - 10, base, [1]),
+        (base - 10, base, []),
+        (base - 10, base, [9]),
+    ):
         with pytest.raises(ValueError):
             store.history(*args)
 
@@ -221,14 +256,20 @@ def test_parallel_sqlite_reads_and_writes(store):
     config = enable(store)
     failures = []
     barrier = threading.Barrier(3)
+
     def writer():
         barrier.wait()
         try:
             for index in range(100):
-                store.append(1000 + index, config,
-                             {1: {"status": "ok", "value_c": float(index)}}, 21)
+                store.append(
+                    1000 + index,
+                    config,
+                    {1: {"status": "ok", "value_c": float(index)}},
+                    21,
+                )
         except Exception as error:  # noqa: BLE001 - collect all thread failures
             failures.append(error)
+
     def reader():
         barrier.wait()
         try:
@@ -237,6 +278,7 @@ def test_parallel_sqlite_reads_and_writes(store):
                 store.nearest(1042)
         except Exception as error:  # noqa: BLE001 - collect all thread failures
             failures.append(error)
+
     threads = [threading.Thread(target=func) for func in (writer, reader)]
     for thread in threads:
         thread.start()
@@ -266,6 +308,7 @@ class FakeSDK:
         self.usb_tc08_close_unit = FakeFunction("close")
         self.usb_tc08_set_mains = FakeFunction("mains")
         self.usb_tc08_set_channel = FakeFunction("channel")
+
         def sample(handle, values, overflow, units):
             assert handle == 7 and units == 0
             if fail_single:
@@ -274,6 +317,7 @@ class FakeSDK:
                 values[index] = 20.0 + index
             overflow._obj.value = 1 << 3
             return 1
+
         self.usb_tc08_get_single = FakeFunction("single", sample)
         self.usb_tc08_get_last_error = FakeFunction("error", lambda *_: 42)
 
@@ -284,11 +328,17 @@ def test_sdk_configured_inputs_cjc_overflow_and_single_open():
     dev.open()
     assert lib.usb_tc08_set_mains.calls == [(7, 0)]
     assert lib.usb_tc08_set_channel.calls[0] == (7, 0, ord("C"))
-    dev.configure([channel(1, type="T"),
-                   channel(2, enabled=False, record_with_experiments=False),
-                   channel(3, type="J")])
+    dev.configure(
+        [
+            channel(1, type="T"),
+            channel(2, enabled=False, record_with_experiments=False),
+            channel(3, type="J"),
+        ]
+    )
     assert lib.usb_tc08_set_channel.calls[-3:] == [
-        (7, 1, ord("T")), (7, 2, ord(" ")), (7, 3, ord("J"))
+        (7, 1, ord("T")),
+        (7, 2, ord(" ")),
+        (7, 3, ord("J")),
     ]
     readings, cjc = dev.read([1, 3])
     assert cjc == 20
@@ -314,6 +364,7 @@ def test_sdk_failures_report_errors_and_close():
 def test_acquisition_reconnects_without_consumer_usb_access(store):
     enable(store)
     instances = []
+
     class FakeDriver:
         def __init__(self):
             self.closed = False
@@ -337,12 +388,15 @@ def test_acquisition_reconnects_without_consumer_usb_access(store):
             self.closed = True
 
     async def exercise():
-        controller = TemperatureController(store, driver_factory=FakeDriver, interval=0.01)
+        controller = TemperatureController(
+            store, driver_factory=FakeDriver, interval=0.01
+        )
         task = asyncio.create_task(controller._acquisition())
         await asyncio.sleep(0.13)
         controller.terminate()
         await asyncio.wait_for(task, timeout=1)
         return controller
+
     controller = asyncio.run(exercise())
     assert len(instances) >= 2
     assert all(instance.closed for instance in instances)
@@ -380,6 +434,7 @@ def test_controller_exclusive_owner_and_loopback_rpc(store, monkeypatch, tmp_pat
     import importlib.util
     import sys
     import types
+
     entry = Path(__file__).parent.parent / "controllers/aqctl_temperature_logger.py"
     spec = importlib.util.spec_from_file_location("_tc08_controller_entry", entry)
     controller_entry = importlib.util.module_from_spec(spec)
@@ -393,6 +448,7 @@ def test_controller_exclusive_owner_and_loopback_rpc(store, monkeypatch, tmp_pat
     with pytest.raises(ValueError, match="loopback"):
         asyncio.run(run_controller(store.path, bind="0.0.0.0"))
     import fcntl
+
     owner_path = tmp_path / "owner.lock"
     fd = os.open(owner_path, os.O_CREAT | os.O_RDWR, 0o600)
     fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -409,8 +465,10 @@ def test_controller_exclusive_owner_and_loopback_rpc(store, monkeypatch, tmp_pat
 
 def test_device_db_registers_locally_managed_native_controller():
     import runpy
-    db = runpy.run_path(str(Path(__file__).parent.parent /
-                            "repository/models/device_db.py"))["device_db"]
+
+    db = runpy.run_path(
+        str(Path(__file__).parent.parent / "repository/models/device_db.py")
+    )["device_db"]
     entry = db["temperature_logger_controller"]
     assert entry["type"] == "controller"
     assert entry["host"] == "127.0.0.1"
@@ -424,7 +482,8 @@ def test_device_db_registers_locally_managed_native_controller():
 
 
 def test_sqlite_write_failure_is_logged_without_restarting_usb_or_stopping_sampling(
-        store, monkeypatch, caplog):
+    store, monkeypatch, caplog
+):
     """A full/busy SQLite database must never trigger a second failing write."""
     import logging
 
@@ -456,22 +515,32 @@ def test_sqlite_write_failure_is_logged_without_restarting_usb_or_stopping_sampl
             usb["close"] += 1
 
     async def exercise():
-        controller = TemperatureController(
-            store, driver_factory=Driver, interval=0.02
-        )
+        # Acquisition has a 100 ms minimum retry delay. Use a realistic
+        # interval so freshness (3 * interval) is not shorter than that delay.
+        controller = TemperatureController(store, driver_factory=Driver, interval=0.2)
         task = asyncio.create_task(controller._acquisition())
+
+        async def wait_for(predicate):
+            async def poll():
+                while not predicate():
+                    assert not task.done()
+                    await asyncio.sleep(0.01)
+
+            await asyncio.wait_for(poll(), timeout=5)
+
         try:
-            await asyncio.sleep(0.06)
+            await wait_for(lambda: controller.connected and not controller.recording_ok)
             assert not task.done()
-            assert controller.connected
-            assert not controller.recording_ok
             assert controller.get_latest()["recording_ok"] is False
             assert controller.get_nearest(time.time())["connected"] is False
-            await asyncio.sleep(0.28)
+            await wait_for(
+                lambda: (
+                    controller.recording_ok
+                    and controller.get_latest()["readings"]["1"]["valid"]
+                )
+            )
             assert not task.done()
-            assert controller.recording_ok
             assert controller.last_success_at is not None
-            assert controller.get_latest()["readings"]["1"]["valid"] is True
         finally:
             controller.terminate()
             await asyncio.wait_for(task, timeout=2)
@@ -487,7 +556,8 @@ def test_sqlite_write_failure_is_logged_without_restarting_usb_or_stopping_sampl
 
 
 def test_configuration_database_failure_is_retried_without_crashing(
-        store, monkeypatch, caplog):
+    store, monkeypatch, caplog
+):
     import logging
 
     enable(store)
