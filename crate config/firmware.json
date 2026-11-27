@@ -5,11 +5,15 @@
   "source_revision": "8344e8075b2cc76b6939a59ae4f6ae0adc45b640",
   "toolchain_repo": "https://github.com/m-labs/artiq",
   "toolchain_revision": "e9949890cd960ae64c3576aab313ff735c43686a",
-  "release": "bu2402001-rtio-v3",
-  "identity": "8.0+unknown.beta;BU2402001",
-  "build_flags": ["--analyzer-telemetry"],
+  "release": "bu2402001-rtio-v3.1",
+  "identity": "8.9002+8344e80;BU2402001",
+  "build_flags": [
+    "--analyzer-telemetry",
+    "--gateware-identifier-str",
+    "8.9002+8344e80;BU2402001"
+  ],
   "files": {
-    "top.bit": "dcaa5c484efe08c42888554e3f7d5ee1dc95c89be18f979e90ff3c3b84ea8537",
+    "top.bit": "7bf651dd448c8055d1d71ecf61be214325eb9399f9d810d0fd9f98050e6a4009",
     "runtime.fbi": "079e120aa22eb83feb6826fc181d035ec79fd545164c3ce2525f647831366abc"
   },
   "config": {

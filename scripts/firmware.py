@@ -48,8 +48,22 @@ def load_pin():
         raise ValueError("invalid release tag")
     if pin["board"] != "bu2402001.json" or set(pin["files"]) != set(IMAGES):
         raise ValueError("unexpected board or firmware files")
-    if "--analyzer-telemetry" not in pin["build_flags"]:
+    flags = pin["build_flags"]
+    if "--analyzer-telemetry" not in flags:
         raise ValueError("the lab requires extended analyser telemetry")
+    # The release identifier is part of the gateware ROM, not the runtime
+    # or host Python package. Explicitly pin it for exported-source builds.
+    identity = re.fullmatch(r"8\.\d+\+([0-9a-f]{7,40});BU2402001", pin["identity"])
+    if not identity or not pin["source_revision"].startswith(identity.group(1)):
+        raise ValueError(
+            "firmware identity must identify the stable ARTIQ 8 fork revision"
+        )
+    if flags.count("--gateware-identifier-str") != 1 or flags[
+        flags.index("--gateware-identifier-str") + 1 :
+    ][:1] != [pin["identity"]]:
+        raise ValueError(
+            "build flags must explicitly select the qualified gateware identity"
+        )
     board_path = CONFIG / pin["board"]
     verify_file(board_path, pin["board_sha256"])
     board = json.loads(board_path.read_text())

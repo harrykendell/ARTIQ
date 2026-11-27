@@ -21,7 +21,14 @@ def test_real_pin():
     pin, board = firmware.load_pin()
     assert board["variant"] == "BU2402001"
     assert pin["source_repo"].endswith("/artiq-firmware")
-    assert pin["build_flags"] == ["--analyzer-telemetry"]
+    assert pin["build_flags"] == [
+        "--analyzer-telemetry",
+        "--gateware-identifier-str",
+        pin["identity"],
+    ]
+    assert pin["source_revision"].startswith(
+        pin["identity"].split("+")[1].split(";")[0]
+    )
     assert pin["config"]["rtio_analyzer_snapshot"] == "2"
     assert pin["snapshot"]["capacity"] == 2 * 1024 * 1024
 
@@ -94,7 +101,32 @@ def test_build_never_flashes(tmp_path, monkeypatch):
     args = run.call_args.args[0]
     assert any(pin["source_revision"] in a for a in args)
     assert "--analyzer-telemetry" in args
+    assert args[args.index("--gateware-identifier-str") + 1] == pin["identity"]
     assert "artiq_flash" not in args
+
+
+@pytest.mark.parametrize(
+    "identity, flags",
+    [
+        ("8.0+unknown.beta;BU2402001", ["--analyzer-telemetry"]),
+        ("8.9002+0000000;BU2402001", ["--analyzer-telemetry"]),
+        (None, ["--analyzer-telemetry"]),
+        (None, ["--analyzer-telemetry", "--gateware-identifier-str", "wrong"]),
+        (None, ["--analyzer-telemetry", "--gateware-identifier-str"]),
+    ],
+)
+def test_missing_or_incorrect_stable_identity_is_rejected(
+    tmp_path, monkeypatch, identity, flags
+):
+    pin, _ = firmware.load_pin()
+    if identity is not None:
+        pin["identity"] = identity
+    pin["build_flags"] = flags
+    path = tmp_path / "firmware.json"
+    path.write_text(json.dumps(pin))
+    monkeypatch.setattr(firmware, "PIN", path)
+    with pytest.raises(ValueError, match="identity"):
+        firmware.load_pin()
 
 
 def test_wrong_board_configuration_fails(tmp_path, monkeypatch):
