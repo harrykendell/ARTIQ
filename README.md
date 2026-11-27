@@ -32,6 +32,25 @@ The primary interface for this codebase is [run_gui.sh](run_gui.sh). This should
 
 Ruff 0.17.4 formats staged Python files automatically before committing when the repository hook is installed. Install the hook in a standard checkout with `install -m 755 scripts/ruff_pre_commit.py .git/hooks/pre-commit` (check for an existing hook first). It uses `uvx` or a matching Ruff executable; set `git config --local artiq.ruffPath /path/to/ruff` if needed. Only staged project Python files are formatted, and a file needing formatting that also has unstaged changes stops the commit without modifying either version. The CI workflow checks formatting of changed Python files on pull requests and runs the hardware-independent regression suite. It does not push formatting commits or hold write credentials.
 
+## Crate firmware and flashing
+
+We maintain firmware changes in [harrykendell/artiq-firmware](https://github.com/harrykendell/artiq-firmware), on the `release-8-lab` branch, separately from this experiment repository. The upstream base, exact maintained source revision, qualified release, board configuration hash, image checksums and required boot settings are pinned in [crate config/firmware.json](crate%20config/firmware.json). The host Python ARTIQ pin in `flake.nix` remains independent: a firmware reflash must not implicitly change the experiment environment.
+
+The current [BU2402001 telemetry release](https://github.com/harrykendell/artiq-firmware/releases/tag/bu2402001-rtio-v1) is the exact tested gateware/runtime pair. It provides the non-destructive 2 MiB analyser on port 1392, hardware SED lane telemetry and bounded kernel-priority scheduling. The website uses the local `~/artiq-tool/.rtio-snapshot-host` marker. The old dashboard waveform reader is not supported.
+
+| Command | Effect |
+| --- | --- |
+| `scripts/flash.sh` or `scripts/flash.sh prepare` | Download or verify the pinned images; no hardware access. |
+| `scripts/flash.sh dry-run` | Generate the actual OpenOCD commands without connecting to the crate. |
+| `scripts/flash.sh build` | Full source build from the pinned fork and its locked Nix environment, with telemetry enabled; never flashes. |
+| `scripts/flash.sh flash --confirm-idle` | Flash only the qualified pair, restore/verify required configuration, and verify core identity and analyser protocol. |
+
+For a real reflash, establish a maintenance window, put the apparatus in a safe state, confirm the scheduler is empty, gracefully stop the master/controller stack, dashboard and any standalone kernels, and run `sudo systemctl stop artiq-viewer.service`. The script refuses to flash while those services or kernel/analyser connections are present. It preserves the bootloader and configuration storage; it does not start the experiment stack automatically. After successful verification, restart the master, GUI and `artiq-viewer.service` and verify a scheduled smoke capture. If anything fails, keep the stack stopped and use the qualified recovery procedure rather than guessing at flash addresses.
+
+Qualified images are cached under `crate config/bu2402001_qualified/<release>/`. The historical `bu2402001_current` directory may contain the old build and is **not** an input to the new flashing workflow. A source rebuild goes into a separate `bu2402001_build_<revision>/` directory. Do not replace the qualified release with its output until checking Vivado timing, register-map compatibility, runtime behaviour and experiment timing on hardware. For an update, rebase the small firmware patch series on a chosen upstream revision, qualify a new matched image pair, create a new tag/release, and change the pin and checksums together. Never flash a moving upstream branch or overwrite an already-qualified release.
+
+The original stock images and exact readbacks, production qualification results and rollback instructions are retained on the lab PC under `~/rtio-production-20261127/`.
+
 ## TC-08 temperature monitor
 
 The Pico USB TC-08 is owned by a **native ARTIQ controller**,
