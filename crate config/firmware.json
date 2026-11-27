@@ -2,15 +2,15 @@
   "board": "bu2402001.json",
   "board_sha256": "7a110adae584571510ff25913d0b2fc7ceddcfe99bf6fe47218be1e29740ddae",
   "source_repo": "https://github.com/harrykendell/artiq-firmware",
-  "source_revision": "162991c6150423a38be1e6703fb92dc3c5ad824b",
+  "source_revision": "0ba5d1dc1a06f91ffdb39479d6a8efd705ce28ac",
   "toolchain_repo": "https://github.com/m-labs/artiq",
   "toolchain_revision": "e9949890cd960ae64c3576aab313ff735c43686a",
-  "release": "bu2402001-rtio-v1",
+  "release": "bu2402001-rtio-v2",
   "identity": "8.9002+e994989;BU2402001",
   "build_flags": ["--analyzer-telemetry"],
   "files": {
     "top.bit": "b3cde2d34b4d0eae1d88fa6dfbc1c2d37cefcc48248352191484c0628ace527d",
-    "runtime.fbi": "2e034ed6804d303550e0fd52afd073211d4340d0343a418d0d0b0dd9717f2ee8"
+    "runtime.fbi": "fec19bd6c27ea411f28f2b4cd3359b0444e4d0322cb39a82500d9a24d67d6b11"
   },
   "config": {
     "rtio_analyzer_snapshot": "2",
