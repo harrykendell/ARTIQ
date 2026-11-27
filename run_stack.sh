@@ -15,6 +15,9 @@ clean_up() {
 artiq_stack() {
     # ARTIQ
     SERVER_ADDRESS=137.222.69.28
+    # Enable FPGA lifecycle tracing for the main experiment pipeline.
+    # Set ARTIQ_RTIO_LIFECYCLE=0 when rolling back to older firmware.
+    export ARTIQ_RTIO_LIFECYCLE="${ARTIQ_RTIO_LIFECYCLE:-1}"
     MASTER="\"artiq_master -v --repository ${SCRIPT_DIR} --device-db ${SCRIPT_DIR}/repository/models/device_db.py --experiment-subdir repository --log-file ${SCRIPT_DIR}/artiq.log --bind=$SERVER_ADDRESS --name 'GECKO ARTIQ'\""
     CTLMGR="\"sleep 1 && ${SCRIPT_DIR}/controllers/artiq_ctlmgr.py --bind=$SERVER_ADDRESS -s=$SERVER_ADDRESS -v\""
     JANITOR="\"sleep 1 && ndscan_dataset_janitor\""

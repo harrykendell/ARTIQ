@@ -1,0 +1,294 @@
+diff --git a/artiq/coredevice/analyzer_lifecycle.py b/artiq/coredevice/analyzer_lifecycle.py
+new file mode 100644
+index 00000000..a1585432
+--- /dev/null
++++ b/artiq/coredevice/analyzer_lifecycle.py
+@@ -0,0 +1,79 @@
++"""Opt-in host lifecycle tracing for the single standalone laboratory Kasli.
++
++Lifecycle requests go over management rather than the kernel socket so that
++pauses can be marked after ndscan closes the core connection. The FPGA samples
++its own counter and emits the records. Diagnostics are best-effort: a failed
++marker never prevents an experiment from running, and is never silently retried.
++"""
++import logging
++import os
++import socket
++
++from artiq.coredevice.comm_mgmt import CommMgmt
++
++logger = logging.getLogger(__name__)
++
++START, END, PAUSE, RESUME, EXCEPTION = range(1, 6)
++
++
++class ExperimentTrace:
++    def __init__(self, host, rid):
++        self.host = host
++        self.rid = rid
++        self.active = False
++        self.started = False
++        self.finished = False
++
++    @classmethod
++    def for_worker(cls, dmgr, scheduler):
++        if os.environ.get("ARTIQ_RTIO_LIFECYCLE") != "1":
++            return None
++        # Restrict trial ownership to one explicitly designated pipeline.
++        if scheduler.pipeline_name != os.environ.get("ARTIQ_RTIO_LIFECYCLE_PIPELINE", "main"):
++            return None
++        try:
++            desc = dmgr.get_desc("core")
++            host = desc["arguments"]["host"]
++            if not host or not 0 <= scheduler.rid < 2**32:
++                return None
++        except Exception:
++            logger.warning("RTIO lifecycle unavailable: core descriptor", exc_info=True)
++            return None
++        trace = cls(host, scheduler.rid)
++        trace.active = trace.started = trace._emit(START)
++        return trace
++
++    def _emit(self, kind):
++        comm = CommMgmt(self.host)
++        try:
++            # Bound connect, handshake, send and reply waits. Do not open
++            # the kernel socket or instantiate a new core driver.
++            comm.socket = socket.create_connection((self.host, comm.port), timeout=0.25)
++            comm.socket.sendall(b"ARTIQ management\n")
++            endian = comm._read(1)
++            if endian not in (b"e", b"E"):
++                raise IOError("invalid management handshake")
++            comm.endian = "<" if endian == b"e" else ">"
++            comm.trace_boundary(kind, self.rid)
++            return True
++        except (OSError, ValueError):
++            logger.warning("RTIO lifecycle marker %d for RID %d unavailable",
++                           kind, self.rid, exc_info=True)
++            return False
++        finally:
++            comm.close()
++
++    def pause(self):
++        if self.started and self.active:
++            self._emit(PAUSE)
++            self.active = False
++
++    def resume(self):
++        if self.started and not self.finished:
++            self.active = self._emit(RESUME)
++
++    def finish(self, failed):
++        if self.started and not self.finished:
++            self._emit(EXCEPTION if failed else END)
++        self.active = False
++        self.finished = True
+diff --git a/artiq/coredevice/comm_kernel.py b/artiq/coredevice/comm_kernel.py
+index 7275ba8d..81cb4bd6 100644
+--- a/artiq/coredevice/comm_kernel.py
++++ b/artiq/coredevice/comm_kernel.py
+@@ -20,6 +20,7 @@ class Request(Enum):
+
+     LoadKernel = 5
+     RunKernel = 6
++    RunKernelTraced = 10
+
+     RPCReply = 7
+     RPCException = 8
+@@ -404,6 +405,11 @@ class CommKernel:
+         self._flush()
+         logger.debug("running kernel")
+
++    def run_traced(self, rid):
++        self._write_header(Request.RunKernelTraced)
++        self._write(struct.pack(self.endian + "I", rid))
++        self._flush()
++
+     _rpc_sentinel = object()
+
+     # See rpc_proto.rs and compiler/ir.py:rpc_tag.
+diff --git a/artiq/coredevice/comm_mgmt.py b/artiq/coredevice/comm_mgmt.py
+index 870e2759..a0261737 100644
+--- a/artiq/coredevice/comm_mgmt.py
++++ b/artiq/coredevice/comm_mgmt.py
+@@ -22,6 +22,7 @@ class Request(Enum):
+     Reboot = 5
+
+     DebugAllocator = 8
++    TraceBoundary = 16
+
+
+ class Reply(Enum):
+@@ -127,6 +128,11 @@ class CommMgmt:
+
+     # External API
+
++    def trace_boundary(self, kind, rid):
++        self._write_header(Request.TraceBoundary)
++        self._write(struct.pack(self.endian + "BI", kind, rid))
++        self._read_expect(Reply.Success)
++
+     def get_log(self):
+         self._write_header(Request.GetLog)
+         self._read_expect(Reply.LogContent)
+diff --git a/artiq/coredevice/core.py b/artiq/coredevice/core.py
+index 1e9527ba..593a7a95 100644
+--- a/artiq/coredevice/core.py
++++ b/artiq/coredevice/core.py
+@@ -157,7 +157,13 @@ class Core:
+             self.comm.check_system_info()
+             self.first_run = False
+         self.comm.load(kernel_library)
+-        self.comm.run()
++        scheduler = getattr(self.dmgr, "virtual_devices", {}).get("scheduler")
++        trace = getattr(scheduler, "rtio_trace", None)
++        if (trace is not None and trace.active and hasattr(self.comm, "run_traced")
++                and self.comm.host == trace.host):
++            self.comm.run_traced(trace.rid)
++        else:
++            self.comm.run()
+         self.comm.serve(embedding_map, symbolizer, demangler)
+
+     def run(self, function, args, kwargs):
+diff --git a/artiq/master/worker_impl.py b/artiq/master/worker_impl.py
+index d185202a..53cac36a 100644
+--- a/artiq/master/worker_impl.py
++++ b/artiq/master/worker_impl.py
+@@ -32,6 +32,7 @@ from artiq.language.core import host_only, set_watchdog_factory, TerminationRequ
+ from artiq.language.types import TBool
+ from artiq.compiler import import_cache
+ from artiq.coredevice.core import CompileError, _render_diagnostic
++from artiq.coredevice.analyzer_lifecycle import ExperimentTrace
+ from artiq import __version__ as artiq_version
+
+
+@@ -99,12 +100,18 @@ class Scheduler:
+         self.pipeline_name = pipeline_name
+         self.expid = expid
+         self.priority = priority
++        self.rtio_trace = None
+
+     pause_noexc = staticmethod(make_parent_action("pause"))
+     @host_only
+     def pause(self):
++        trace = self.rtio_trace
++        if trace is not None:
++            trace.pause()
+         if self.pause_noexc():
+             raise TerminationRequested
++        if trace is not None:
++            trace.resume()
+
+     _check_pause = staticmethod(make_parent_action("scheduler_check_pause"))
+     def check_pause(self, rid=None) -> TBool:
+@@ -354,14 +361,24 @@ def main():
+                 put_completed()
+             elif action == "run":
+                 run_time = time.time()
++                scheduler = device_mgr.virtual_devices["scheduler"]
++                trace = ExperimentTrace.for_worker(device_mgr, scheduler)
++                scheduler.rtio_trace = trace
++                failed = True
+                 try:
+                     exp_inst.run()
++                    failed = False
+                 except:
++                    if trace is not None:
++                        trace.finish(True)
+                     # Only write results in run() on failure; on success wait
+                     # for end of analyze stage.
+                     write_results()
+                     raise
+                 finally:
++                    if trace is not None:
++                        trace.finish(failed)
++                    scheduler.rtio_trace = None
+                     try:
+                         device_mgr.notify_run_end()
+                     except:
+diff --git a/artiq/test/test_analyzer_lifecycle.py b/artiq/test/test_analyzer_lifecycle.py
+new file mode 100644
+index 00000000..99a8bbf2
+--- /dev/null
++++ b/artiq/test/test_analyzer_lifecycle.py
+@@ -0,0 +1,80 @@
++"""Host-side wire and lifecycle checks; no connections to the lab."""
++import os
++import struct
++import unittest
++from types import SimpleNamespace
++from unittest.mock import Mock, patch
++
++from artiq.coredevice.analyzer_lifecycle import ExperimentTrace
++from artiq.coredevice.comm_kernel import CommKernel
++from artiq.coredevice.core import Core
++
++
++class TestAnalyzerLifecycle(unittest.TestCase):
++    def test_exact_management_marker_wire(self):
++        trace = ExperimentTrace("test.invalid", 123456)
++        sock = Mock()
++        sock.recv.side_effect = [b"e", b"\x01"]
++        with patch("artiq.coredevice.analyzer_lifecycle.socket.create_connection",
++                   return_value=sock):
++            self.assertTrue(trace._emit(1))
++        self.assertEqual([c.args[0] for c in sock.sendall.call_args_list],
++                         [b"ARTIQ management\n", b"\x10", struct.pack("<BI", 1, 123456)])
++        sock.close.assert_called_once()
++
++    def test_worker_lifecycle_and_disabled_fallback(self):
++        dmgr = Mock()
++        dmgr.get_desc.return_value = {"arguments": {"host":"test.invalid"}}
++        scheduler = SimpleNamespace(rid=42,pipeline_name="main")
++        with patch.dict(os.environ, {"ARTIQ_RTIO_LIFECYCLE":"1",
++                                    "ARTIQ_RTIO_LIFECYCLE_PIPELINE":"main"}):
++            with patch.object(ExperimentTrace, "_emit", return_value=True) as emit:
++                trace = ExperimentTrace.for_worker(dmgr,scheduler)
++                self.assertTrue(trace.active)
++                trace.pause()
++                self.assertFalse(trace.active)
++                trace.resume()
++                self.assertTrue(trace.active)
++                trace.finish(False)
++                trace.finish(False)
++                self.assertFalse(trace.active)
++                self.assertEqual([c.args[0] for c in emit.call_args_list],[1,3,4,2])
++            with patch.object(ExperimentTrace, "_emit", return_value=False) as emit:
++                trace = ExperimentTrace.for_worker(dmgr,scheduler)
++                self.assertFalse(trace.active)
++                trace.finish(False)
++                emit.assert_called_once_with(1)
++        with patch.dict(os.environ, {"ARTIQ_RTIO_LIFECYCLE":"0"}):
++            self.assertIsNone(ExperimentTrace.for_worker(dmgr,scheduler))
++
++    def test_traced_run_request(self):
++        comm = CommKernel("test.invalid")
++        comm.open = Mock()
++        comm.endian = "<"
++        comm.pack_header = struct.Struct("<lB").pack
++        comm.socket = Mock()
++        comm.run_traced(42)
++        comm.socket.sendall.assert_called_once()
++        # sendall was passed a bytearray that is subsequently cleared. Capture
++        # the actual bytes at send time instead of inspecting that mutable object.
++        sent = []
++        comm.socket.sendall.side_effect = lambda data: sent.append(bytes(data))
++        comm.run_traced(43)
++        self.assertEqual(sent, [struct.pack("<lBI",0x5a5a5a5a,10,43)])
++
++    def test_compiled_kernel_uses_tag_only_when_active_and_matching_host(self):
++        comm = Mock()
++        comm.host = "test.invalid"
++        trace = ExperimentTrace(comm.host, 42)
++        scheduler = SimpleNamespace(rtio_trace=trace)
++        core = SimpleNamespace(first_run=False,comm=comm,
++                               dmgr=SimpleNamespace(virtual_devices={"scheduler":scheduler}))
++        Core._run_compiled(core,b"kernel",None,None,None)
++        comm.run.assert_called_once()
++        comm.run_traced.assert_not_called()
++        trace.active = True
++        Core._run_compiled(core,b"kernel",None,None,None)
++        comm.run_traced.assert_called_once_with(42)
++        trace.host = "other.invalid"
++        Core._run_compiled(core,b"kernel",None,None,None)
++        self.assertEqual(comm.run.call_count, 2)

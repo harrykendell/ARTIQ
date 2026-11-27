@@ -114,7 +114,14 @@ def test_protocol_probe_uses_empty_tail_and_validates_capability(monkeypatch):
     tail = 2**64 - 1
     reply = struct.pack(
         "<4sIQQQQII", b"RTS1", 0, tail, 64, 64, 64, 2097152, 49
-    ) + struct.pack("<4s11Q16s8Q", b"RTP4", *([0] * 11), token, 1, *([0] * 7))
+    ) + struct.pack(
+        "<4s11Q16s8Q",
+        b"RTP4",
+        *([0] * 11),
+        token,
+        pin["snapshot"]["features"],
+        *([0] * 7),
+    )
     mock = Mock()
     # Return short pieces to exercise the exact framing loop.
     chunks = bytearray(reply)

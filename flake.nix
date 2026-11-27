@@ -36,6 +36,9 @@
       # ARTIQ 8 pins qasync 0.24.1 internally. Replace that dependency with
       # the qasync 0.28 package above.
       artiq-pkg = aqmain.artiq.overridePythonAttrs (old: {
+        # RTIO lifecycle host protocol backport from the qualified laboratory
+        # firmware fork (8344e807). Keep the newer upstream host pin intact.
+        patches = (old.patches or []) ++ [ ./patches/artiq-rtio-lifecycle.patch ];
         propagatedBuildInputs =
           builtins.filter
             (dep: (dep.pname or "") != "qasync")
